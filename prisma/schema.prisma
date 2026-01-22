@@ -1,0 +1,89 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Template {
+  id          Int               @id @default(autoincrement())
+  name        String
+  createdAt  DateTime          @default(now())
+
+  exercises   TemplateExercise[]
+  sessions    Session[]
+
+  @@map("templates")
+}
+
+model Exercise {
+  id        Int               @id @default(autoincrement())
+  name      String            @unique
+
+  templates TemplateExercise[]
+  logs      Log[]
+
+  @@map("exercises")
+}
+
+model TemplateExercise {
+  id          Int      @id @default(autoincrement())
+  templateId  Int
+  exerciseId  Int
+  order       Int
+
+  template    Template @relation(fields: [templateId], references: [id])
+  exercise    Exercise @relation(fields: [exerciseId], references: [id])
+  sets        Set[]
+
+  @@unique([templateId, exerciseId])
+  @@map("templateexercise")
+}
+
+model Set {
+  id                 Int      @id @default(autoincrement())
+  templateExerciseId Int
+  setNumber          Int
+  targetReps         Int
+  targetWeight       Int
+
+  templateExercise   TemplateExercise @relation(fields: [templateExerciseId], references: [id])
+
+  @@map("sets")
+}
+
+model Session {
+  id          Int      @id @default(autoincrement())
+  templateId  Int?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  template    Template? @relation(fields: [templateId], references: [id])
+  logs        Log[]
+
+  @@map("sessions")
+}
+
+model Log {
+  id          Int      @id @default(autoincrement())
+  sessionId   Int
+  exerciseId  Int
+  setNumber   Int
+  reps        Int
+  weight      Float?
+
+  session     Session  @relation(fields: [sessionId], references: [id])
+  exercise    Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@index([sessionId])
+  @@index([exerciseId, setNumber])
+  @@map("logs")
+}

@@ -1,0 +1,203 @@
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../generated/prisma';
+
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL!,
+});
+
+const prisma = new PrismaClient({ adapter });
+
+async function main() {
+  console.log('🌱 Seeding database...')
+
+  // Clean existing data (order matters because of FKs)
+  await prisma.set.deleteMany()
+  await prisma.templateExercise.deleteMany()
+  await prisma.exercise.deleteMany()
+  await prisma.template.deleteMany()
+
+  // Create exercises
+  const exercises = await prisma.exercise.createMany({
+    data: [
+      { name: 'Squat' },
+      { name: 'Bench Press' },
+      { name: 'Deadlift' },
+      { name: 'Overhead Press' },
+      { name: 'Barbell Row' },
+      { name: 'Pull-ups' },
+      { name: 'Dips' },
+      { name: 'Leg Press' },
+    ],
+  })
+
+  console.log(`✅ Created ${exercises.count} exercises`)
+
+  // Get created exercises
+  const squat = await prisma.exercise.findUnique({ where: { name: 'Squat' } })
+  const benchPress = await prisma.exercise.findUnique({ where: { name: 'Bench Press' } })
+  const deadlift = await prisma.exercise.findUnique({ where: { name: 'Deadlift' } })
+  const overheadPress = await prisma.exercise.findUnique({ where: { name: 'Overhead Press' } })
+  const barbellRow = await prisma.exercise.findUnique({ where: { name: 'Barbell Row' } })
+
+  if (!squat || !benchPress || !deadlift || !overheadPress || !barbellRow) {
+    throw new Error('Failed to create exercises')
+  }
+
+  // Create templates
+  const fullBodyTemplate = await prisma.template.create({
+    data: {
+      name: 'Full Body Beginner',
+    },
+  })
+
+  const upperBodyTemplate = await prisma.template.create({
+    data: {
+      name: 'Upper Body Focus',
+    },
+  })
+
+  console.log(`✅ Created 2 templates`)
+
+  // Add exercises to Full Body template
+  const fullBodyExercises = [
+    { exercise: squat, order: 1 },
+    { exercise: benchPress, order: 2 },
+    { exercise: deadlift, order: 3 },
+    { exercise: overheadPress, order: 4 },
+    { exercise: barbellRow, order: 5 },
+  ]
+
+  const fullBodyTemplateExercises = []
+  for (const { exercise, order } of fullBodyExercises) {
+    const te = await prisma.templateExercise.create({
+      data: {
+        templateId: fullBodyTemplate.id,
+        exerciseId: exercise.id,
+        order,
+      },
+    })
+    fullBodyTemplateExercises.push(te)
+  }
+
+  // Add exercises to Upper Body template
+  const upperBodyExercises = [
+    { exercise: benchPress, order: 1 },
+    { exercise: overheadPress, order: 2 },
+    { exercise: barbellRow, order: 3 },
+  ]
+
+  const upperBodyTemplateExercises = []
+  for (const { exercise, order } of upperBodyExercises) {
+    const te = await prisma.templateExercise.create({
+      data: {
+        templateId: upperBodyTemplate.id,
+        exerciseId: exercise.id,
+        order,
+      },
+    })
+    upperBodyTemplateExercises.push(te)
+  }
+
+  console.log(`✅ Created ${fullBodyTemplateExercises.length + upperBodyTemplateExercises.length} template exercises`)
+
+  // Create sets for Full Body template exercises
+  const setsData = []
+  
+  // Squat: 3 sets
+  for (let i = 0; i < 3; i++) {
+    setsData.push({
+      templateExerciseId: fullBodyTemplateExercises[0]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 10,
+      targetWeight: 135,
+    })
+  }
+
+  // Bench Press: 4 sets
+  for (let i = 0; i < 4; i++) {
+    setsData.push({
+      templateExerciseId: fullBodyTemplateExercises[1]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 8,
+      targetWeight: 185,
+    })
+  }
+
+  // Deadlift: 3 sets
+  for (let i = 0; i < 3; i++) {
+    setsData.push({
+      templateExerciseId: fullBodyTemplateExercises[2]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 5,
+      targetWeight: 225,
+    })
+  }
+
+  // Overhead Press: 3 sets
+  for (let i = 0; i < 3; i++) {
+    setsData.push({
+      templateExerciseId: fullBodyTemplateExercises[3]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 8,
+      targetWeight: 95,
+    })
+  }
+
+  // Barbell Row: 3 sets
+  for (let i = 0; i < 3; i++) {
+    setsData.push({
+      templateExerciseId: fullBodyTemplateExercises[4]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 10,
+      targetWeight: 135,
+    })
+  }
+
+  // Upper Body template sets
+  // Bench Press: 4 sets
+  for (let i = 0; i < 4; i++) {
+    setsData.push({
+      templateExerciseId: upperBodyTemplateExercises[0]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 8,
+      targetWeight: 185,
+    })
+  }
+
+  // Overhead Press: 3 sets
+  for (let i = 0; i < 3; i++) {
+    setsData.push({
+      templateExerciseId: upperBodyTemplateExercises[1]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 8,
+      targetWeight: 95,
+    })
+  }
+
+  // Barbell Row: 3 sets
+  for (let i = 0; i < 3; i++) {
+    setsData.push({
+      templateExerciseId: upperBodyTemplateExercises[2]?.id ?? 0,
+      setNumber: i + 1,
+      targetReps: 10,
+      targetWeight: 135,
+    })
+  }
+
+  const sets = await prisma.set.createMany({
+    data: setsData,
+  })
+
+  console.log(`✅ Created ${sets.count} sets`)
+
+  console.log('✅ Seed completed successfully')
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Error seeding database:', e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
