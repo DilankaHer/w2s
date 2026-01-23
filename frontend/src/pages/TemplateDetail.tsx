@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { trpc } from '../api/client'
 
 interface Set {
@@ -34,6 +34,7 @@ function TemplateDetail() {
   const [template, setTemplate] = useState<Template | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [creatingSession, setCreatingSession] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -45,13 +46,86 @@ function TemplateDetail() {
     try {
       setLoading(true)
       setError(null)
-      const data = await trpc.getTemplateById.query({ id: templateId })
+      const data = await trpc.templates.getById.query({ id: templateId })
       setTemplate(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       console.error('Error fetching template:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSetUpdate = async (
+    setId: number,
+    field: 'targetWeight' | 'targetReps',
+    value: number
+  ) => {
+    if (!template) return
+
+    // Find the set in the template
+    let targetSet: Set | null = null
+    for (const templateExercise of template.exercises) {
+      const foundSet = templateExercise.sets.find((s) => s.id === setId)
+      if (foundSet) {
+        targetSet = foundSet
+        break
+      }
+    }
+
+    if (!targetSet) return
+
+    // Prepare update data
+    const updateData = {
+      setId,
+      targetWeight: field === 'targetWeight' ? value : targetSet.targetWeight,
+      targetReps: field === 'targetReps' ? value : targetSet.targetReps,
+    }
+
+    try {
+      // Update via API
+      await trpc.sets.update.mutate(updateData)
+
+      // Update local state
+      setTemplate((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          exercises: prev.exercises.map((templateExercise) => ({
+            ...templateExercise,
+            sets: templateExercise.sets.map((set) =>
+              set.id === setId
+                ? {
+                    ...set,
+                    [field]: value,
+                  }
+                : set
+            ),
+          })),
+        }
+      })
+    } catch (err) {
+      console.error('Error updating set:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update set')
+    }
+  }
+
+  const handleCreateSession = async () => {
+    if (!template) return
+
+    try {
+      setCreatingSession(true)
+      setError(null)
+      const session = await trpc.sessions.create.mutate({
+        templateId: template.id,
+      })
+      // Navigate to session page with session data
+      navigate(`/session/${session.id}`, { state: { session } })
+    } catch (err) {
+      console.error('Error creating session:', err)
+      setError(err instanceof Error ? err.message : 'Failed to create session')
+    } finally {
+      setCreatingSession(false)
     }
   }
 
@@ -103,6 +177,16 @@ function TemplateDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <style>{`
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       <div className="max-w-4xl mx-auto px-4">
         <button
           onClick={() => navigate('/')}
@@ -112,10 +196,21 @@ function TemplateDetail() {
         </button>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{template.name}</h1>
-          <p className="text-sm text-gray-500">
-            Created: {new Date(template.createdAt).toLocaleDateString()}
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{template.name}</h1>
+              <p className="text-sm text-gray-500">
+                Created: {new Date(template.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+            <button
+              onClick={handleCreateSession}
+              disabled={creatingSession}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+            >
+              {creatingSession ? 'Creating...' : 'Start Session'}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -140,13 +235,13 @@ function TemplateDetail() {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Set
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Weight (kg)
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Reps
                           </th>
                         </tr>
@@ -154,14 +249,36 @@ function TemplateDetail() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {templateExercise.sets.map((set) => (
                           <tr key={set.id}>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
                               {set.setNumber}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                              {set.targetWeight}
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                              <input
+                                type="number"
+                                value={set.targetWeight}
+                                onChange={(e) =>
+                                  handleSetUpdate(
+                                    set.id,
+                                    'targetWeight',
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                              {set.targetReps}
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                              <input
+                                type="number"
+                                value={set.targetReps}
+                                onChange={(e) =>
+                                  handleSetUpdate(
+                                    set.id,
+                                    'targetReps',
+                                    parseInt(e.target.value) || 0
+                                  )
+                                }
+                                className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
                             </td>
                           </tr>
                         ))}

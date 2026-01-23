@@ -65,6 +65,7 @@ model Session {
   templateId  Int?
   createdAt   DateTime @default(now())
   completedAt DateTime?
+  sessionTime String?
 
   template    Template? @relation(fields: [templateId], references: [id])
   logs        Log[]
@@ -80,8 +81,8 @@ model Log {
   reps        Int
   weight      Float?
 
-  session     Session  @relation(fields: [sessionId], references: [id])
-  exercise    Exercise @relation(fields: [exerciseId], references: [id])
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise    Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([exerciseId, setNumber])

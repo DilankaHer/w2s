@@ -42,6 +42,7 @@ CREATE TABLE "sessions" (
     "templateId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "completedAt" TIMESTAMP(3),
+    "sessionTime" TEXT,
 
     CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
 );
@@ -83,7 +84,7 @@ ALTER TABLE "sets" ADD CONSTRAINT "sets_templateExerciseId_fkey" FOREIGN KEY ("t
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "templates"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "logs" ADD CONSTRAINT "logs_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "sessions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "logs" ADD CONSTRAINT "logs_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "logs" ADD CONSTRAINT "logs_exerciseId_fkey" FOREIGN KEY ("exerciseId") REFERENCES "exercises"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "logs" ADD CONSTRAINT "logs_exerciseId_fkey" FOREIGN KEY ("exerciseId") REFERENCES "exercises"("id") ON DELETE CASCADE ON UPDATE CASCADE;

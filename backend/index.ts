@@ -1,5 +1,5 @@
-import { createBunServeHandler } from 'trpc-bun-adapter'
-import { appRouter } from './trpc/router.ts'
+import { createBunServeHandler } from 'trpc-bun-adapter';
+import { appRouter } from './trpc/router.ts';
 
 const trpcHandler = createBunServeHandler({
   router: appRouter,
