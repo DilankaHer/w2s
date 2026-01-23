@@ -1,9 +1,8 @@
-import { createBunServeHandler } from 'trpc-bun-adapter';
 import z from 'zod';
 import { prisma } from '../prisma/client';
 import { publicProcedure, router } from './trpc';
 
-const appRouter = router({
+export const appRouter = router({
     listTemplates: publicProcedure.query(async () => {
       return prisma.template.findMany({
         include: {
@@ -66,10 +65,3 @@ const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
-
-Bun.serve(createBunServeHandler({
-  router: appRouter,
-  port: 3000
-}));
-
-console.log('🚀 tRPC server running at http://localhost:3000');
