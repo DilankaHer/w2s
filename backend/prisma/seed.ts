@@ -12,9 +12,9 @@ async function main() {
 
   // Clean existing data (order matters because of FKs)
   await prisma.set.deleteMany()
-  await prisma.templateExercise.deleteMany()
+  await prisma.workoutExercise.deleteMany()
   await prisma.exercise.deleteMany()
-  await prisma.template.deleteMany()
+  await prisma.workout.deleteMany()
 
   // Create exercises
   const exercises = await prisma.exercise.createMany({
@@ -43,22 +43,24 @@ async function main() {
     throw new Error('Failed to create exercises')
   }
 
-  // Create templates
-  const fullBodyTemplate = await prisma.template.create({
+  // Create workouts
+  const fullBodyWorkout = await prisma.workout.create({
     data: {
       name: 'Full Body Beginner',
+      isTemplate: true,
     },
   })
 
-  const upperBodyTemplate = await prisma.template.create({
+  const upperBodyWorkout = await prisma.workout.create({
     data: {
       name: 'Upper Body Focus',
+      isTemplate: true,
     },
   })
 
   console.log(`✅ Created 2 templates`)
 
-  // Add exercises to Full Body template
+  // Add exercises to Full Body workout
   const fullBodyExercises = [
     { exercise: squat, order: 1 },
     { exercise: benchPress, order: 2 },
@@ -69,9 +71,9 @@ async function main() {
 
   const fullBodyTemplateExercises = []
   for (const { exercise, order } of fullBodyExercises) {
-    const te = await prisma.templateExercise.create({
+    const te = await prisma.workoutExercise.create({
       data: {
-        templateId: fullBodyTemplate.id,
+        workoutId: fullBodyWorkout.id,
         exerciseId: exercise.id,
         order,
       },
@@ -79,7 +81,7 @@ async function main() {
     fullBodyTemplateExercises.push(te)
   }
 
-  // Add exercises to Upper Body template
+  // Add exercises to Upper Body workout
   const upperBodyExercises = [
     { exercise: benchPress, order: 1 },
     { exercise: overheadPress, order: 2 },
@@ -88,9 +90,9 @@ async function main() {
 
   const upperBodyTemplateExercises = []
   for (const { exercise, order } of upperBodyExercises) {
-    const te = await prisma.templateExercise.create({
+    const te = await prisma.workoutExercise.create({
       data: {
-        templateId: upperBodyTemplate.id,
+        workoutId: upperBodyWorkout.id,
         exerciseId: exercise.id,
         order,
       },
@@ -98,15 +100,15 @@ async function main() {
     upperBodyTemplateExercises.push(te)
   }
 
-  console.log(`✅ Created ${fullBodyTemplateExercises.length + upperBodyTemplateExercises.length} template exercises`)
+  console.log(`✅ Created ${fullBodyTemplateExercises.length + upperBodyTemplateExercises.length} workout exercises`)
 
-  // Create sets for Full Body template exercises
+  // Create sets for Full Body workout exercises
   const setsData = []
   
   // Squat: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      templateExerciseId: fullBodyTemplateExercises[0]?.id ?? 0,
+      workoutExerciseId: fullBodyTemplateExercises[0]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 10,
       targetWeight: 135,
@@ -116,7 +118,7 @@ async function main() {
   // Bench Press: 4 sets
   for (let i = 0; i < 4; i++) {
     setsData.push({
-      templateExerciseId: fullBodyTemplateExercises[1]?.id ?? 0,
+      workoutExerciseId: fullBodyTemplateExercises[1]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 185,
@@ -126,7 +128,7 @@ async function main() {
   // Deadlift: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      templateExerciseId: fullBodyTemplateExercises[2]?.id ?? 0,
+      workoutExerciseId: fullBodyTemplateExercises[2]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 5,
       targetWeight: 225,
@@ -136,7 +138,7 @@ async function main() {
   // Overhead Press: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      templateExerciseId: fullBodyTemplateExercises[3]?.id ?? 0,
+      workoutExerciseId: fullBodyTemplateExercises[3]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 95,
@@ -146,18 +148,18 @@ async function main() {
   // Barbell Row: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      templateExerciseId: fullBodyTemplateExercises[4]?.id ?? 0,
+      workoutExerciseId: fullBodyTemplateExercises[4]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 10,
       targetWeight: 135,
     })
   }
 
-  // Upper Body template sets
+  // Upper Body workout sets
   // Bench Press: 4 sets
   for (let i = 0; i < 4; i++) {
     setsData.push({
-      templateExerciseId: upperBodyTemplateExercises[0]?.id ?? 0,
+      workoutExerciseId: upperBodyTemplateExercises[0]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 185,
@@ -167,7 +169,7 @@ async function main() {
   // Overhead Press: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      templateExerciseId: upperBodyTemplateExercises[1]?.id ?? 0,
+      workoutExerciseId: upperBodyTemplateExercises[1]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 95,
@@ -177,7 +179,7 @@ async function main() {
   // Barbell Row: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      templateExerciseId: upperBodyTemplateExercises[2]?.id ?? 0,
+      workoutExerciseId: upperBodyTemplateExercises[2]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 10,
       targetWeight: 135,

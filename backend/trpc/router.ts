@@ -1,14 +1,14 @@
-import { logsRouter } from './routers/logs.router';
+import { exercisesRouter } from './routers/exercises.router';
 import { sessionsRouter } from './routers/sessions.router';
 import { setRouter } from './routers/sets.router';
-import { templatesRouter } from './routers/templates.router.';
+import { workoutsRouter } from './routers/workouts.router.';
 import { router } from './trpc';
 
 export const appRouter = router({
-  templates: templatesRouter,
+  workouts: workoutsRouter,
+  exercises: exercisesRouter,
   sets: setRouter,
   sessions: sessionsRouter,
-  logs: logsRouter,
 });
 
 export type AppRouter = typeof appRouter;

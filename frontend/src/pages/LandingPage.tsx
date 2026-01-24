@@ -11,7 +11,7 @@ interface Template {
 
 interface Session {
   id: number
-  templateId: number | null
+  workoutId: number | null
   createdAt: string
   completedAt: string | null
   sessionTime: string | null
@@ -36,7 +36,7 @@ function LandingPage() {
     try {
       setLoading(true)
       setError(null)
-      const data = await trpc.templates.list.query()
+      const data = await trpc.workouts.getTemplates.query()
       setTemplates(Array.isArray(data) ? data : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -50,7 +50,14 @@ function LandingPage() {
     try {
       setSessionsLoading(true)
       const data = await trpc.sessions.getAll.query({ take, skip: 0 })
-      setSessions(Array.isArray(data) ? data : [])
+      const mapped = Array.isArray(data)
+        ? data.map((sess: any) => ({
+            ...sess,
+            sessionTime: typeof sess.sessionTime !== "undefined" ? sess.sessionTime : null,
+          }))
+        : []
+
+      setSessions(mapped)
     } catch (err) {
       console.error('Error fetching sessions:', err)
     } finally {
@@ -150,7 +157,15 @@ function LandingPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Workout Templates</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Workout Templates</h1>
+          <button
+            onClick={() => navigate('/template/create')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          >
+            Create Template
+          </button>
+        </div>
         
         {templates.length === 0 ? (
           <div className="text-center text-gray-600 py-12">

@@ -25,7 +25,7 @@ interface Template {
   id: number
   name: string
   createdAt: string
-  exercises: TemplateExercise[]
+  workoutExercises: TemplateExercise[]
 }
 
 function TemplateDetail() {
@@ -46,7 +46,7 @@ function TemplateDetail() {
     try {
       setLoading(true)
       setError(null)
-      const data = await trpc.templates.getById.query({ id: templateId })
+      const data = await trpc.workouts.getById.query({ id: templateId })
       setTemplate(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -65,7 +65,7 @@ function TemplateDetail() {
 
     // Find the set in the template
     let targetSet: Set | null = null
-    for (const templateExercise of template.exercises) {
+    for (const templateExercise of template.workoutExercises) {
       const foundSet = templateExercise.sets.find((s) => s.id === setId)
       if (foundSet) {
         targetSet = foundSet
@@ -91,7 +91,7 @@ function TemplateDetail() {
         if (!prev) return null
         return {
           ...prev,
-          exercises: prev.exercises.map((templateExercise) => ({
+          workoutExercises: prev.workoutExercises.map((templateExercise) => ({
             ...templateExercise,
             sets: templateExercise.sets.map((set) =>
               set.id === setId
@@ -117,7 +117,7 @@ function TemplateDetail() {
       setCreatingSession(true)
       setError(null)
       const session = await trpc.sessions.create.mutate({
-        templateId: template.id,
+        workoutId: template.id,
       })
       // Navigate to session page with session data
       navigate(`/session/${session.id}`, { state: { session } })
@@ -126,6 +126,30 @@ function TemplateDetail() {
       setError(err instanceof Error ? err.message : 'Failed to create session')
     } finally {
       setCreatingSession(false)
+    }
+  }
+
+  const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, allowDecimal: boolean = false) => {
+    // Allow: backspace, delete, tab, escape, enter, and decimal point (if allowed)
+    if (
+      [8, 9, 27, 13, 46, 110, 190].indexOf(e.keyCode) !== -1 ||
+      // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+      (e.keyCode === 65 && e.ctrlKey === true) ||
+      (e.keyCode === 67 && e.ctrlKey === true) ||
+      (e.keyCode === 86 && e.ctrlKey === true) ||
+      (e.keyCode === 88 && e.ctrlKey === true) ||
+      // Allow: home, end, left, right, down, up
+      (e.keyCode >= 35 && e.keyCode <= 40)
+    ) {
+      return
+    }
+    // Ensure that it is a number and stop the keypress
+    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+      // Allow decimal point if allowed
+      if (allowDecimal && (e.keyCode === 190 || e.keyCode === 110)) {
+        return
+      }
+      e.preventDefault()
     }
   }
 
@@ -214,12 +238,12 @@ function TemplateDetail() {
         </div>
 
         <div className="space-y-4">
-          {template.exercises.length === 0 ? (
+          {template.workoutExercises.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center text-gray-600">
               No exercises in this template
             </div>
           ) : (
-            template.exercises.map((templateExercise) => (
+            template.workoutExercises.map((templateExercise) => (
               <div
                 key={templateExercise.id}
                 className="bg-white rounded-lg shadow-md p-6"
@@ -263,6 +287,7 @@ function TemplateDetail() {
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
+                                onKeyDown={(e) => handleNumberKeyDown(e, true)}
                                 className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </td>
@@ -277,6 +302,7 @@ function TemplateDetail() {
                                     parseInt(e.target.value) || 0
                                   )
                                 }
+                                onKeyDown={(e) => handleNumberKeyDown(e, false)}
                                 className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </td>

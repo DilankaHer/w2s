@@ -3,38 +3,60 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Swal from 'sweetalert2'
 import { trpc } from '../api/client'
 
-interface WorkoutSet {
-  id: number
-  setNumber: number
-  targetReps: number
-  targetWeight: number
-}
-
 interface Exercise {
   id: number
   name: string
 }
 
-interface TemplateExercise {
+interface SessionSet {
+  id: number
+  setNumber: number
+  reps: number | null
+  weight: number | null
+  isCompleted: boolean
+}
+
+interface SessionExercise {
   id: number
   order: number
   exercise: Exercise
-  sets: WorkoutSet[]
-}
-
-interface Template {
-  id: number
-  name: string
-  createdAt: string
-  exercises: TemplateExercise[]
+  sets: SessionSet[]
 }
 
 interface Session {
   id: number
-  templateId: number | null
+  name: string
   createdAt: string
   completedAt: string | null
-  template: Template | null
+  sessionExercises: SessionExercise[]
+}
+
+// Helper function to map session data
+const mapSessionData = (sessionData: any): Session | null => {
+  if (!sessionData) return null
+  try {
+    return {
+      id: sessionData.id,
+      name: sessionData.name,
+      createdAt: sessionData.createdAt,
+      completedAt: sessionData.completedAt,
+      sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
+        id: se.id,
+        order: se.order,
+        exercise: se.exercise,
+        sets: (se.sessionSets || se.sets || []).map((set: any) => ({
+          id: set.id,
+          setNumber: set.setNumber,
+          reps: set.reps ?? set.targetReps ?? 0,
+          weight: set.weight ?? set.targetWeight ?? 0,
+          isCompleted: set.isCompleted ?? false,
+        })),
+      })),
+    }
+  } catch (err) {
+    console.error('Error mapping session data:', err)
+    return null
+  }
 }
 
 function SessionDetail() {
@@ -42,21 +64,36 @@ function SessionDetail() {
   const navigate = useNavigate()
   const location = useLocation()
   const [session, setSession] = useState<Session | null>(
-    location.state?.session || null
+    mapSessionData(location.state?.session)
   )
   const [loading, setLoading] = useState(!location.state?.session)
   const [error, setError] = useState<string | null>(null)
-  const [completedSets, setCompletedSets] = useState<Set<number>>(new Set<number>())
   const [completing, setCompleting] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
   const [deleting, setDeleting] = useState(false)
+  const [startingNew, setStartingNew] = useState(false)
+  const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
 
   useEffect(() => {
-    // If we don't have session data from navigation state, fetch it
-    if (!location.state?.session && id) {
-      fetchSession(parseInt(id))
-    } else if (location.state?.session) {
-      setLoading(false)
+    const sessionId = id ? parseInt(id) : null
+    
+    // If we have session data from navigation state
+    if (location.state?.session) {
+      const mappedSession = mapSessionData(location.state.session)
+      // Update if session is different (new navigation) or if we don't have a session yet
+      if (mappedSession && (!session || session.id !== mappedSession.id)) {
+        setSession(mappedSession)
+        setLoading(false)
+        setError(null)
+      } else if (!mappedSession) {
+        setError('Failed to load session data')
+        setLoading(false)
+      } else {
+        setLoading(false)
+      }
+    } else if (sessionId && (!session || session.id !== sessionId)) {
+      // No state data, fetch by ID (and only if ID changed)
+      fetchSession(sessionId)
     }
   }, [id, location.state])
 
@@ -69,7 +106,13 @@ function SessionDetail() {
         setError('Session not found')
         return
       }
-      setSession(data as Session)
+      // Map sessionSets to sets to match the interface
+      const mappedSession = mapSessionData(data)
+      if (mappedSession) {
+        setSession(mappedSession)
+      } else {
+        setError('Failed to process session data')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       console.error('Error fetching session:', err)
@@ -103,59 +146,129 @@ function SessionDetail() {
     return () => clearInterval(interval)
   }, [session])
 
-  const toggleSetComplete = (setId: number) => {
-    setCompletedSets((prev: Set<number>) => {
-      const newSet = new Set(prev)
-      if (newSet.has(setId)) {
-        newSet.delete(setId)
-      } else {
-        newSet.add(setId)
+  const toggleSetComplete = async (set: SessionSet) => {
+    const newIsCompleted = !set.isCompleted
+    try {
+      await trpc.sessions.updateSessionSets.mutate({
+        setId: set.id,
+        setNumber: set.setNumber,
+        isCompleted: newIsCompleted,
+      })
+
+      // Update local session state
+      setSession((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          sessionExercises: prev.sessionExercises.map((se) => ({
+            ...se,
+            sets: se.sets.map((s) =>
+              s.id === set.id
+                ? { ...s, isCompleted: newIsCompleted }
+                : s
+            ),
+          })),
+        }
+      })
+    } catch (err) {
+      console.error('Error updating set completion:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update set completion')
+    }
+  }
+
+  const initializeEditingSet = (set: SessionSet) => {
+    setEditingSets((prev) => {
+      if (!prev.has(set.id)) {
+        const newMap = new Map(prev)
+        newMap.set(set.id, {
+          reps: set.reps ?? 0,
+          weight: set.weight ?? 0,
+        })
+        return newMap
       }
-      return newSet
+      return prev
     })
   }
 
+  const updateSetValue = (setId: number, field: 'reps' | 'weight', value: number) => {
+    setEditingSets((prev) => {
+      const newMap = new Map(prev)
+      const current = newMap.get(setId)
+      if (!current) {
+        // This shouldn't happen if we initialize properly, but fallback to set values
+        const set = session?.sessionExercises
+          .flatMap(se => se.sets)
+          .find(s => s.id === setId)
+        newMap.set(setId, {
+          reps: set?.reps ?? 0,
+          weight: set?.weight ?? 0,
+          [field]: value,
+        })
+      } else {
+        newMap.set(setId, { ...current, [field]: value })
+      }
+      return newMap
+    })
+  }
+
+  const saveSetUpdate = async (set: SessionSet) => {
+    const edited = editingSets.get(set.id)
+    if (!edited) return
+
+    try {
+      await trpc.sessions.updateSessionSets.mutate({
+        setId: set.id,
+        setNumber: set.setNumber,
+        reps: edited.reps,
+        weight: edited.weight,
+        isCompleted: set.isCompleted,
+      })
+
+      // Update local session state
+      setSession((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          sessionExercises: prev.sessionExercises.map((se) => ({
+            ...se,
+            sets: se.sets.map((s) =>
+              s.id === set.id
+                ? {
+                    ...s,
+                    reps: edited.reps,
+                    weight: edited.weight,
+                  }
+                : s
+            ),
+          })),
+        }
+      })
+
+      // Remove from editing map
+      setEditingSets((prev) => {
+        const newMap = new Map(prev)
+        newMap.delete(set.id)
+        return newMap
+      })
+    } catch (err) {
+      console.error('Error updating set:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update set')
+    }
+  }
+
   const handleCompleteWorkout = async () => {
-    if (!session || !session.template) return
+    if (!session) return
 
     try {
       setCompleting(true)
       setError(null)
 
-      // Collect all completed sets data
-      const logs: Array<{
-        sessionId: number
-        exerciseId: number
-        setNumber: number
-        reps: number
-        weight: number
-      }> = []
-
-      for (const templateExercise of session.template.exercises) {
-        for (const set of templateExercise.sets) {
-          if (completedSets.has(set.id)) {
-            logs.push({
-              sessionId: session.id,
-              exerciseId: templateExercise.exercise.id,
-              setNumber: set.setNumber,
-              reps: set.targetReps,
-              weight: set.targetWeight,
-            })
-          }
-        }
-      }
-
-      // Update session completedAt and create logs
-      await Promise.all([
-        trpc.sessions.update.mutate({
-          id: session.id,
-          createdAt: new Date(session.createdAt),
-          completedAt: new Date(),
-        }),
-        logs.length > 0
-          ? trpc.logs.createMany.mutate(logs)
-          : Promise.resolve(),
-      ])
+      // Update session completedAt
+      await trpc.sessions.update.mutate({
+        id: session.id,
+        createdAt: new Date(session.createdAt),
+        completedAt: new Date(),
+      })
 
       // Navigate back to templates or show success
       navigate('/')
@@ -198,6 +311,26 @@ function SessionDetail() {
     }
   }
 
+  const handleStartNewWorkout = async () => {
+    if (!session) return
+
+    try {
+      setStartingNew(true)
+      setError(null)
+
+      // Create a new session from the current session
+      const newSession = await trpc.sessions.create.mutate({ sessionId: session.id })
+
+      // Navigate to the new session with session data (similar to TemplateDetail)
+      navigate(`/session/${newSession.id}`, { state: { session: newSession } })
+    } catch (err) {
+      console.error('Error starting new workout:', err)
+      setError(err instanceof Error ? err.message : 'Failed to start new workout')
+    } finally {
+      setStartingNew(false)
+    }
+  }
+
 
   if (loading) {
     return (
@@ -223,7 +356,7 @@ function SessionDetail() {
     )
   }
 
-  if (!session || !session.template) {
+  if (!session) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -239,7 +372,7 @@ function SessionDetail() {
     )
   }
 
-  const allSets = session.template.exercises.flatMap((ex) => ex.sets)
+  const allSets = session.sessionExercises.flatMap((ex) => ex.sets)
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)
@@ -251,8 +384,42 @@ function SessionDetail() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, allowDecimal: boolean = false) => {
+    // Allow: backspace, delete, tab, escape, enter, and decimal point (if allowed)
+    if (
+      [8, 9, 27, 13, 46, 110, 190].indexOf(e.keyCode) !== -1 ||
+      // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+      (e.keyCode === 65 && e.ctrlKey === true) ||
+      (e.keyCode === 67 && e.ctrlKey === true) ||
+      (e.keyCode === 86 && e.ctrlKey === true) ||
+      (e.keyCode === 88 && e.ctrlKey === true) ||
+      // Allow: home, end, left, right, down, up
+      (e.keyCode >= 35 && e.keyCode <= 40)
+    ) {
+      return
+    }
+    // Ensure that it is a number and stop the keypress
+    if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+      // Allow decimal point if allowed
+      if (allowDecimal && (e.keyCode === 190 || e.keyCode === 110)) {
+        return
+      }
+      e.preventDefault()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <style>{`
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       <div className="max-w-4xl mx-auto px-4">
         <button
           onClick={() => navigate('/')}
@@ -264,13 +431,24 @@ function SessionDetail() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-start mb-2">
             <h1 className="text-3xl font-bold text-gray-900">
-              {session.template.name}
+              {session.name}
             </h1>
-            {!session.completedAt && (
-              <div className="text-2xl font-mono font-semibold text-gray-700">
-                {formatTime(elapsedTime)}
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {!session.completedAt && (
+                <div className="text-2xl font-mono font-semibold text-gray-700">
+                  {formatTime(elapsedTime)}
+                </div>
+              )}
+              {session.completedAt && (
+                <button
+                  onClick={handleStartNewWorkout}
+                  disabled={startingNew}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                >
+                  {startingNew ? 'Starting...' : 'Perform Again'}
+                </button>
+              )}
+            </div>
           </div>
           <p className="text-sm text-gray-500">
             Session started: {new Date(session.createdAt).toLocaleString()}
@@ -289,79 +467,133 @@ function SessionDetail() {
         )}
 
         <div className="space-y-4">
-          {session.template.exercises.length === 0 ? (
+          {session.sessionExercises.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center text-gray-600">
-              No exercises in this template
+              No exercises in this workout
             </div>
           ) : (
-            session.template.exercises.map((templateExercise) => (
-              <div
-                key={templateExercise.id}
-                className="bg-white rounded-lg shadow-md p-6"
-              >
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  {templateExercise.order + 1}. {templateExercise.exercise.name}
-                </h2>
+            session.sessionExercises.map((sessionExercise) => {
+              return (
+                <div
+                  key={sessionExercise.id}
+                  className="bg-white rounded-lg shadow-md p-6"
+                >
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                    {sessionExercise.order + 1}. {sessionExercise.exercise.name}
+                  </h2>
 
-                {templateExercise.sets.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No sets configured</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Set
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Weight (kg)
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Reps
-                          </th>
-                          {!session.completedAt && (
+                  {sessionExercise.sets.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No sets configured</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
                             <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Complete
+                              Set
                             </th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {templateExercise.sets.map((set) => {
-                          const isCompleted = completedSets.has(set.id)
-                          return (
-                            <tr
-                              key={set.id}
-                              className={isCompleted ? 'bg-green-50' : ''}
-                            >
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
-                                {set.setNumber}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                                {set.targetWeight}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                                {set.targetReps}
-                              </td>
-                              {!session.completedAt && (
-                                <td className="px-4 py-3 whitespace-nowrap text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={isCompleted}
-                                    onChange={() => toggleSetComplete(set.id)}
-                                    className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                                  />
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Weight (kg)
+                            </th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Reps
+                            </th>
+                            {!session.completedAt && (
+                              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Complete
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {sessionExercise.sets.map((set) => {
+                            const edited = editingSets.get(set.id)
+                            const displayWeight = edited?.weight ?? set.weight ?? 0
+                            const displayReps = edited?.reps ?? set.reps ?? 0
+
+                            return (
+                              <tr
+                                key={set.id}
+                                className={set.isCompleted ? 'bg-green-50' : ''}
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                                  {set.setNumber}
                                 </td>
-                              )}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ))
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                                  {!session.completedAt ? (
+                                    <input
+                                      type="number"
+                                      value={displayWeight === 0 ? '' : displayWeight}
+                                      onFocus={(e) => {
+                                        initializeEditingSet(set)
+                                        e.target.select()
+                                      }}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0
+                                        updateSetValue(set.id, 'weight', val)
+                                      }}
+                                      onKeyDown={(e) => handleNumberKeyDown(e, true)}
+                                      onBlur={() => {
+                                        const edited = editingSets.get(set.id)
+                                        if (edited) {
+                                          saveSetUpdate(set)
+                                        }
+                                      }}
+                                      className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                                      min="0"
+                                      step="0.5"
+                                    />
+                                  ) : (
+                                    set.weight ?? 0
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                                  {!session.completedAt ? (
+                                    <input
+                                      type="number"
+                                      value={displayReps === 0 ? '' : displayReps}
+                                      onFocus={(e) => {
+                                        initializeEditingSet(set)
+                                        e.target.select()
+                                      }}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                                        updateSetValue(set.id, 'reps', val)
+                                      }}
+                                      onKeyDown={(e) => handleNumberKeyDown(e, false)}
+                                      onBlur={() => {
+                                        const edited = editingSets.get(set.id)
+                                        if (edited) {
+                                          saveSetUpdate(set)
+                                        }
+                                      }}
+                                      className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                                      min="0"
+                                    />
+                                  ) : (
+                                    set.reps ?? 0
+                                  )}
+                                </td>
+                                {!session.completedAt && (
+                                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={set.isCompleted}
+                                      onChange={() => toggleSetComplete(set)}
+                                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                    />
+                                  </td>
+                                )}
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })
           )}
         </div>
 
@@ -381,9 +613,12 @@ function SessionDetail() {
             >
               {completing
                 ? 'Completing...'
-                : completedSets.size > 0
-                  ? `Complete Workout (${completedSets.size} of ${allSets.length} sets)`
-                  : 'Complete Workout'}
+                : (() => {
+                    const completedCount = allSets.filter(s => s.isCompleted).length
+                    return completedCount > 0
+                      ? `Complete Workout (${completedCount} of ${allSets.length} sets)`
+                      : 'Complete Workout'
+                  })()}
             </button>
           </div>
         )}

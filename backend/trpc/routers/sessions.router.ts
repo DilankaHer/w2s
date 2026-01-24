@@ -17,27 +17,93 @@ const formatTime = (seconds: number) => {
 export const sessionsRouter = router({
     create: publicProcedure
         .input(z.object({
-            templateId: z.number(),
+            workoutId: z.number().optional(),
+            sessionId: z.number().optional(),
         }))
         .mutation(async ({ input }) => {
-            return prisma.session.create({
-                data: input,
-                include: {
-                    template: {
-                        include: {
-                            exercises: {
-                                include: {
-                                    exercise: true,
-                                    sets: {
-                                        orderBy: { setNumber: "asc" },
-                                    },
-                                },
-                                orderBy: { order: "asc" },
+            if (input.workoutId) {
+                const workout = await prisma.workout.findUnique({
+                    where: { id: input.workoutId },
+                    include: {
+                        workoutExercises: {
+                            include: {
+                                exercise: true,
+                                sets: true
                             },
                         },
                     },
-                },
-            })
+                });
+                return await prisma.session.create({
+                    data: {
+                        name: workout!.name,
+                        createdAt: new Date(),
+                        sessionExercises: {
+                            create: workout!.workoutExercises.map(ex => ({
+                                exerciseId: ex.exercise.id,
+                                order: ex.order,
+                                sessionSets: {
+                                    create: ex.sets.map(set => ({
+                                        setNumber: set.setNumber,
+                                        reps: set.targetReps,
+                                        weight: set.targetWeight,
+                                    })),
+                                },
+                            })),
+                        },
+                    },
+                    include: {
+                        sessionExercises: {
+                            include: {
+                                exercise: true,
+                                sessionSets: { orderBy: { setNumber: 'asc' } },
+                            },
+                            orderBy: { order: 'asc' },
+                        },
+                    },
+                });
+            } else if (input.sessionId) {
+                const session = await prisma.session.findUnique({
+                    where: { id: input.sessionId },
+                    include: {
+                        sessionExercises: {
+                            include: {
+                                exercise: true,
+                                sessionSets: true
+                            },
+                        },
+                    },
+                });
+                return await prisma.session.create({
+                    data: {
+                        name: session!.name,
+                        createdAt: new Date(),
+                        sessionExercises: {
+                            create: session!.sessionExercises.map(ex => ({
+                                exerciseId: ex.exercise.id,
+                                order: ex.order,
+                                sessionSets: {
+                                    create: ex.sessionSets.map(set => ({
+                                        setNumber: set.setNumber,
+                                        reps: set.reps,
+                                        weight: set.weight,
+                                    })),
+                                },
+                            })),
+                        },
+                    },
+                    include: {
+                        sessionExercises: {
+                            include: {
+                                exercise: true,
+                                sessionSets: { orderBy: { setNumber: 'asc' } },
+                            },
+                            orderBy: { order: 'asc' },
+                        },
+                    },
+                });
+            } else {
+                throw new Error("No workout or session ID provided");
+            }
         }),
     getById: publicProcedure
         .input(z.object({
@@ -47,18 +113,12 @@ export const sessionsRouter = router({
             return prisma.session.findUnique({
                 where: { id: input.id },
                 include: {
-                    template: {
+                    sessionExercises: {
                         include: {
-                            exercises: {
-                                include: {
-                                    exercise: true,
-                                    sets: {
-                                        orderBy: { setNumber: "asc" },
-                                    },
-                                },
-                                orderBy: { order: "asc" },
-                            },
+                            exercise: true,
+                            sessionSets: { orderBy: { setNumber: "asc" } },
                         },
+                        orderBy: { order: "asc" },
                     },
                 },
             })
@@ -70,12 +130,11 @@ export const sessionsRouter = router({
         }))
         .query(async ({ input }) => {
             return prisma.session.findMany({
-                take: input?.take ?? undefined,
-                skip: input?.skip ?? 0,
                 orderBy: { createdAt: "desc" },
+                ...(input?.skip !== undefined && { skip: input.skip }),
+                ...(input?.take !== undefined && { take: input.take }),
                 select: {
                     id: true,
-                    templateId: true,
                     createdAt: true,
                     completedAt: true,
                     sessionTime: true,
@@ -89,6 +148,22 @@ export const sessionsRouter = router({
             completedAt: z.coerce.date(),
         }))
         .mutation(async ({ input }) => {
+            await prisma.sessionSet.deleteMany({
+                where: {
+                    sessionExercise: {
+                        sessionId: input.id,
+                    },
+                    isCompleted: false,
+                }
+            });
+            await prisma.sessionExercise.deleteMany({
+                where: {
+                    sessionId: input.id,
+                    sessionSets: {
+                        none: {},
+                    },
+                },
+            });
             return prisma.session.update({
                 where: { id: input.id },
                 data: {
@@ -104,6 +179,26 @@ export const sessionsRouter = router({
         .mutation(async ({ input }) => {
             return prisma.session.delete({
                 where: { id: input.id },
+            })
+        }),
+
+    updateSessionSets: publicProcedure
+        .input(z.object({
+            setId: z.number(),
+            setNumber: z.number(),
+            reps: z.number().optional(),
+            weight: z.number().optional(),
+            isCompleted: z.boolean(),
+        }))
+        .mutation(async ({ input }) => {
+            return prisma.sessionSet.update({
+                where: { id: input.setId },
+                data: {
+                    setNumber: input.setNumber,
+                    ...(input.reps !== undefined && { reps: input.reps }),
+                    ...(input.weight !== undefined && { weight: input.weight }),
+                    isCompleted: input.isCompleted,
+                },
             })
         })
 })
