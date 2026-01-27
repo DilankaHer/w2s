@@ -1,6 +1,7 @@
 import z from "zod"
 import { prisma } from "../../prisma/client"
 import { publicProcedure, router } from "../trpc"
+import { protectedProcedure } from "../middleware/auth.middleware"
 
 const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)
@@ -15,12 +16,12 @@ const formatTime = (seconds: number) => {
 }
 
 export const sessionsRouter = router({
-    create: publicProcedure
+    create: protectedProcedure
         .input(z.object({
             workoutId: z.number().optional(),
             sessionId: z.number().optional(),
         }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ input, ctx }) => {
             if (input.workoutId) {
                 const workout = await prisma.workout.findUnique({
                     where: { id: input.workoutId },
@@ -36,6 +37,7 @@ export const sessionsRouter = router({
                 return await prisma.session.create({
                     data: {
                         name: workout!.name,
+                        userId: ctx.user.userId,
                         createdAt: new Date(),
                         sessionExercises: {
                             create: workout!.workoutExercises.map(ex => ({
@@ -76,6 +78,7 @@ export const sessionsRouter = router({
                 return await prisma.session.create({
                     data: {
                         name: session!.name,
+                        userId: ctx.user.userId,
                         createdAt: new Date(),
                         sessionExercises: {
                             create: session!.sessionExercises.map(ex => ({

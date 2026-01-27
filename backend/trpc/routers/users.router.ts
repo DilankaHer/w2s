@@ -1,0 +1,82 @@
+import z from "zod";
+import { publicProcedure, router } from "../trpc";
+import bcrypt from "bcryptjs";
+import { prisma } from "../../prisma/client";
+import { protectedProcedure } from "../middleware/auth.middleware";
+import { TRPCError } from "@trpc/server";
+import { createToken } from "../utils/cookie";
+
+export const usersRouter = router({
+    create: publicProcedure.input(z.object({ username: z.string(), email: z.email().optional(), password: z.string() })).mutation(async ({ input, ctx }) => {
+        const existingUser = await prisma.user.findFirst({
+            where: { username: input.username },
+        });
+        if (existingUser) {
+            throw new TRPCError({ code: 'CONFLICT', message: 'Username already exists' });
+        }
+
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const user = await prisma.user.create({
+            data: {
+                username: input.username,
+                passwordHash,
+                ...(input.email && { email: input.email }),
+            },
+        });
+
+        createToken(user, ctx);
+
+        return {
+            success: true,
+            user: {
+                username: user.username,
+            },
+        };
+    }),
+
+    login: publicProcedure.input(z.object({ username: z.string(), password: z.string() })).mutation(async ({ input, ctx }) => {
+        const user = await prisma.user.findFirst({
+            where: { username: input.username },
+        });
+        if (!user) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!isPasswordValid) {
+            throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid password' });
+        }
+
+        createToken(user, ctx);
+
+        return {
+            success: true,
+            user: {
+                username: user.username,
+            },
+        };
+    }),
+
+    getUser: protectedProcedure.query(async ({ ctx }) => {
+        return ctx.user;
+    }),
+
+    getWorkoutInfo: protectedProcedure.mutation(async ({ ctx }) => {
+        return prisma.user.findUnique({
+            where: { id: ctx.user.userId },
+            select: {
+                username: true,
+                workouts: {
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                },
+                sessions: {
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                },
+            },
+        });
+    }),
+});

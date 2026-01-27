@@ -3,14 +3,16 @@ import { templateLiteral, z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { prisma } from "../../prisma/client";
 import { WorkoutCreateInput } from "../interfaces/workout.interface";
+import { protectedProcedure } from "../middleware/auth.middleware";
 
 export const workoutsRouter = router({
-  create: publicProcedure
+  create: protectedProcedure
     .input(z.object({ workout: WorkoutCreateInput }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return prisma.workout.create({
         data: {
           name: input.workout.name,
+          userId: ctx.user.userId,
           isTemplate: input.workout.isTemplate,
           workoutExercises: {
             create: input.workout.workoutExercises.map(exercise => ({
@@ -45,6 +47,24 @@ export const workoutsRouter = router({
   getTemplates: publicProcedure.query(async () => {
     return prisma.workout.findMany({
       where: { isTemplate: true },
+      include: {
+        workoutExercises: {
+          include: {
+            exercise: true,
+            sets: {
+              orderBy: { setNumber: "asc" },
+            },
+          },
+          orderBy: { order: "asc" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }),
+
+  getTemplatesByUser: protectedProcedure.input(z.object({ userId: z.number() })).query(async ({ input }) => {
+    return prisma.workout.findMany({
+      where: { userId: input.userId, isTemplate: true },
       include: {
         workoutExercises: {
           include: {

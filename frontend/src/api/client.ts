@@ -7,6 +7,12 @@ export const trpc = createTRPCProxyClient<AppRouter>({
   links: [
     httpLink({
       url: API_BASE_URL,
+      fetch(url, options) {
+        return fetch(url, {
+          ...options,
+          credentials: 'include', // Include cookies in requests
+        })
+      },
     }),
   ],
 })

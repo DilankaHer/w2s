@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
 import Swal from 'sweetalert2'
 
 interface Template {
@@ -18,52 +19,33 @@ interface Session {
 }
 
 function LandingPage() {
+  const { workoutInfo, isLoading } = useAuth()
   const [templates, setTemplates] = useState<Template[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [showAllSessions, setShowAllSessions] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sessionsLoading, setSessionsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchTemplates()
-    fetchSessions(5)
-  }, [])
-
-  const fetchTemplates = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const data = await trpc.workouts.getTemplates.query()
-      setTemplates(Array.isArray(data) ? data : [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      console.error('Error fetching templates:', err)
-    } finally {
-      setLoading(false)
+    // Only use workoutInfo from getWorkoutInfo - no fallback to other endpoints
+    if (!isLoading) {
+      if (workoutInfo) {
+        // Use workout and session info from the hook
+        setTemplates(workoutInfo.workouts || [])
+        setSessions(workoutInfo.sessions || [])
+        setLoading(false)
+        setSessionsLoading(false)
+      } else {
+        // If workoutInfo is null but user is authenticated, they have no workouts/sessions yet
+        setTemplates([])
+        setSessions([])
+        setLoading(false)
+        setSessionsLoading(false)
+      }
     }
-  }
-
-  const fetchSessions = async (take?: number) => {
-    try {
-      setSessionsLoading(true)
-      const data = await trpc.sessions.getAll.query({ take, skip: 0 })
-      const mapped = Array.isArray(data)
-        ? data.map((sess: any) => ({
-            ...sess,
-            sessionTime: typeof sess.sessionTime !== "undefined" ? sess.sessionTime : null,
-          }))
-        : []
-
-      setSessions(mapped)
-    } catch (err) {
-      console.error('Error fetching sessions:', err)
-    } finally {
-      setSessionsLoading(false)
-    }
-  }
+  }, [workoutInfo, isLoading])
 
   const handleTemplateClick = (id: number) => {
     navigate(`/template/${id}`)
@@ -74,13 +56,8 @@ function LandingPage() {
   }
 
   const handleViewAllSessions = () => {
-    if (showAllSessions) {
-      fetchSessions(5)
-      setShowAllSessions(false)
-    } else {
-      fetchSessions()
-      setShowAllSessions(true)
-    }
+    // Toggle showing all sessions vs limited view
+    setShowAllSessions(!showAllSessions)
   }
 
   const handleDeleteSession = async (sessionId: number, e: React.MouseEvent) => {
@@ -130,33 +107,49 @@ function LandingPage() {
     }
   }
 
-  if (loading) {
+  if (isLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading templates...</div>
+        <div className="text-lg text-gray-600">Loading...</div>
       </div>
     )
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 mb-4">Error: {error}</div>
-          <button
-            onClick={fetchTemplates}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+
+  // Show message if user has no workout info
+  const hasNoWorkoutInfo = workoutInfo && (!workoutInfo.workouts || workoutInfo.workouts.length === 0) && (!workoutInfo.sessions || workoutInfo.sessions.length === 0)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
+        {hasNoWorkoutInfo && (
+          <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-sm font-medium text-blue-800">
+                  Get Started
+                </h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p>You don't have any workout templates or sessions yet. Create your first template to get started!</p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => navigate('/template/create')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    Create Your First Template
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Workout Templates</h1>
           <button
@@ -209,7 +202,7 @@ function LandingPage() {
             <div className="text-center text-gray-600 py-8">No sessions found</div>
           ) : (
             <div className="space-y-3">
-              {sessions.map((session) => (
+              {(showAllSessions ? sessions : sessions.slice(0, 5)).map((session) => (
                 <div
                   key={session.id}
                   className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 hover:border-green-500 relative"
