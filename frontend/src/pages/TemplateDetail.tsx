@@ -35,6 +35,7 @@ function TemplateDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
+  const [editingSets, setEditingSets] = useState<Map<number, { targetReps: number; targetWeight: number }>>(new Map())
 
   useEffect(() => {
     if (id) {
@@ -56,30 +57,45 @@ function TemplateDetail() {
     }
   }
 
-  const handleSetUpdate = async (
-    setId: number,
-    field: 'targetWeight' | 'targetReps',
-    value: number
-  ) => {
-    if (!template) return
-
-    // Find the set in the template
-    let targetSet: Set | null = null
-    for (const templateExercise of template.workoutExercises) {
-      const foundSet = templateExercise.sets.find((s) => s.id === setId)
-      if (foundSet) {
-        targetSet = foundSet
-        break
+  const updateSetValue = (setId: number, field: 'targetReps' | 'targetWeight', value: number) => {
+    setEditingSets((prev) => {
+      const newMap = new Map(prev)
+      const current = newMap.get(setId)
+      if (!current) {
+        // Initialize with current set values
+        let targetSet: Set | null = null
+        for (const templateExercise of template?.workoutExercises || []) {
+          const foundSet = templateExercise.sets.find((s) => s.id === setId)
+          if (foundSet) {
+            targetSet = foundSet
+            break
+          }
+        }
+        if (targetSet) {
+          newMap.set(setId, {
+            targetReps: targetSet.targetReps,
+            targetWeight: targetSet.targetWeight,
+            [field]: value,
+          })
+        }
+      } else {
+        newMap.set(setId, { ...current, [field]: value })
       }
-    }
+      return newMap
+    })
+  }
 
-    if (!targetSet) return
+  const saveSetUpdate = async (set: Set) => {
+    const edited = editingSets.get(set.id)
+    if (!edited) return
+
+    if (!template) return
 
     // Prepare update data
     const updateData = {
-      setId,
-      targetWeight: field === 'targetWeight' ? value : targetSet.targetWeight,
-      targetReps: field === 'targetReps' ? value : targetSet.targetReps,
+      setId: set.id,
+      targetWeight: edited.targetWeight,
+      targetReps: edited.targetReps,
     }
 
     try {
@@ -93,16 +109,24 @@ function TemplateDetail() {
           ...prev,
           workoutExercises: prev.workoutExercises.map((templateExercise) => ({
             ...templateExercise,
-            sets: templateExercise.sets.map((set) =>
-              set.id === setId
+            sets: templateExercise.sets.map((s) =>
+              s.id === set.id
                 ? {
-                    ...set,
-                    [field]: value,
+                    ...s,
+                    targetReps: edited.targetReps,
+                    targetWeight: edited.targetWeight,
                   }
-                : set
+                : s
             ),
           })),
         }
+      })
+
+      // Remove from editing map
+      setEditingSets((prev) => {
+        const newMap = new Map(prev)
+        newMap.delete(set.id)
+        return newMap
       })
     } catch (err) {
       console.error('Error updating set:', err)
@@ -271,43 +295,75 @@ function TemplateDetail() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {templateExercise.sets.map((set) => (
-                          <tr key={set.id}>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
-                              {set.setNumber}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                              <input
-                                type="number"
-                                value={set.targetWeight}
-                                onChange={(e) =>
-                                  handleSetUpdate(
-                                    set.id,
-                                    'targetWeight',
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                onKeyDown={(e) => handleNumberKeyDown(e, true)}
-                                className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                              <input
-                                type="number"
-                                value={set.targetReps}
-                                onChange={(e) =>
-                                  handleSetUpdate(
-                                    set.id,
-                                    'targetReps',
-                                    parseInt(e.target.value) || 0
-                                  )
-                                }
-                                onKeyDown={(e) => handleNumberKeyDown(e, false)}
-                                className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </td>
-                          </tr>
-                        ))}
+                        {templateExercise.sets.map((set) => {
+                          const edited = editingSets.get(set.id)
+                          const displayWeight = edited?.targetWeight ?? set.targetWeight
+                          const displayReps = edited?.targetReps ?? set.targetReps
+
+                          return (
+                            <tr key={set.id}>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                                {set.setNumber}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <input
+                                  type="number"
+                                  value={displayWeight === 0 ? '' : displayWeight}
+                                  onChange={(e) =>
+                                    updateSetValue(
+                                      set.id,
+                                      'targetWeight',
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  onFocus={(e) => {
+                                    // Initialize editing state if not already set
+                                    if (!editingSets.has(set.id)) {
+                                      updateSetValue(set.id, 'targetWeight', set.targetWeight)
+                                    }
+                                    e.target.select()
+                                  }}
+                                  onBlur={() => {
+                                    const edited = editingSets.get(set.id)
+                                    if (edited) {
+                                      saveSetUpdate(set)
+                                    }
+                                  }}
+                                  onKeyDown={(e) => handleNumberKeyDown(e, true)}
+                                  className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <input
+                                  type="number"
+                                  value={displayReps === 0 ? '' : displayReps}
+                                  onChange={(e) =>
+                                    updateSetValue(
+                                      set.id,
+                                      'targetReps',
+                                      parseInt(e.target.value) || 0
+                                    )
+                                  }
+                                  onFocus={(e) => {
+                                    // Initialize editing state if not already set
+                                    if (!editingSets.has(set.id)) {
+                                      updateSetValue(set.id, 'targetReps', set.targetReps)
+                                    }
+                                    e.target.select()
+                                  }}
+                                  onBlur={() => {
+                                    const edited = editingSets.get(set.id)
+                                    if (edited) {
+                                      saveSetUpdate(set)
+                                    }
+                                  }}
+                                  onKeyDown={(e) => handleNumberKeyDown(e, false)}
+                                  className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

@@ -174,8 +174,9 @@ function CreateTemplate() {
 
   const areAllSetsFilled = () => {
     if (workoutExercises.length === 0) return false
-    return workoutExercises.every((ex) =>
-      ex.sets.every((set) => set.targetReps > 0 && set.targetWeight > 0)
+    // At least one set with both reps and weight filled is enough
+    return workoutExercises.some((ex) =>
+      ex.sets.some((set) => set.targetReps > 0 && set.targetWeight > 0)
     )
   }
 
@@ -224,18 +225,8 @@ function CreateTemplate() {
         </button>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">Create Template</h1>
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled()}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
-            >
-              {submitting ? 'Creating...' : 'Create Template'}
-            </button>
-          </div>
-
           <div className="mb-4">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Create Template</h1>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Template Name
             </label>
@@ -255,49 +246,49 @@ function CreateTemplate() {
           )}
         </div>
 
-        <div className="mb-4 flex justify-end">
-          <div className="relative">
-            <button
-              onClick={() => setShowExerciseList(!showExerciseList)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-            >
-              Add Exercise
-            </button>
-            {showExerciseList && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-96 overflow-y-auto">
-                {exercisesLoading ? (
-                  <div className="p-4 text-center text-gray-500">Loading...</div>
-                ) : exercises && exercises.length > 0 ? (
-                  exercises
-                    .filter(
-                      (ex) => !workoutExercises.some((we) => we.id === ex.id)
-                    )
-                    .map((exercise) => (
-                      <button
-                        key={exercise.id}
-                        onClick={() => addExercise(exercise)}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-200 last:border-b-0"
-                      >
-                        {exercise.name}
-                      </button>
-                    ))
-                ) : (
-                  <div className="p-4 text-center text-gray-500">
-                    No exercises available
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
         <div className="space-y-4">
           {workoutExercises.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-md p-6 text-center text-gray-600">
-              No exercises added. Click "Add Exercise" to get started.
+            <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <p className="text-gray-600 mb-4">No exercises added. Click "Add Exercise" to get started.</p>
+              <div className="flex justify-center">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExerciseList(!showExerciseList)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    Add Exercise
+                  </button>
+                  {showExerciseList && (
+                    <div className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-96 overflow-y-auto">
+                      {exercisesLoading ? (
+                        <div className="p-4 text-center text-gray-500">Loading...</div>
+                      ) : exercises && exercises.length > 0 ? (
+                        exercises
+                          .filter(
+                            (ex) => !workoutExercises.some((we) => we.id === ex.id)
+                          )
+                          .map((exercise) => (
+                            <button
+                              key={exercise.id}
+                              onClick={() => addExercise(exercise)}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-200 last:border-b-0"
+                            >
+                              {exercise.name}
+                            </button>
+                          ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-500">
+                          No exercises available
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
-            workoutExercises.map((workoutExercise) => (
+            <>
+              {workoutExercises.map((workoutExercise) => (
               <div
                 key={workoutExercise.id}
                 className="bg-white rounded-lg shadow-md p-6"
@@ -417,8 +408,55 @@ function CreateTemplate() {
                   </>
                 )}
               </div>
-            ))
+            ))}
+              
+            <div className="flex justify-center my-6">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExerciseList(!showExerciseList)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    Add Exercise
+                  </button>
+                  {showExerciseList && (
+                    <div className="absolute left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10 max-h-96 overflow-y-auto">
+                      {exercisesLoading ? (
+                        <div className="p-4 text-center text-gray-500">Loading...</div>
+                      ) : exercises && exercises.length > 0 ? (
+                        exercises
+                          .filter(
+                            (ex) => !workoutExercises.some((we) => we.id === ex.id)
+                          )
+                          .map((exercise) => (
+                            <button
+                              key={exercise.id}
+                              onClick={() => addExercise(exercise)}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b border-gray-200 last:border-b-0"
+                            >
+                              {exercise.name}
+                            </button>
+                          ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-500">
+                          No exercises available
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
+        </div>
+
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled()}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+          >
+            {submitting ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
     </div>
