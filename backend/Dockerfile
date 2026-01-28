@@ -1,21 +1,39 @@
-FROM oven/bun:1 AS base
-
+FROM oven/bun:1.3.7 AS base
 WORKDIR /app
 
+# -------------------------
+# Install dependencies
+# -------------------------
 FROM base AS install
-RUN mkdir -p /temp/prod
-COPY package.json bun.lock /temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile
 
+# Copy root manifest + lockfile
+COPY package.json bun.lock ./
+
+# Copy workspace manifests needed by backend
+COPY backend/package.json backend/package.json
+
+# Install deps
+RUN bun install --frozen-lockfile
+
+# -------------------------
+# Runtime image
+# -------------------------
 FROM base AS release
-COPY --from=install /temp/prod/node_modules node_modules
-COPY . .
+WORKDIR /app
+
+# Copy node_modules
+COPY --from=install /app/node_modules ./node_modules
+
+# Copy backend + shared source
+COPY backend backend
 
 ENV NODE_ENV=production
 
+# Prisma client
+WORKDIR /app/backend
 RUN bunx prisma generate
-RUN bun run build
 
-USER bun
 EXPOSE 3000
-ENTRYPOINT ["sh", "-c", "bunx prisma migrate deploy && bun dist/index.js"]
+USER bun
+
+ENTRYPOINT ["sh", "-c", "bunx prisma migrate deploy && bun run start"]

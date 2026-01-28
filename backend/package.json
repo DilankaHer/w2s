@@ -29,8 +29,7 @@
     "zod": "^4.3.5"
   },
   "scripts": {
-    "build": "bun build index.ts --outdir dist --target bun",
-    "start": "bun dist/index.js",
+    "start": "bun index.ts",
     "dev": "bun run index.ts"
   },
   "prisma": {
