@@ -27,7 +27,7 @@
     "zod": "^4.3.5"
   },
   "scripts": {
-    "build": "bun build index.ts --outdir dist",
+    "build": "bun build index.ts --outdir dist --target bun",
     "start": "bun dist/index.js",
     "dev": "bun run index.ts"
   },
