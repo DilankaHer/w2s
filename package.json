@@ -1,0 +1,11 @@
+{
+    "private": true,
+    "workspaces": [
+        "frontend",
+        "backend",
+        "shared"
+    ],
+    "dependencies": {
+        "@trpc/client": "^11.9.0"
+    }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "w2s",
+  "name": "w2s-backend",
   "module": "index.ts",
   "type": "module",
   "private": true,
