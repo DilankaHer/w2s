@@ -31,15 +31,17 @@ export function createToken(user: { id: number, username: string }, ctx: ReturnT
         }
     );
 
+    const cookieOptions: SerializeOptions = {
+        httpOnly: true,
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: expiresIn,
+    }
+
     ctx.setCookie(
         "auth_token",
         token,
-        {
-            httpOnly: true,
-            path: "/",
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: expiresIn,
-        }
+        cookieOptions
     );
 }
