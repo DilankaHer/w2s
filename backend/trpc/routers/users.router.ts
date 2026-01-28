@@ -1,9 +1,9 @@
-import z from "zod";
-import { publicProcedure, router } from "../trpc";
+import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
+import z from "zod";
 import { prisma } from "../../prisma/client";
 import { protectedProcedure } from "../middleware/auth.middleware";
-import { TRPCError } from "@trpc/server";
+import { publicProcedure, router } from "../trpc";
 import { createToken } from "../utils/cookie";
 
 export const usersRouter = router({
@@ -29,7 +29,7 @@ export const usersRouter = router({
         return {
             success: true,
             user: {
-                username: user.username,
+                username: user.username
             },
         };
     }),
@@ -52,7 +52,7 @@ export const usersRouter = router({
         return {
             success: true,
             user: {
-                username: user.username,
+                username: user.username
             },
         };
     }),
