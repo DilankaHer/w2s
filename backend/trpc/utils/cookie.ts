@@ -35,12 +35,9 @@ export function createToken(user: { id: number, username: string }, ctx: ReturnT
         httpOnly: true,
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         maxAge: expiresIn,
     }
-
-    console.log("cookieOptions", cookieOptions);
-    console.log("process.env.NODE_ENV", process.env.NODE_ENV);
 
     ctx.setCookie(
         "auth_token",
