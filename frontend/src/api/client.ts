@@ -1,5 +1,5 @@
 import { createTRPCProxyClient, httpLink } from '@trpc/client'
-import type { AppRouter } from '@w2s/shared/api-types'
+import type { AppRouter } from '../../../backend/trpc/types'
 
 // Docker backend is exposed on port 3000; override with VITE_API_BASE_URL if needed
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
