@@ -10,7 +10,7 @@ const trpcHandler = createBunServeHandler({
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
-  'https://w2s-126.pages.dev',
+  'https://w2s-app.duvaher.com',
 ]);
 
 Bun.serve({
@@ -22,7 +22,7 @@ Bun.serve({
     const corsOrigin =
       origin && allowedOrigins.has(origin)
         ? origin
-        : 'https://w2s-126.pages.dev';
+        : 'https://w2s-app.duvaher.com';
 
 
     // Preflight
