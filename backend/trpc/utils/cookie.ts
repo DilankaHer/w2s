@@ -39,6 +39,7 @@ export function createToken(user: { id: number, username: string }, ctx: ReturnT
         maxAge: expiresIn,
     }
 
+    console.log("process.env.NODE_ENV", process.env.NODE_ENV);
     console.log("cookieOptions", cookieOptions);
 
     ctx.setCookie(
