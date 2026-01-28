@@ -7,7 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000
 export const trpc = createTRPCProxyClient<AppRouter>({
   links: [
     httpLink({
-      url: API_BASE_URL,
+      url: `${API_BASE_URL}/trpc`,
       fetch(url: string | Request | URL, options: RequestInit | undefined) {
         return fetch(url, {
           ...options,
