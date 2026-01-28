@@ -19,7 +19,7 @@ Bun.serve({
       return new Response(null, {
         status: 204,
         headers: {
-          'Access-Control-Allow-Origin': origin || 'http://localhost:5173',
+          'Access-Control-Allow-Origin': origin || 'http://localhost:5173' || 'https://w2s-126.pages.dev',
           'Access-Control-Allow-Credentials': 'true',
           'Access-Control-Allow-Methods': 'POST, OPTIONS',
           'Access-Control-Allow-Headers': 'content-type',
