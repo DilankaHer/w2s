@@ -1,4 +1,4 @@
-import cookie, { type SerializeOptions } from 'cookie'
+import cookie, { type SerializeOptions } from 'cookie';
 import jwt from "jsonwebtoken";
 import type { createContext } from './context';
 
@@ -37,7 +37,8 @@ export function createToken(user: { id: number, username: string }, ctx: ReturnT
         {
             httpOnly: true,
             path: "/",
-            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             maxAge: expiresIn,
         }
     );
