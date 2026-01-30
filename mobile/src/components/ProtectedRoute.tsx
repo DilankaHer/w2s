@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -21,12 +20,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, [isAuthenticated, isLoading, error, navigation])
 
   if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4B5563" />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    )
+    return null
   }
 
   if (!isAuthenticated || error?.message === 'UNAUTHORIZED') {
@@ -35,17 +29,3 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   return <>{children}</>
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: '#4B5563',
-  },
-})

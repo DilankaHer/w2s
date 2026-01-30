@@ -5,6 +5,6 @@ import { getCookie, setCookie } from "./cookie"
 export const createContext = ({
   req, resHeaders
 }: FetchCreateContextFnOptions) => ({
-  setCookie: (name: string, value: string, options?: SerializeOptions) => { setCookie(resHeaders, name, value, options) },
+  setCookie: (name: string, value: string, isMobile: boolean = false, options?: SerializeOptions) => { setCookie(resHeaders, name, value, isMobile, options) },
   getCookie: (name: string) => { return getCookie(req, name) },
 })

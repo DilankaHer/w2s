@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -349,11 +348,7 @@ function CreateTemplateScreen() {
           onPress={handleSubmit}
           disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled()}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
+          <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </ScrollView>
 

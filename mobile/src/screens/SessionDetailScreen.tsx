@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -381,11 +380,7 @@ function SessionDetailScreen() {
                 onPress={handleStartNewWorkout}
                 disabled={startingNew}
               >
-                {startingNew ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.performAgainButtonText}>Perform Again</Text>
-                )}
+                <Text style={styles.performAgainButtonText}>Perform Again</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -502,26 +497,18 @@ function SessionDetailScreen() {
               onPress={handleCancelWorkout}
               disabled={deleting || completing}
             >
-              {deleting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.cancelButtonText}>Cancel Workout</Text>
-              )}
+              <Text style={styles.cancelButtonText}>Cancel Workout</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.completeButton, (completing || deleting) && styles.buttonDisabled]}
               onPress={handleCompleteWorkout}
               disabled={completing || deleting}
             >
-              {completing ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.completeButtonText}>
-                  {completedCount > 0
-                    ? `Complete Workout (${completedCount}/${allSets.length})`
-                    : 'Complete Workout'}
-                </Text>
-              )}
+              <Text style={styles.completeButtonText}>
+                {completedCount > 0
+                  ? `Complete Workout (${completedCount}/${allSets.length})`
+                  : 'Complete Workout'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}

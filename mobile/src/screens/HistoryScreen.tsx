@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Alert,
   RefreshControl,
 } from 'react-native'
@@ -24,7 +23,6 @@ interface Session {
 
 function HistoryScreen() {
   const { workoutInfo, isLoading, checkAuth } = useAuth()
-  const [sessions, setSessions] = useState<Session[]>([])
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const navigation = useNavigation()
@@ -42,21 +40,6 @@ function HistoryScreen() {
       }
     }
   }, [isFocused, checkAuth])
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (workoutInfo) {
-        const sessionsData = workoutInfo.sessions || []
-        console.log('HistoryScreen - workoutInfo:', workoutInfo)
-        console.log('HistoryScreen - sessions array:', sessionsData)
-        console.log('HistoryScreen - sessions length:', sessionsData.length)
-        setSessions(sessionsData)
-      } else {
-        console.log('HistoryScreen - no workoutInfo')
-        setSessions([])
-      }
-    }
-  }, [workoutInfo, isLoading])
 
   const onRefresh = async () => {
     setRefreshing(true)
@@ -84,7 +67,7 @@ function HistoryScreen() {
             try {
               setDeletingSessionId(sessionId)
               await trpc.sessions.delete.mutate({ id: sessionId })
-              setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+              await checkAuth()
               Toast.show({
                 type: 'success',
                 text1: 'Success',
@@ -106,8 +89,14 @@ function HistoryScreen() {
     )
   }
 
-  // Only show "No sessions yet" if we're not loading, workoutInfo has been loaded, and there are no sessions
-  const hasNoSessions = !isLoading && workoutInfo !== null && (!sessions || sessions.length === 0)
+  // Only derive list and show empty state after API has finished (isLoading is false)
+  const displaySessions = !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
+  const hasNoSessions = !isLoading && workoutInfo !== null && displaySessions.length === 0
+
+  // Don't render empty state or list until API call is done (avoids flash)
+  if (isLoading) {
+    return <View style={styles.container} />
+  }
 
   return (
     <View style={styles.container}>
@@ -126,7 +115,7 @@ function HistoryScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {sessions.map((session) => (
+          {displaySessions.map((session) => (
             <View key={session.id} style={styles.sessionCard}>
               <TouchableOpacity
                 style={styles.sessionContent}

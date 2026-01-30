@@ -13,12 +13,17 @@ export function setCookie(
     resHeaders: Headers,
     name: string,
     value: string,
+    isMobile: boolean = false,
     options?: SerializeOptions
 ) {
-    resHeaders.append('Set-Cookie', cookie.serialize(name, value, options))
+    if (isMobile) {
+        resHeaders.append('X-Auth-Token', cookie.serialize(name, value, options))
+    } else {
+        resHeaders.append('Set-Cookie', cookie.serialize(name, value, options))
+    }
 }
 
-export function createToken(user: { id: number, username: string }, ctx: ReturnType<typeof createContext>) {
+export function createToken(user: { id: number, username: string }, ctx: ReturnType<typeof createContext>, isMobile: boolean = false) {
     const expiresIn = parseInt(process.env.JWT_EXPIRES_IN!);
     const token = jwt.sign(
         {
@@ -42,6 +47,7 @@ export function createToken(user: { id: number, username: string }, ctx: ReturnT
     ctx.setCookie(
         "auth_token",
         token,
+        isMobile,
         cookieOptions
     );
 }

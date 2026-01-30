@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  FlatList,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
@@ -16,24 +14,8 @@ import type { Template } from '../types'
 
 function TemplatesScreen() {
   const { workoutInfo, isLoading, checkAuth } = useAuth()
-  const [templates, setTemplates] = useState<Template[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const navigation = useNavigation()
-
-  useEffect(() => {
-    if (!isLoading) {
-      if (workoutInfo) {
-        const workouts = workoutInfo.workouts || []
-        console.log('TemplatesScreen - workoutInfo:', workoutInfo)
-        console.log('TemplatesScreen - workouts array:', workouts)
-        console.log('TemplatesScreen - workouts length:', workouts.length)
-        setTemplates(workouts)
-      } else {
-        console.log('TemplatesScreen - no workoutInfo')
-        setTemplates([])
-      }
-    }
-  }, [workoutInfo, isLoading])
 
   const onRefresh = async () => {
     setRefreshing(true)
@@ -41,13 +23,18 @@ function TemplatesScreen() {
     setRefreshing(false)
   }
 
-
   const handleTemplateClick = (id: number) => {
     navigation.navigate('TemplateDetail' as never, { id } as never)
   }
 
-  // Only show "No templates yet" if we're not loading, workoutInfo has been loaded, and there are no templates
-  const hasNoTemplates = !isLoading && workoutInfo !== null && (!templates || templates.length === 0)
+  // Only derive list and show empty state after API has finished (isLoading is false)
+  const displayTemplates = !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : []
+  const hasNoTemplates = !isLoading && workoutInfo !== null && displayTemplates.length === 0
+
+  // Don't render empty state or list until API call is done (avoids flash)
+  if (isLoading) {
+    return <View style={styles.container} />
+  }
 
   return (
     <View style={styles.container}>
@@ -72,7 +59,7 @@ function TemplatesScreen() {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
           >
-            {templates.map((template) => (
+            {displayTemplates.map((template) => (
               <TouchableOpacity
                 key={template.id}
                 style={styles.templateCard}

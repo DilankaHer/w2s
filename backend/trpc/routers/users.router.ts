@@ -7,7 +7,7 @@ import { publicProcedure, router } from "../trpc";
 import { createToken } from "../utils/cookie";
 
 export const usersRouter = router({
-    create: publicProcedure.input(z.object({ username: z.string(), email: z.email().optional(), password: z.string() })).mutation(async ({ input, ctx }) => {
+    create: publicProcedure.input(z.object({ username: z.string(), email: z.email().optional(), password: z.string(), isMobile: z.boolean().optional() })).mutation(async ({ input, ctx }) => {
         const existingUser = await prisma.user.findFirst({
             where: { username: input.username },
         });
@@ -24,7 +24,7 @@ export const usersRouter = router({
             },
         });
 
-        createToken(user, ctx);
+        createToken(user, ctx, input.isMobile);
 
         return {
             success: true,
@@ -34,7 +34,7 @@ export const usersRouter = router({
         };
     }),
 
-    login: publicProcedure.input(z.object({ username: z.string(), password: z.string() })).mutation(async ({ input, ctx }) => {
+    login: publicProcedure.input(z.object({ username: z.string(), password: z.string(), isMobile: z.boolean().optional() })).mutation(async ({ input, ctx }) => {
         const user = await prisma.user.findFirst({
             where: { username: input.username },
         });
@@ -47,7 +47,7 @@ export const usersRouter = router({
             throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid password' });
         }
 
-        createToken(user, ctx);
+        createToken(user, ctx, input.isMobile);
 
         return {
             success: true,

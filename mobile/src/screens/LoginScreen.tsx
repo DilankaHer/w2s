@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
@@ -40,10 +39,12 @@ function LoginScreen() {
         ? await trpc.users.login.mutate({
             username: username.trim(),
             password: password,
+            isMobile: true,
           })
         : await trpc.users.create.mutate({
             username: username.trim(),
             password: password,
+            isMobile: true,
           })
 
       if (result.success) {
@@ -113,13 +114,9 @@ function LoginScreen() {
               onPress={handleSubmit}
               disabled={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {isLogin ? 'Sign In' : 'Create Account'}
-                </Text>
-              )}
+              <Text style={styles.buttonText}>
+                {isLogin ? 'Sign In' : 'Create Account'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity

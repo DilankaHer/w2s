@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -6,8 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  ActivityIndicator,
-  FlatList,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
@@ -24,24 +22,15 @@ interface Session {
 }
 
 function LandingScreen() {
-  const { workoutInfo, isLoading } = useAuth()
-  const [templates, setTemplates] = useState<Template[]>([])
-  const [sessions, setSessions] = useState<Session[]>([])
+  const { workoutInfo, isLoading, checkAuth } = useAuth()
   const [showAllSessions, setShowAllSessions] = useState(false)
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const navigation = useNavigation()
 
-  useEffect(() => {
-    if (!isLoading) {
-      if (workoutInfo) {
-        setTemplates(workoutInfo.workouts || [])
-        setSessions(workoutInfo.sessions || [])
-      } else {
-        setTemplates([])
-        setSessions([])
-      }
-    }
-  }, [workoutInfo, isLoading])
+  // Only derive lists after API has finished (avoids flash of empty state)
+  const templates = !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : []
+  const sessions = !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
+  const displayedSessions = showAllSessions ? sessions : sessions.slice(0, 5)
 
   const handleTemplateClick = (id: number) => {
     navigation.navigate('TemplateDetail' as never, { id } as never)
@@ -67,7 +56,7 @@ function LandingScreen() {
             try {
               setDeletingSessionId(sessionId)
               await trpc.sessions.delete.mutate({ id: sessionId })
-              setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+              await checkAuth()
               Toast.show({
                 type: 'success',
                 text1: 'Success',
@@ -89,12 +78,17 @@ function LandingScreen() {
     )
   }
 
+  // Only show "Get Started" / empty states after API call is done
   const hasNoWorkoutInfo =
+    !isLoading &&
     workoutInfo &&
     (!workoutInfo.workouts || workoutInfo.workouts.length === 0) &&
     (!workoutInfo.sessions || workoutInfo.sessions.length === 0)
 
-  const displayedSessions = showAllSessions ? sessions : sessions.slice(0, 5)
+  // Don't render content until API call is done (avoids flash)
+  if (isLoading) {
+    return <View style={[styles.container, styles.content]} />
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

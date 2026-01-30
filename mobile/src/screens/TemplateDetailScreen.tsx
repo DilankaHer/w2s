@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -192,11 +191,7 @@ function TemplateDetailScreen() {
             onPress={handleCreateSession}
             disabled={creatingSession}
           >
-            {creatingSession ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.startButtonText}>Start Session</Text>
-            )}
+            <Text style={styles.startButtonText}>Start Session</Text>
           </TouchableOpacity>
         </View>
 
