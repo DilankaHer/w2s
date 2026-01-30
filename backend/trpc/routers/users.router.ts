@@ -58,7 +58,49 @@ export const usersRouter = router({
     }),
 
     getUser: protectedProcedure.query(async ({ ctx }) => {
-        return ctx.user;
+        return prisma.user.findUnique({
+            where: { id: ctx.user.userId },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+            },
+        });
+    }),
+
+    updateUser: protectedProcedure.input(z.object({
+        username: z.string().optional(),
+        email: z.email().optional(),
+    })).mutation(async ({ input, ctx }) => {
+        await prisma.user.update({
+            where: { id: ctx.user.userId },
+            data: {
+                ...(input.username && { username: input.username }),
+                ...(input.email && { email: input.email }),
+            },
+        });
+
+        return {
+            success: true,
+        };
+    }),
+
+    checkUsername: publicProcedure.input(z.object({ username: z.string() })).mutation(async ({ input }) => {
+        const existingUser = await prisma.user.findFirst({
+            where: { username: input.username },
+        });
+        return {
+            exists: !!existingUser,
+        };
+    }),
+
+    checkEmail: publicProcedure.input(z.object({ email: z.string() })).mutation(async ({ input }) => {
+        const existingUser = await prisma.user.findFirst({
+            where: { email: input.email },
+        });
+        return {
+            exists: !!existingUser,
+        };
     }),
 
     getWorkoutInfo: protectedProcedure.mutation(async ({ ctx }) => {

@@ -47,14 +47,14 @@ async function main() {
   const fullBodyWorkout = await prisma.workout.create({
     data: {
       name: 'Full Body Beginner',
-      isTemplate: true,
+      isDefaultTemplate: true,
     },
   })
 
   const upperBodyWorkout = await prisma.workout.create({
     data: {
       name: 'Upper Body Focus',
-      isTemplate: true,
+      isDefaultTemplate: true,
     },
   })
 

@@ -1,7 +1,7 @@
 import z from "zod"
 import { prisma } from "../../prisma/client"
-import { publicProcedure, router } from "../trpc"
 import { protectedProcedure } from "../middleware/auth.middleware"
+import { publicProcedure, router } from "../trpc"
 
 const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)
@@ -108,6 +108,54 @@ export const sessionsRouter = router({
                 throw new Error("No workout or session ID provided");
             }
         }),
+
+    createUnprotected: publicProcedure
+        .input(z.object({
+            workoutId: z.number()
+        }))
+        .mutation(async ({ input }) => {
+            const workout = await prisma.workout.findUnique({
+                where: { id: input.workoutId },
+                include: {
+                    workoutExercises: {
+                        include: {
+                            exercise: true,
+                            sets: true
+                        },
+                    },
+                },
+            });
+            return await prisma.session.create({
+                data: {
+                    name: workout!.name,
+                    userId: null,
+                    createdAt: new Date(),
+                    sessionExercises: {
+                        create: workout!.workoutExercises.map(ex => ({
+                            exerciseId: ex.exercise.id,
+                            order: ex.order,
+                            sessionSets: {
+                                create: ex.sets.map(set => ({
+                                    setNumber: set.setNumber,
+                                    reps: set.targetReps,
+                                    weight: set.targetWeight,
+                                })),
+                            },
+                        })),
+                    },
+                },
+                include: {
+                    sessionExercises: {
+                        include: {
+                            exercise: true,
+                            sessionSets: { orderBy: { setNumber: 'asc' } },
+                        },
+                        orderBy: { order: 'asc' },
+                    },
+                },
+            });
+        }),
+
     getById: publicProcedure
         .input(z.object({
             id: z.number(),
@@ -149,6 +197,7 @@ export const sessionsRouter = router({
             id: z.number(),
             createdAt: z.coerce.date(),
             completedAt: z.coerce.date(),
+            userId: z.number().optional(),
         }))
         .mutation(async ({ input }) => {
             await prisma.sessionSet.deleteMany({
@@ -172,6 +221,7 @@ export const sessionsRouter = router({
                 data: {
                     completedAt: input.completedAt,
                     sessionTime: formatTime((input.completedAt.getTime() - input.createdAt.getTime()) / 1000),
+                    ...(input.userId !== undefined && { userId: input.userId }),
                 },
             })
         }),

@@ -27,7 +27,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "https://w2s-api.duvaher.com"
+      "apiBaseUrl": "http://192.168.2.35:3000"
     }
   }
 }

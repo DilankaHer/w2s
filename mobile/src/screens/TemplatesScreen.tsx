@@ -1,25 +1,57 @@
-import React, { useState } from 'react'
+import { useNavigation } from '@react-navigation/native'
+import React, { useEffect, useState } from 'react'
 import {
-  View,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
+  View,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
 import type { Template } from '../types'
 
 function TemplatesScreen() {
-  const { workoutInfo, isLoading, checkAuth } = useAuth()
+  const { workoutInfo, isLoading, checkAuth, isAuthenticated } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
+  const [defaultTemplates, setDefaultTemplates] = useState<Template[]>([])
+  const [defaultTemplatesLoading, setDefaultTemplatesLoading] = useState(true)
+  const [defaultTemplatesFetched, setDefaultTemplatesFetched] = useState(false)
   const navigation = useNavigation()
+
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) {
+      setDefaultTemplatesFetched(false)
+      setDefaultTemplatesLoading(true)
+      trpc.workouts.getTemplates
+        .query({ isDefaultTemplate: true })
+        .then((data) => {
+          setDefaultTemplates(Array.isArray(data) ? data : [])
+        })
+        .catch(() => setDefaultTemplates([]))
+        .finally(() => {
+          setDefaultTemplatesFetched(true)
+          setDefaultTemplatesLoading(false)
+        })
+    } else {
+      if (isAuthenticated) setDefaultTemplatesFetched(false)
+      setDefaultTemplatesLoading(false)
+    }
+  }, [isAuthenticated, isLoading])
 
   const onRefresh = async () => {
     setRefreshing(true)
-    await checkAuth()
+    if (isAuthenticated) {
+      await checkAuth()
+    } else {
+      try {
+        const data = await trpc.workouts.getTemplates.query({ isDefaultTemplate: true })
+        setDefaultTemplates(Array.isArray(data) ? data : [])
+      } catch {
+        setDefaultTemplates([])
+      }
+    }
     setRefreshing(false)
   }
 
@@ -27,12 +59,20 @@ function TemplatesScreen() {
     navigation.navigate('TemplateDetail' as never, { id } as never)
   }
 
-  // Only derive list and show empty state after API has finished (isLoading is false)
-  const displayTemplates = !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : []
-  const hasNoTemplates = !isLoading && workoutInfo !== null && displayTemplates.length === 0
+  const displayTemplates = isAuthenticated
+    ? (!isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : [])
+    : defaultTemplates
+  const effectiveDefaultLoading =
+    !isAuthenticated && (!defaultTemplatesFetched || defaultTemplatesLoading)
+  const hasNoTemplates = isAuthenticated
+    ? !isLoading && workoutInfo !== null && displayTemplates.length === 0
+    : defaultTemplatesFetched && !defaultTemplatesLoading && displayTemplates.length === 0
 
-  // Don't render empty state or list until API call is done (avoids flash)
-  if (isLoading) {
+  if (isLoading && isAuthenticated) {
+    return <View style={styles.container} />
+  }
+
+  if (effectiveDefaultLoading) {
     return <View style={styles.container} />
   }
 
@@ -40,38 +80,44 @@ function TemplatesScreen() {
     <View style={styles.container}>
       {hasNoTemplates ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>No Templates Yet</Text>
-          <Text style={styles.emptyText}>
-            Create your first workout template to get started!
+          <Text style={styles.emptyTitle}>
+            {isAuthenticated ? 'No Templates Yet' : 'No Default Templates'}
           </Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => navigation.navigate('CreateTemplate' as never)}
-          >
-            <Text style={styles.createButtonText}>Create Template</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptyText}>
+            {isAuthenticated
+              ? 'Create your first workout template to get started!'
+              : 'Default templates will appear here.'}
+          </Text>
+          {isAuthenticated && (
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => navigation.navigate('CreateTemplate' as never)}
+            >
+              <Text style={styles.createButtonText}>Create Template</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
-        <ScrollView 
-            style={styles.scrollView} 
-            contentContainerStyle={styles.content}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-          >
-            {displayTemplates.map((template) => (
-              <TouchableOpacity
-                key={template.id}
-                style={styles.templateCard}
-                onPress={() => handleTemplateClick(template.id)}
-              >
-                <Text style={styles.templateName}>{template.name}</Text>
-                <Text style={styles.templateDate}>
-                  Created: {new Date(template.createdAt).toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {displayTemplates.map((template) => (
+            <TouchableOpacity
+              key={template.id}
+              style={styles.templateCard}
+              onPress={() => handleTemplateClick(template.id)}
+            >
+              <Text style={styles.templateName}>{template.name}</Text>
+              <Text style={styles.templateDate}>
+                Created: {new Date(template.createdAt).toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       )}
     </View>
   )

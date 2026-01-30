@@ -27,3 +27,4 @@ export const isAuthed = middleware(({ ctx, next }) => {
 export const protectedProcedure = publicProcedure.use(isAuthed);
 
 export { middleware };
+

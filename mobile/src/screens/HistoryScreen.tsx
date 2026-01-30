@@ -1,14 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react'
+import { useNavigation } from '@react-navigation/native'
+import React, { useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  RefreshControl,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native'
-import { useNavigation, useIsFocused } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
@@ -22,28 +22,16 @@ interface Session {
 }
 
 function HistoryScreen() {
-  const { workoutInfo, isLoading, checkAuth } = useAuth()
+  const { workoutInfo, isLoading, checkAuth, isAuthenticated } = useAuth()
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const navigation = useNavigation()
-  const isFocused = useIsFocused()
-  const lastRefreshRef = useRef<number>(0)
-
-  // Refresh when screen comes into focus (but not too frequently)
-  useEffect(() => {
-    if (isFocused) {
-      const now = Date.now()
-      // Only refresh if it's been more than 1 second since last refresh
-      if (now - lastRefreshRef.current > 1000) {
-        lastRefreshRef.current = now
-        checkAuth()
-      }
-    }
-  }, [isFocused, checkAuth])
 
   const onRefresh = async () => {
     setRefreshing(true)
-    await checkAuth()
+    if (isAuthenticated) {
+      await checkAuth()
+    }
     setRefreshing(false)
   }
 
@@ -67,7 +55,7 @@ function HistoryScreen() {
             try {
               setDeletingSessionId(sessionId)
               await trpc.sessions.delete.mutate({ id: sessionId })
-              await checkAuth()
+              await checkAuth({ silent: true })
               Toast.show({
                 type: 'success',
                 text1: 'Success',
@@ -78,7 +66,7 @@ function HistoryScreen() {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: err instanceof Error ? err.message : 'Failed to delete session',
+                text2: 'Failed to delete session. Please try again.',
               })
             } finally {
               setDeletingSessionId(null)
@@ -89,11 +77,29 @@ function HistoryScreen() {
     )
   }
 
-  // Only derive list and show empty state after API has finished (isLoading is false)
-  const displaySessions = !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
-  const hasNoSessions = !isLoading && workoutInfo !== null && displaySessions.length === 0
+  const displaySessions = isAuthenticated && !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
+  const hasNoSessions = isAuthenticated
+    ? !isLoading && workoutInfo !== null && displaySessions.length === 0
+    : true
 
-  // Don't render empty state or list until API call is done (avoids flash)
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyTitleRow}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login' as never)}>
+              <Text style={styles.emptyTitleLoginLink}>Log in</Text>
+            </TouchableOpacity>
+            <Text style={styles.emptyTitle}> to see your history</Text>
+          </View>
+          <Text style={styles.emptyText}>
+            Your workout sessions will appear here once you log in and complete workouts.
+          </Text>
+        </View>
+      </View>
+    )
+  }
+
   if (isLoading) {
     return <View style={styles.container} />
   }
@@ -169,11 +175,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
+  emptyTitleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 8,
+  },
+  emptyTitleLoginLink: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2563EB',
   },
   emptyText: {
     fontSize: 16,

@@ -1,23 +1,23 @@
-import { createTRPCProxyClient, httpLink } from '@trpc/client'
-import type { AppRouter } from '../../../backend/trpc/types'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { createTRPCProxyClient, httpLink } from '@trpc/client'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
+import type { AppRouter } from '../../../backend/trpc/types'
 
 // Get API base URL from Expo config or default
 // On Android emulator, use 10.0.2.2 instead of localhost
 const getApiBaseUrl = (): string => {
   // Try to get from Expo config first, then env var, then default
-  const configUrl = 
-    Constants.expoConfig?.extra?.apiBaseUrl ?? 
-    process.env.EXPO_PUBLIC_API_BASE_URL ?? 
-    'http://localhost:3000'
-  
+  const configUrl =
+    Constants.expoConfig?.extra?.apiBaseUrl ??
+    process.env.EXPO_PUBLIC_API_BASE_URL ??
+    'http://119.76.183.15:3000'
+
   // Replace localhost with 10.0.2.2 for Android emulator
   if (Platform.OS === 'android' && configUrl.includes('localhost')) {
     return configUrl.replace('localhost', '10.0.2.2')
   }
-  
+
   return configUrl
 }
 
@@ -32,10 +32,10 @@ const COOKIE_STORAGE_KEY = '@w2s:cookies'
 // Parse cookies from Set-Cookie header
 function parseCookies(setCookieHeader: string | null): Record<string, string> {
   if (!setCookieHeader) return {}
-  
+
   const cookies: Record<string, string> = {}
   const cookieStrings = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader]
-  
+
   cookieStrings.forEach(cookieStr => {
     const parts = cookieStr.split(';')
     const [name, value] = parts[0].split('=')
@@ -43,7 +43,7 @@ function parseCookies(setCookieHeader: string | null): Record<string, string> {
       cookies[name.trim()] = value.trim()
     }
   })
-  
+
   return cookies
 }
 
@@ -66,6 +66,15 @@ async function saveCookies(cookies: Record<string, string>) {
   }
 }
 
+/** Clear stored auth token (for testing unauthenticated flow / log out) */
+export async function clearStoredAuth(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(COOKIE_STORAGE_KEY)
+  } catch (error) {
+    console.error('Error clearing auth:', error)
+  }
+}
+
 // Build cookie header string
 function buildCookieHeader(cookies: Record<string, string>): string {
   return Object.entries(cookies)
@@ -81,7 +90,14 @@ export const trpc = createTRPCProxyClient<AppRouter>({
         // Get stored cookies
         const storedCookies = await getStoredCookies()
         const cookieHeader = buildCookieHeader(storedCookies)
-        
+        console.log('[API] Request:', typeof url === 'string' ? url : url.toString(), cookieHeader ? 'Cookie header present' : 'No cookie')
+
+        // Log token when sending (for login/getWorkoutInfo debugging)
+        const urlStr = typeof url === 'string' ? url : url.toString()
+        if (storedCookies.auth_token && (urlStr.includes('users.login') || urlStr.includes('users.getWorkoutInfo'))) {
+          console.log('[API] Token being sent:', storedCookies.auth_token)
+        }
+
         // Make request with cookies
         const response = await fetch(url, {
           ...options,
@@ -90,23 +106,36 @@ export const trpc = createTRPCProxyClient<AppRouter>({
             ...(cookieHeader && { Cookie: cookieHeader }),
           },
         })
-        
-        // Extract and save new cookies from response
-        // Note: React Native fetch may not expose Set-Cookie headers directly
-        // Cookies are typically handled automatically by the platform, but we'll try to extract them
+
+        // Log response for login and getWorkoutInfo (clone so we don't consume body)
+        if (urlStr.includes('users.login') || urlStr.includes('users.getWorkoutInfo')) {
+          response
+            .clone()
+            .json()
+            .then((body) => {
+              console.log('[API] Response', urlStr.includes('users.login') ? 'login' : 'getWorkoutInfo', 'status:', response.status, 'body:', JSON.stringify(body))
+            })
+            .catch(() =>
+              response
+                .clone()
+                .text()
+                .then((text) => console.log('[API] Response', urlStr.includes('users.login') ? 'login' : 'getWorkoutInfo', 'status:', response.status, 'body (text):', text))
+            )
+        }
+
+        // Persist auth token from X-Auth-Token header (mobile: backend sends token here since Set-Cookie is not readable in RN)
         try {
-          const setCookieHeader = response.headers.get('Set-Cookie')
-          if (setCookieHeader) {
-            const newCookies = parseCookies(setCookieHeader)
+          const authTokenHeader = response.headers.get('X-Auth-Token')
+          if (authTokenHeader) {
+            const newCookies = parseCookies(authTokenHeader)
+            console.log('[API] X-Auth-Token received, token:', newCookies.auth_token ?? '(no auth_token in header)')
             const updatedCookies = { ...storedCookies, ...newCookies }
             await saveCookies(updatedCookies)
           }
         } catch (err) {
-          // Set-Cookie headers may not be accessible in React Native
-          // Cookies should still work if the backend sets them properly
-          console.warn('Could not extract Set-Cookie header:', err)
+          console.warn('Could not persist X-Auth-Token:', err)
         }
-        
+
         return response
       },
     }),

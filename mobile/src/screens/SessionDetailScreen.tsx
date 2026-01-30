@@ -1,22 +1,22 @@
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import React, { useEffect, useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Switch,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native'
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
+import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
-import type { RootStackParamList } from '../../App'
 import type { Session, SessionSet } from '../types'
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
@@ -53,7 +53,7 @@ function SessionDetailScreen() {
   const route = useRoute<SessionDetailRouteProp>()
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
-  const { checkAuth } = useAuth()
+  const { checkAuth, isAuthenticated } = useAuth()
   const { id } = route.params
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -225,6 +225,46 @@ function SessionDetailScreen() {
   const handleCompleteWorkout = async () => {
     if (!session) return
 
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Save session?',
+        'To save this session to your history, log in. Proceed without logging in? This session will not be saved.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: "Don't save",
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setCompleting(true)
+                await trpc.sessions.delete.mutate({ id: session.id })
+                navigation.navigate('MainTabs' as never)
+              } catch (err) {
+                console.error('Error deleting session:', err)
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: 'Failed to delete session. Please try again.',
+                })
+              } finally {
+                setCompleting(false)
+              }
+            },
+          },
+          {
+            text: 'Log in',
+            onPress: () => {
+              navigation.navigate('Login' as never, {
+                completeSessionId: session.id,
+                sessionCreatedAt: session.createdAt,
+              } as never)
+            },
+          },
+        ]
+      )
+      return
+    }
+
     try {
       setCompleting(true)
       setError(null)
@@ -235,7 +275,6 @@ function SessionDetailScreen() {
         completedAt: new Date(),
       })
 
-      // Refresh workout info to update sessions list
       await checkAuth()
       navigation.navigate('MainTabs' as never)
     } catch (err) {
@@ -244,7 +283,7 @@ function SessionDetailScreen() {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: err instanceof Error ? err.message : 'Failed to complete workout',
+        text2: 'Failed to complete workout. Please try again.',
       })
     } finally {
       setCompleting(false)
@@ -276,11 +315,6 @@ function SessionDetailScreen() {
             } catch (err) {
               console.error('Error canceling workout:', err)
               setError(err instanceof Error ? err.message : 'Failed to cancel workout')
-              Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: err instanceof Error ? err.message : 'Failed to cancel workout',
-              })
             } finally {
               setDeleting(false)
             }
@@ -306,7 +340,7 @@ function SessionDetailScreen() {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: err instanceof Error ? err.message : 'Failed to start new workout',
+        text2: 'Failed to start new workout. Please try again.',
       })
     } finally {
       setStartingNew(false)

@@ -37,6 +37,7 @@ export interface Template {
   name: string
   createdAt: string
   workoutExercises: TemplateExercise[]
+  isDefaultTemplate?: boolean
 }
 
 export interface Session {

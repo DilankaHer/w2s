@@ -1,21 +1,23 @@
-import React from 'react'
-import { NavigationContainer, useNavigation } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack'
+import { NavigationContainer, useNavigation } from '@react-navigation/native'
+import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack'
 import { StatusBar } from 'expo-status-bar'
-import { Text, Platform, TouchableOpacity, View, StyleSheet } from 'react-native'
+import React from 'react'
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
-import LoginScreen from './src/screens/LoginScreen'
-import TemplatesScreen from './src/screens/TemplatesScreen'
-import HistoryScreen from './src/screens/HistoryScreen'
-import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
-import SessionDetailScreen from './src/screens/SessionDetailScreen'
-import CreateTemplateScreen from './src/screens/CreateTemplateScreen'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
+import { AuthProvider, useAuth } from './src/contexts/AuthContext'
+import CreateTemplateScreen from './src/screens/CreateTemplateScreen'
+import HistoryScreen from './src/screens/HistoryScreen'
+import LoginScreen from './src/screens/LoginScreen'
+import ProfileScreen from './src/screens/ProfileScreen'
+import SessionDetailScreen from './src/screens/SessionDetailScreen'
+import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
+import TemplatesScreen from './src/screens/TemplatesScreen'
 
 export type RootStackParamList = {
-  Login: undefined
+  Login: { completeSessionId?: number; sessionCreatedAt?: string } | undefined
   MainTabs: undefined
   TemplateDetail: { id: number }
   SessionDetail: { id: number }
@@ -26,6 +28,7 @@ export type TabParamList = {
   Templates: undefined
   Create: undefined
   History: undefined
+  Profile: undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>()
@@ -39,17 +42,30 @@ function CreatePlaceholder() {
 // Custom Add Button component for the tab bar
 function AddButtonTab(props: any) {
   const navigation = useNavigation()
-  
+  const { isAuthenticated } = useAuth()
+
+  const handlePress = () => {
+    const parentNavigation = navigation.getParent()
+    if (!parentNavigation) return
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Login required',
+        'You need to log in to create a template.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Login', onPress: () => parentNavigation.navigate('Login' as never) },
+        ]
+      )
+      return
+    }
+    parentNavigation.navigate('CreateTemplate' as never)
+  }
+
   return (
     <TouchableOpacity
       {...props}
       style={[props.style, styles.addButtonWrapper]}
-      onPress={() => {
-        const parentNavigation = navigation.getParent()
-        if (parentNavigation) {
-          parentNavigation.navigate('CreateTemplate' as never)
-        }
-      }}
+      onPress={handlePress}
     >
       <View style={styles.addButtonContainer}>
         <View style={styles.addButton}>
@@ -126,6 +142,17 @@ function MainTabs() {
           ),
         }}
       />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          title: 'Profile',
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <Text style={{ color, fontSize: 20 }}>👤</Text>
+          ),
+        }}
+      />
     </Tab.Navigator>
   )
 }
@@ -162,87 +189,82 @@ const styles = StyleSheet.create({
   },
 })
 
+const stackScreenOptions = {
+  headerStyle: {
+    backgroundColor: '#2563EB',
+  },
+  headerTintColor: '#fff',
+  headerTitleStyle: {
+    fontWeight: 'bold',
+  },
+  cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+  transitionSpec: {
+    open: { animation: 'timing', config: { duration: 300 } },
+    close: { animation: 'timing', config: { duration: 300 } },
+  },
+}
+
+function RootNavigator() {
+  const { isLoading, isAuthenticated } = useAuth()
+
+  // Only show full-screen loading on initial auth check (before we know auth state).
+  // Later checkAuth() calls (e.g. when switching to History tab) must not unmount the navigator.
+  if (isLoading && isAuthenticated === null) {
+    return <View style={{ flex: 1, backgroundColor: '#F9FAFB' }} />
+  }
+
+  return (
+    <Stack.Navigator
+      initialRouteName="MainTabs"
+      screenOptions={stackScreenOptions}
+    >
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MainTabs"
+        options={{ headerShown: false }}
+      >
+        {() => <MainTabs />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="TemplateDetail"
+        options={{ title: 'Template Details' }}
+      >
+        {() => <TemplateDetailScreen />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="SessionDetail"
+        options={{ title: 'Workout Session' }}
+      >
+        {() => <SessionDetailScreen />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="CreateTemplate"
+        options={{ title: 'Create Template' }}
+      >
+        {() => (
+          <ProtectedRoute>
+            <CreateTemplateScreen />
+          </ProtectedRoute>
+        )}
+      </Stack.Screen>
+    </Stack.Navigator>
+  )
+}
+
 function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="auto" />
-        <Stack.Navigator
-        initialRouteName="Login"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#2563EB',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          // Smooth slide-in-from-right transition
-          cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-          transitionSpec: {
-            open: {
-              animation: 'timing',
-              config: {
-                duration: 300,
-              },
-            },
-            close: {
-              animation: 'timing',
-              config: {
-                duration: 300,
-              },
-            },
-          },
-        }}
-      >
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="MainTabs"
-          options={{ headerShown: false }}
-        >
-          {() => (
-            <ProtectedRoute>
-              <MainTabs />
-            </ProtectedRoute>
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name="TemplateDetail"
-          options={{ title: 'Template Details' }}
-        >
-          {() => (
-            <ProtectedRoute>
-              <TemplateDetailScreen />
-            </ProtectedRoute>
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name="SessionDetail"
-          options={{ title: 'Workout Session' }}
-        >
-          {() => (
-            <ProtectedRoute>
-              <SessionDetailScreen />
-            </ProtectedRoute>
-          )}
-        </Stack.Screen>
-        <Stack.Screen
-          name="CreateTemplate"
-          options={{ title: 'Create Template' }}
-        >
-          {() => (
-            <ProtectedRoute>
-              <CreateTemplateScreen />
-            </ProtectedRoute>
-          )}
-        </Stack.Screen>
-      </Stack.Navigator>
-      </NavigationContainer>
-      <Toast />
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </NavigationContainer>
+        <Toast />
+      </AuthProvider>
     </SafeAreaProvider>
   )
 }

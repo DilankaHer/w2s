@@ -14,6 +14,7 @@ const allowedOrigins = new Set([
 ]);
 
 Bun.serve({
+  hostname: '0.0.0.0',
   port: 3000,
   websocket: trpcHandler.websocket,
   fetch: async (req, server) => {

@@ -2,7 +2,6 @@ import z from "zod";
 
 export const WorkoutCreateInput = z.object({
   name: z.string(),
-  isTemplate: z.boolean(),
   workoutExercises: z.array(z.object({
     id: z.number(),
     order: z.number(),

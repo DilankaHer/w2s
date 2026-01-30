@@ -37,10 +37,10 @@ model Exercise {
 }
 
 model Workout {
-  id         Int      @id @default(autoincrement())
-  name       String
-  userId     Int?
-  isTemplate Boolean
+  id                  Int      @id @default(autoincrement())
+  name                String
+  userId              Int?
+  isDefaultTemplate   Boolean @default(false)
   createdAt  DateTime @default(now())
 
   workoutExercises WorkoutExercise[]
@@ -56,7 +56,7 @@ model WorkoutExercise {
   exerciseId Int
   order      Int
 
-  workout  Workout  @relation(fields: [workoutId], references: [id])
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise Exercise @relation(fields: [exerciseId], references: [id])
   sets     Set[]
 
@@ -71,7 +71,7 @@ model Set {
   targetReps        Int
   targetWeight      Int
 
-  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
 
   @@map("sets")
 }

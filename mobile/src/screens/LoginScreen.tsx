@@ -1,19 +1,21 @@
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import React, { useState } from 'react'
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
+import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
+
+type LoginRouteProp = RouteProp<RootStackParamList, 'Login'>
 
 function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true) // true for login, false for signup
@@ -21,6 +23,7 @@ function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const navigation = useNavigation()
+  const route = useRoute<LoginRouteProp>()
   const { checkAuth } = useAuth()
 
   const handleSubmit = async () => {
@@ -48,12 +51,32 @@ function LoginScreen() {
           })
 
       if (result.success) {
-        // Refresh auth state
         await checkAuth()
-        // Navigate to main tabs
+
+        const completeSessionId = route.params?.completeSessionId
+        const sessionCreatedAt = route.params?.sessionCreatedAt
+        if (completeSessionId != null && sessionCreatedAt) {
+          try {
+            const user = await trpc.users.getUser.query()
+            await trpc.sessions.update.mutate({
+              id: completeSessionId,
+              createdAt: new Date(sessionCreatedAt),
+              completedAt: new Date(),
+              userId: user.userId,
+            })
+            await checkAuth()
+          } catch (err) {
+            console.error('Error saving session:', err)
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: 'Failed to save session. Please try again.',
+            })
+          }
+        }
+
         navigation.navigate('MainTabs' as never)
-        
-        // Show success toast
+
         Toast.show({
           type: 'success',
           text1: 'Success',
@@ -62,11 +85,33 @@ function LoginScreen() {
       }
     } catch (err) {
       console.error(`Error ${isLogin ? 'logging in' : 'creating account'}:`, err)
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: err instanceof Error ? err.message : `Failed to ${isLogin ? 'log in' : 'create account'}`,
-      })
+      const errorMessage = err instanceof Error ? err.message : ''
+      // Show user-friendly error messages
+      if (errorMessage.includes('not found') || errorMessage.includes('User not found')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: 'Username or password is incorrect.',
+        })
+      } else if (errorMessage.includes('Invalid password')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: 'Username or password is incorrect.',
+        })
+      } else if (errorMessage.includes('already exists') || errorMessage.includes('Username already exists')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Signup Failed',
+          text2: 'Username already exists. Please choose another.',
+        })
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: isLogin ? 'Failed to log in. Please try again.' : 'Failed to create account. Please try again.',
+        })
+      }
     } finally {
       setLoading(false)
     }

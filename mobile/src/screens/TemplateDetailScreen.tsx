@@ -1,26 +1,27 @@
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import React, { useEffect, useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native'
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
-import { trpc } from '../api/client'
 import type { RootStackParamList } from '../../App'
-import type { Template, Set } from '../types'
+import { trpc } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
+import type { Set, Template } from '../types'
 
 type TemplateDetailRouteProp = RouteProp<RootStackParamList, 'TemplateDetail'>
 
 function TemplateDetailScreen() {
   const route = useRoute<TemplateDetailRouteProp>()
   const navigation = useNavigation()
+  const { isAuthenticated } = useAuth()
   const { id } = route.params
   const [template, setTemplate] = useState<Template | null>(null)
   const [loading, setLoading] = useState(true)
@@ -126,9 +127,9 @@ function TemplateDetailScreen() {
     try {
       setCreatingSession(true)
       setError(null)
-      const session = await trpc.sessions.create.mutate({
-        workoutId: template.id,
-      })
+      const session = isAuthenticated
+        ? await trpc.sessions.create.mutate({ workoutId: template.id })
+        : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
       navigation.navigate('SessionDetail' as never, { id: session.id } as never)
     } catch (err) {
       console.error('Error creating session:', err)
@@ -136,7 +137,7 @@ function TemplateDetailScreen() {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: err instanceof Error ? err.message : 'Failed to create session',
+        text2: 'Failed to start workout. Please try again.',
       })
     } finally {
       setCreatingSession(false)

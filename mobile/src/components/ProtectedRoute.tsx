@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { useNavigation } from '@react-navigation/native'
+import { useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 interface ProtectedRouteProps {

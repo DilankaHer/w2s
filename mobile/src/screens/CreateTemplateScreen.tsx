@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react'
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
-} from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import React, { useEffect, useState } from 'react'
+import {
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native'
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
@@ -179,7 +178,7 @@ function CreateTemplateScreen() {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: err instanceof Error ? err.message : 'Failed to create template',
+        text2: 'Failed to create template. Please try again.',
       })
     } finally {
       setSubmitting(false)

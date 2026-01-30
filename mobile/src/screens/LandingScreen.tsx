@@ -1,17 +1,16 @@
+import { useNavigation } from '@react-navigation/native'
 import React, { useState } from 'react'
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
-import type { Template } from '../types'
 
 interface Session {
   id: number
@@ -67,7 +66,7 @@ function LandingScreen() {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: err instanceof Error ? err.message : 'Failed to delete session',
+                text2: 'Failed to delete session. Please try again.',
               })
             } finally {
               setDeletingSessionId(null)
