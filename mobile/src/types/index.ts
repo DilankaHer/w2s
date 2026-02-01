@@ -45,6 +45,8 @@ export interface Session {
   name: string
   createdAt: string
   completedAt: string | null
+  workoutId?: number | null
+  sessionTime?: string | null
   sessionExercises: SessionExercise[]
 }
 

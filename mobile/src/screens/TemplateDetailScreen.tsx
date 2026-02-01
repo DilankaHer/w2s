@@ -1,5 +1,5 @@
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useEffect, useState } from 'react'
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Platform,
@@ -13,6 +13,7 @@ import {
 import Toast from 'react-native-toast-message'
 import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
+import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
 import type { Set, Template } from '../types'
 
@@ -21,13 +22,14 @@ type TemplateDetailRouteProp = RouteProp<RootStackParamList, 'TemplateDetail'>
 function TemplateDetailScreen() {
   const route = useRoute<TemplateDetailRouteProp>()
   const navigation = useNavigation()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, serverDown, isLoading: authLoading, checkServerOnFocus } = useAuth()
   const { id } = route.params
   const [template, setTemplate] = useState<Template | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { targetReps: number; targetWeight: number }>>(new Map())
+  const prevServerDownRef = useRef(serverDown)
 
   useEffect(() => {
     if (id) {
@@ -35,19 +37,35 @@ function TemplateDetailScreen() {
     }
   }, [id])
 
+  useFocusEffect(
+    useCallback(() => {
+      checkServerOnFocus()
+    }, [checkServerOnFocus])
+  )
+
   const fetchTemplate = async (templateId: number) => {
     try {
       setLoading(true)
       setError(null)
       const data = await trpc.workouts.getById.query({ id: templateId })
       setTemplate(data)
+      setEditingSets(new Map())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(getApiErrorMessage(err, 'An error occurred'))
       console.error('Error fetching template:', err)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (serverDown) prevServerDownRef.current = true
+    else if (prevServerDownRef.current && !authLoading && !template && id) {
+      fetchTemplate(id)
+      prevServerDownRef.current = false
+    } else if ((template || !id) && !authLoading) prevServerDownRef.current = false
+    else if (!serverDown && !authLoading) prevServerDownRef.current = false
+  }, [serverDown, authLoading, template, id])
 
   const updateSetValue = (setId: number, field: 'targetReps' | 'targetWeight', value: number) => {
     setEditingSets((prev) => {
@@ -80,7 +98,7 @@ function TemplateDetailScreen() {
     const edited = editingSets.get(set.id)
     if (!edited) return
 
-    if (!template) return
+    if (!template || template.isDefaultTemplate) return
 
     const updateData = {
       setId: set.id,
@@ -89,7 +107,7 @@ function TemplateDetailScreen() {
     }
 
     try {
-      await trpc.sets.update.mutate(updateData)
+      const updatedSet = await trpc.sets.update.mutate(updateData)
 
       setTemplate((prev) => {
         if (!prev) return null
@@ -98,11 +116,11 @@ function TemplateDetailScreen() {
           workoutExercises: prev.workoutExercises.map((templateExercise) => ({
             ...templateExercise,
             sets: templateExercise.sets.map((s) =>
-              s.id === set.id
+              s.id === updatedSet.id
                 ? {
                     ...s,
-                    targetReps: edited.targetReps,
-                    targetWeight: edited.targetWeight,
+                    targetReps: updatedSet.targetReps,
+                    targetWeight: updatedSet.targetWeight,
                   }
                 : s
             ),
@@ -117,7 +135,15 @@ function TemplateDetailScreen() {
       })
     } catch (err) {
       console.error('Error updating set:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update set')
+      setEditingSets((prev) => {
+        const newMap = new Map(prev)
+        newMap.delete(set.id)
+        return newMap
+      })
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update set',
+      })
     }
   }
 
@@ -130,10 +156,10 @@ function TemplateDetailScreen() {
       const session = isAuthenticated
         ? await trpc.sessions.create.mutate({ workoutId: template.id })
         : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
-      navigation.navigate('SessionDetail' as never, { id: session.id } as never)
+      navigation.navigate('SessionDetail' as never, { id: session.id, initialSession: session } as never)
     } catch (err) {
       console.error('Error creating session:', err)
-      setError(err instanceof Error ? err.message : 'Failed to create session')
+      setError(getApiErrorMessage(err, 'Failed to create session'))
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -142,6 +168,14 @@ function TemplateDetailScreen() {
     } finally {
       setCreatingSession(false)
     }
+  }
+
+  // Only show white when server is up and we have no template yet. When server is down always show content we have so overlay is the only change.
+  if (!serverDown && !template && loading) {
+    return <View style={[styles.container, styles.errorContainer, { backgroundColor: '#fff' }]} />
+  }
+  if (serverDown && !template) {
+    return <View style={[styles.container, styles.errorContainer, { backgroundColor: '#F9FAFB' }]} />
   }
 
   // Only show error if we're not loading
@@ -168,9 +202,9 @@ function TemplateDetailScreen() {
     )
   }
 
-  // Show nothing while loading (or return null to prevent flash)
+  // Show gray container while loading and no template (dialog takes priority; no content update until resolved)
   if (loading && !template) {
-    return null
+    return <View style={[styles.container, { backgroundColor: '#F9FAFB' }]} />
   }
 
   return (
@@ -227,50 +261,60 @@ function TemplateDetailScreen() {
                       const edited = editingSets.get(set.id)
                       const displayWeight = edited?.targetWeight ?? set.targetWeight
                       const displayReps = edited?.targetReps ?? set.targetReps
+                      const readOnly = template.isDefaultTemplate
 
                       return (
                         <View key={set.id} style={styles.setRow}>
                           <Text style={styles.setNumber}>{set.setNumber}</Text>
-                          <TextInput
-                            style={styles.setInput}
-                            value={displayWeight === 0 ? '' : displayWeight.toString()}
-                            onChangeText={(text) =>
-                              updateSetValue(set.id, 'targetWeight', parseFloat(text) || 0)
-                            }
-                            onFocus={() => {
-                              if (!editingSets.has(set.id)) {
-                                updateSetValue(set.id, 'targetWeight', set.targetWeight)
-                              }
-                            }}
-                            onBlur={() => {
-                              const edited = editingSets.get(set.id)
-                              if (edited) {
-                                saveSetUpdate(set)
-                              }
-                            }}
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
-                          <TextInput
-                            style={styles.setInput}
-                            value={displayReps === 0 ? '' : displayReps.toString()}
-                            onChangeText={(text) =>
-                              updateSetValue(set.id, 'targetReps', parseInt(text) || 0)
-                            }
-                            onFocus={() => {
-                              if (!editingSets.has(set.id)) {
-                                updateSetValue(set.id, 'targetReps', set.targetReps)
-                              }
-                            }}
-                            onBlur={() => {
-                              const edited = editingSets.get(set.id)
-                              if (edited) {
-                                saveSetUpdate(set)
-                              }
-                            }}
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
+                          {readOnly ? (
+                            <>
+                              <Text style={styles.setValue}>{displayWeight}</Text>
+                              <Text style={styles.setValue}>{displayReps}</Text>
+                            </>
+                          ) : (
+                            <>
+                              <TextInput
+                                style={styles.setInput}
+                                value={displayWeight === 0 ? '' : displayWeight.toString()}
+                                onChangeText={(text) =>
+                                  updateSetValue(set.id, 'targetWeight', parseFloat(text) || 0)
+                                }
+                                onFocus={() => {
+                                  if (!editingSets.has(set.id)) {
+                                    updateSetValue(set.id, 'targetWeight', set.targetWeight)
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const edited = editingSets.get(set.id)
+                                  if (edited) {
+                                    saveSetUpdate(set)
+                                  }
+                                }}
+                                keyboardType="numeric"
+                                placeholder="0"
+                              />
+                              <TextInput
+                                style={styles.setInput}
+                                value={displayReps === 0 ? '' : displayReps.toString()}
+                                onChangeText={(text) =>
+                                  updateSetValue(set.id, 'targetReps', parseInt(text) || 0)
+                                }
+                                onFocus={() => {
+                                  if (!editingSets.has(set.id)) {
+                                    updateSetValue(set.id, 'targetReps', set.targetReps)
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const edited = editingSets.get(set.id)
+                                  if (edited) {
+                                    saveSetUpdate(set)
+                                  }
+                                }}
+                                keyboardType="numeric"
+                                placeholder="0"
+                              />
+                            </>
+                          )}
                         </View>
                       )
                     })}
@@ -449,6 +493,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 4,
     backgroundColor: '#fff',
+  },
+  setValue: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    textAlign: 'center',
   },
 })
 

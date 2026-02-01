@@ -1,5 +1,5 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Platform,
@@ -13,7 +13,10 @@ import {
 import Toast from 'react-native-toast-message'
 import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
+import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+
+const USERNAME_CHECK_DEBOUNCE_MS = 400
 
 type LoginRouteProp = RouteProp<RootStackParamList, 'Login'>
 
@@ -22,9 +25,50 @@ function LoginScreen() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [usernameTaken, setUsernameTaken] = useState<boolean | null>(null)
+  const usernameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigation = useNavigation()
   const route = useRoute<LoginRouteProp>()
   const { checkAuth } = useAuth()
+
+  const checkUsername = useCallback(async (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      setUsernameTaken(null)
+      return
+    }
+    try {
+      const result = await trpc.users.checkUsername.mutate({ username: trimmed })
+      setUsernameTaken(result.exists)
+    } catch {
+      setUsernameTaken(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isLogin) {
+      if (usernameCheckTimeoutRef.current) {
+        clearTimeout(usernameCheckTimeoutRef.current)
+        usernameCheckTimeoutRef.current = null
+      }
+      const trimmed = username.trim()
+      if (!trimmed) {
+        setUsernameTaken(null)
+        return
+      }
+      usernameCheckTimeoutRef.current = setTimeout(() => {
+        checkUsername(trimmed)
+        usernameCheckTimeoutRef.current = null
+      }, USERNAME_CHECK_DEBOUNCE_MS)
+      return () => {
+        if (usernameCheckTimeoutRef.current) {
+          clearTimeout(usernameCheckTimeoutRef.current)
+        }
+      }
+    } else {
+      setUsernameTaken(null)
+    }
+  }, [username, isLogin, checkUsername])
 
   const handleSubmit = async () => {
     if (!username.trim() || !password.trim()) {
@@ -32,6 +76,14 @@ function LoginScreen() {
         type: 'error',
         text1: 'Validation Error',
         text2: 'Please enter both username and password',
+      })
+      return
+    }
+    if (!isLogin && usernameTaken) {
+      Toast.show({
+        type: 'error',
+        text1: 'Signup Failed',
+        text2: 'Username already exists. Please choose another.',
       })
       return
     }
@@ -85,7 +137,7 @@ function LoginScreen() {
       }
     } catch (err) {
       console.error(`Error ${isLogin ? 'logging in' : 'creating account'}:`, err)
-      const errorMessage = err instanceof Error ? err.message : ''
+      const errorMessage = getApiErrorMessage(err, '')
       // Show user-friendly error messages
       if (errorMessage.includes('not found') || errorMessage.includes('User not found')) {
         Toast.show({
@@ -138,13 +190,19 @@ function LoginScreen() {
 
           <View style={styles.form}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, usernameTaken === true && styles.inputError]}
               placeholder="Username"
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
               editable={!loading}
             />
+            {!isLogin && usernameTaken === true && (
+              <Text style={styles.usernameTakenText}>Username already taken</Text>
+            )}
+            {!isLogin && username.trim().length > 0 && usernameTaken === false && (
+              <Text style={styles.usernameAvailableText}>Username available</Text>
+            )}
             <TextInput
               style={styles.input}
               placeholder="Password"
@@ -226,6 +284,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
     color: '#111827',
+  },
+  inputError: {
+    borderColor: '#DC2626',
+  },
+  usernameTakenText: {
+    color: '#DC2626',
+    fontSize: 14,
+    marginTop: -12,
+    marginBottom: 16,
+  },
+  usernameAvailableText: {
+    color: '#059669',
+    fontSize: 14,
+    marginTop: -12,
+    marginBottom: 16,
   },
   button: {
     backgroundColor: '#2563EB',

@@ -35,8 +35,11 @@ function LandingScreen() {
     navigation.navigate('TemplateDetail' as never, { id } as never)
   }
 
-  const handleSessionClick = (id: number) => {
-    navigation.navigate('SessionDetail' as never, { id } as never)
+  const handleSessionClick = (sessionItem: { id: number; createdAt: string }) => {
+    navigation.navigate('SessionDetail' as never, {
+      id: sessionItem.id,
+      initialCreatedAt: sessionItem.createdAt,
+    } as never)
   }
 
   const handleDeleteSession = (sessionId: number) => {
@@ -159,7 +162,7 @@ function LandingScreen() {
               <View key={session.id} style={styles.sessionCard}>
                 <TouchableOpacity
                   style={styles.sessionContent}
-                  onPress={() => handleSessionClick(session.id)}
+                  onPress={() => handleSessionClick(session)}
                 >
                   <View style={styles.sessionInfo}>
                     <Text style={styles.sessionDate}>

@@ -44,7 +44,6 @@ export const workoutsRouter = router({
   }),
 
   getTemplates: publicProcedure.input(z.object({ isDefaultTemplate: z.boolean().optional().default(false) })).query(async ({ input }) => {
-    console.log('input', input);
     return prisma.workout.findMany({
       where: { isDefaultTemplate: input.isDefaultTemplate },
       include: {
@@ -99,18 +98,136 @@ export const workoutsRouter = router({
       });
     }),
 
-  // update: publicProcedure
-  // .input(z.object({ id: z.number(), exercises: z.array(z.object({ id: z.number(), order: z.number(), sets: z.array(z.object({ id: z.number(), setNumber: z.number(), targetReps: z.number(), targetWeight: z.number() })) })) }))
-  // .mutation(async ({ input }) => {
-  //   for (const exercise of input.exercises) {
-  //     await prisma.workoutExercise.update({
-  //       where: { id: exercise.id },
-  //       data: { order: exercise.order, sets: { deleteMany: {}, create: exercise.sets.map(set => ({ setNumber: set.setNumber, targetReps: set.targetReps, targetWeight: set.targetWeight })) } },
-  //     });
-  //   }
-  //   return prisma.workout.update({
-  //     where: { id: input.id },
-  //     data: { exercises: { deleteMany: {}, create: input.exercises.map(exercise => ({ exerciseId: exercise.id, order: exercise.order, sets: exercise.sets.map(set => ({ setNumber: set.setNumber, targetReps: set.targetReps, targetWeight: set.targetWeight })) })) } },
-  //   });
-  // }),
+  update: protectedProcedure
+    .input(z.object({ id: z.number(), name: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.workout.update({
+        where: { id: input.id },
+        data: { name: input.name },
+      });
+    }),
+
+  updateBySession: protectedProcedure
+    .input(z.object({ sessionId: z.number(), workoutId: z.number() }))
+    .mutation(async ({ input }) => {
+      await prisma.$transaction(async (tx) => {
+        const sessionExercises = await tx.sessionExercise.findMany({
+          where: {
+            sessionId: input.sessionId,
+          },
+          include: {
+            sessionSets: {
+              orderBy: { setNumber: 'asc' },
+            },
+          },
+        });
+        for (const sessionExercise of sessionExercises) {
+          const workoutExercise = await tx.workoutExercise.findUnique({
+            where: {
+              workoutId_exerciseId: {
+                workoutId: input.workoutId,
+                exerciseId: sessionExercise.exerciseId,
+              },
+            },
+            include: {
+              sets: true,
+            },
+          });
+          if (workoutExercise === null) {
+            await tx.workoutExercise.create({
+              data: {
+                workoutId: input.workoutId,
+                exerciseId: sessionExercise.exerciseId,
+                order: sessionExercise.order,
+                sets: {
+                  create: sessionExercise.sessionSets.map(set => ({
+                    setNumber: set.setNumber,
+                    targetReps: set.reps ?? 0,
+                    targetWeight: set.weight ?? 0,
+                  })),
+                },
+              },
+            });
+          } else {
+            const noOfSessionSets = sessionExercise.sessionSets.length;
+            const noOfWorkoutSets = workoutExercise ? workoutExercise.sets.length : 0;
+            let remainingSets = noOfWorkoutSets;
+            for (const sessionSet of sessionExercise.sessionSets) {
+              if (remainingSets === 0) {
+                await tx.set.create({
+                  data: {
+                    workoutExerciseId: workoutExercise!.id,
+                    setNumber: sessionSet.setNumber,
+                    targetReps: sessionSet.reps ?? 0,
+                    targetWeight: sessionSet.weight ?? 0,
+                  },
+                });
+                continue;
+              }
+              await tx.set.update({
+                where: { setNumber_workoutExerciseId: { setNumber: sessionSet.setNumber, workoutExerciseId: workoutExercise!.id } },
+                data: {
+                  targetReps: sessionSet.reps ?? 0,
+                  targetWeight: sessionSet.weight ?? 0,
+                },
+              });
+              remainingSets--;
+            }
+            if (remainingSets > 0) {
+              await tx.set.deleteMany({
+                where: { setNumber: { in: Array.from({ length: remainingSets }, (_, index) => index + noOfSessionSets + 1) }, workoutExerciseId: workoutExercise!.id },
+              });
+            }
+          }
+        }
+      });
+    }),
+
+  createBySession: protectedProcedure
+    .input(z.object({ sessionId: z.number(), name: z.string() }))
+    .mutation(async ({ input }) => {
+      await prisma.$transaction(async (tx) => {
+        const session = await tx.session.findUnique({
+          where: { id: input.sessionId },
+          include: {
+            sessionExercises: {
+              include: {
+                exercise: true,
+                sessionSets: {
+                  orderBy: { setNumber: 'asc' },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+        });
+        if (session === null) {
+          throw new Error("Session not found");
+        }
+        const workout = await tx.workout.create({
+          data: {
+            name: input.name,
+            userId: session.userId,
+            workoutExercises: {
+              create: session.sessionExercises.map(exercise => ({
+                exerciseId: exercise.exerciseId,
+                order: exercise.order,
+                sets: {
+                  create: exercise.sessionSets.map(set => ({
+                    setNumber: set.setNumber,
+                    targetReps: set.reps ?? 0,
+                    targetWeight: set.weight ?? 0,
+                  })),
+                },
+              })),
+            },
+          },
+        });
+        await tx.session.update({
+          where: { id: input.sessionId },
+          data: { name: input.name, workoutId: workout.id },
+        });
+      });
+      return "Workout created successfully";
+    }),
 });

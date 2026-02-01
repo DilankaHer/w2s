@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "packageManager": "pnpm@8.0.0",
   "main": "index.js",
+  "pnpm": {
+    "overrides": {
+      "glob": "^10.4.5",
+      "rimraf": "^5.0.10"
+    }
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",

@@ -3,6 +3,10 @@ import { createTRPCProxyClient, httpLink } from '@trpc/client'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import type { AppRouter } from '../../../backend/trpc/types'
+import { triggerUnauthorized } from './onUnauthorized'
+import { triggerServerUnreachable } from './onServerUnreachable'
+
+const API_REQUEST_TIMEOUT_MS = 4_000
 
 // Get API base URL from Expo config or default
 // On Android emulator, use 10.0.2.2 instead of localhost
@@ -98,14 +102,25 @@ export const trpc = createTRPCProxyClient<AppRouter>({
           console.log('[API] Token being sent:', storedCookies.auth_token)
         }
 
-        // Make request with cookies
-        const response = await fetch(url, {
-          ...options,
-          headers: {
-            ...(options?.headers || {}),
-            ...(cookieHeader && { Cookie: cookieHeader }),
-          },
-        })
+        // Make request with cookies and 4s timeout
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS)
+        let response: Response
+        try {
+          response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+              ...(options?.headers || {}),
+              ...(cookieHeader && { Cookie: cookieHeader }),
+            },
+          })
+        } catch (err) {
+          clearTimeout(timeoutId)
+          triggerServerUnreachable()
+          throw err
+        }
+        clearTimeout(timeoutId)
 
         // Log response for login and getWorkoutInfo (clone so we don't consume body)
         if (urlStr.includes('users.login') || urlStr.includes('users.getWorkoutInfo')) {
@@ -121,6 +136,11 @@ export const trpc = createTRPCProxyClient<AppRouter>({
                 .text()
                 .then((text) => console.log('[API] Response', urlStr.includes('users.login') ? 'login' : 'getWorkoutInfo', 'status:', response.status, 'body (text):', text))
             )
+        }
+
+        if (response.status === 401) {
+          await clearStoredAuth()
+          triggerUnauthorized()
         }
 
         // Persist auth token from X-Auth-Token header (mobile: backend sends token here since Set-Cookie is not readable in RN)

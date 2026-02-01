@@ -1,8 +1,10 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import React, { useEffect, useState } from 'react'
 import {
+    ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -16,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
+import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
 import type { Session, SessionSet } from '../types'
 
@@ -30,6 +33,8 @@ const mapSessionData = (sessionData: any): Session | null => {
       name: sessionData.name,
       createdAt: sessionData.createdAt,
       completedAt: sessionData.completedAt,
+      workoutId: sessionData.workoutId ?? undefined,
+      sessionTime: sessionData.sessionTime ?? undefined,
       sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
         id: se.id,
         order: se.order,
@@ -54,21 +59,39 @@ function SessionDetailScreen() {
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
   const { checkAuth, isAuthenticated } = useAuth()
-  const { id } = route.params
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { id, initialSession: initialSessionParam, initialCreatedAt: initialCreatedAtParam } = route.params
+  const [session, setSession] = useState<Session | null>(() =>
+    initialSessionParam ? mapSessionData(initialSessionParam) : null
+  )
+  const [loading, setLoading] = useState(() => !initialSessionParam)
   const [error, setError] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
-  const [elapsedTime, setElapsedTime] = useState(0)
+  const [elapsedTime, setElapsedTime] = useState(() => {
+    const s = initialSessionParam ? mapSessionData(initialSessionParam) : null
+    if (s && !s.completedAt) {
+      return Math.max(0, Math.floor((Date.now() - new Date(s.createdAt).getTime()) / 1000))
+    }
+    if (initialCreatedAtParam) {
+      return Math.max(0, Math.floor((Date.now() - new Date(initialCreatedAtParam).getTime()) / 1000))
+    }
+    return 0
+  })
   const [deleting, setDeleting] = useState(false)
   const [startingNew, setStartingNew] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
+  const [showCompletionSummary, setShowCompletionSummary] = useState(false)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+  const [templateErrorSource, setTemplateErrorSource] = useState<'update' | 'create' | null>(null)
+  const [templateLoading, setTemplateLoading] = useState(false)
+  const [templateSuccess, setTemplateSuccess] = useState(false)
+  const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
+  const [newTemplateName, setNewTemplateName] = useState('')
 
   useEffect(() => {
-    if (id) {
-      fetchSession(id)
-    }
-  }, [id])
+    if (!id) return
+    if (initialSessionParam && mapSessionData(initialSessionParam)) return
+    fetchSession(id)
+  }, [id, initialSessionParam])
 
   const fetchSession = async (sessionId: number) => {
     try {
@@ -86,35 +109,37 @@ function SessionDetailScreen() {
         setError('Failed to process session data')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(getApiErrorMessage(err, 'An error occurred'))
       console.error('Error fetching session:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  // Timer effect
+  // Timer effect: run when we have session (and not completed) or when loading with initialCreatedAt (e.g. from History)
   useEffect(() => {
-    if (!session || session.completedAt) {
-      if (session?.completedAt) {
-        const startTime = new Date(session.createdAt).getTime()
-        const endTime = new Date(session.completedAt).getTime()
-        setElapsedTime(Math.floor((endTime - startTime) / 1000))
-      }
+    if (session?.completedAt) {
+      const startTime = new Date(session.createdAt).getTime()
+      const endTime = new Date(session.completedAt).getTime()
+      setElapsedTime(Math.max(0, Math.floor((endTime - startTime) / 1000)))
       return
     }
 
-    const startTime = new Date(session.createdAt).getTime()
-    const now = Date.now()
-    setElapsedTime(Math.floor((now - startTime) / 1000))
-    
-    const interval = setInterval(() => {
-      const now = Date.now()
-      setElapsedTime(Math.floor((now - startTime) / 1000))
-    }, 1000)
+    const startTimeMs = session
+      ? new Date(session.createdAt).getTime()
+      : initialCreatedAtParam
+        ? new Date(initialCreatedAtParam).getTime()
+        : null
 
+    if (startTimeMs === null) return
+
+    const updateElapsed = () => {
+      setElapsedTime(Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000)))
+    }
+    updateElapsed()
+    const interval = setInterval(updateElapsed, 1000)
     return () => clearInterval(interval)
-  }, [session])
+  }, [session, initialCreatedAtParam])
 
   const toggleSetComplete = async (set: SessionSet) => {
     const newIsCompleted = !set.isCompleted
@@ -141,7 +166,7 @@ function SessionDetailScreen() {
       })
     } catch (err) {
       console.error('Error updating set completion:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update set completion')
+      setError(getApiErrorMessage(err, 'Failed to update set completion'))
     }
   }
 
@@ -218,7 +243,7 @@ function SessionDetailScreen() {
       })
     } catch (err) {
       console.error('Error updating set:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update set')
+      setError(getApiErrorMessage(err, 'Failed to update set'))
     }
   }
 
@@ -269,17 +294,26 @@ function SessionDetailScreen() {
       setCompleting(true)
       setError(null)
 
-      await trpc.sessions.update.mutate({
+      const updatedSession = await trpc.sessions.update.mutate({
         id: session.id,
         createdAt: new Date(session.createdAt),
         completedAt: new Date(),
       })
 
+      const mappedSession = mapSessionData(updatedSession)
+      if (mappedSession) {
+        setSession(mappedSession)
+      }
+      setShowCompletionSummary(true)
       await checkAuth()
-      navigation.navigate('MainTabs' as never)
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Workout completed and saved.',
+      })
     } catch (err) {
       console.error('Error completing workout:', err)
-      setError(err instanceof Error ? err.message : 'Failed to complete workout')
+      setError(getApiErrorMessage(err, 'Failed to complete workout'))
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -314,7 +348,7 @@ function SessionDetailScreen() {
               navigation.navigate('MainTabs' as never)
             } catch (err) {
               console.error('Error canceling workout:', err)
-              setError(err instanceof Error ? err.message : 'Failed to cancel workout')
+              setError(getApiErrorMessage(err, 'Failed to cancel workout'))
             } finally {
               setDeleting(false)
             }
@@ -336,7 +370,7 @@ function SessionDetailScreen() {
       navigation.navigate('SessionDetail' as never, { id: newSession.id } as never)
     } catch (err) {
       console.error('Error starting new workout:', err)
-      setError(err instanceof Error ? err.message : 'Failed to start new workout')
+      setError(getApiErrorMessage(err, 'Failed to start new workout'))
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -347,10 +381,87 @@ function SessionDetailScreen() {
     }
   }
 
+  const handleUpdateTemplate = async () => {
+    if (!session?.workoutId) return
+    try {
+      setTemplateLoading(true)
+      setTemplateError(null)
+      setTemplateErrorSource(null)
+      await trpc.workouts.updateBySession.mutate({
+        sessionId: session.id,
+        workoutId: session.workoutId,
+      })
+      setTemplateSuccess(true)
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Template updated.',
+      })
+      await checkAuth()
+      handleGoToTemplates()
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to update template. Please try again.')
+      setTemplateError(msg)
+      setTemplateErrorSource('update')
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to update template. Please try again.',
+      })
+    } finally {
+      setTemplateLoading(false)
+    }
+  }
+
+  const handleCreateTemplatePress = () => {
+    setNewTemplateName(session?.name ?? '')
+    setTemplateError(null)
+    setShowCreateTemplateModal(true)
+  }
+
+  const handleCreateTemplateConfirm = async () => {
+    if (!session || !newTemplateName.trim()) return
+    try {
+      setTemplateLoading(true)
+      setTemplateError(null)
+      setTemplateErrorSource(null)
+      await trpc.workouts.createBySession.mutate({
+        sessionId: session.id,
+        name: newTemplateName.trim(),
+      })
+      setTemplateSuccess(true)
+      setShowCreateTemplateModal(false)
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Template created.',
+      })
+      await checkAuth()
+      handleGoToTemplates()
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Failed to create template. Please try again.')
+      setTemplateError(msg)
+      setTemplateErrorSource('create')
+      setShowCreateTemplateModal(false)
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to create template. Please try again.',
+      })
+    } finally {
+      setTemplateLoading(false)
+    }
+  }
+
+  const handleGoToTemplates = () => {
+    navigation.navigate('MainTabs' as never, { screen: 'Templates' } as never)
+  }
+
   const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600)
-    const mins = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
+    const s = Math.max(0, Math.floor(seconds))
+    const hrs = Math.floor(s / 3600)
+    const mins = Math.floor((s % 3600) / 60)
+    const secs = s % 60
     if (hrs > 0) {
       return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     }
@@ -375,8 +486,18 @@ function SessionDetailScreen() {
     )
   }
 
-  // Show nothing while loading (or return null to prevent flash)
+  // Show nothing while loading unless we have initialCreatedAt (then show timer immediately)
   if (loading && !session) {
+    if (initialCreatedAtParam) {
+      return (
+        <View style={styles.container}>
+          <View style={[styles.headerCard, styles.loadingHeader]}>
+            <Text style={styles.loadingText}>Loading session…</Text>
+            <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
+          </View>
+        </View>
+      )
+    }
     return null
   }
 
@@ -408,7 +529,7 @@ function SessionDetailScreen() {
             {!session.completedAt && (
               <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
             )}
-            {session.completedAt && (
+            {session.completedAt && !showCompletionSummary && (
               <TouchableOpacity
                 style={styles.performAgainButton}
                 onPress={handleStartNewWorkout}
@@ -547,12 +668,120 @@ function SessionDetailScreen() {
           </View>
         )}
 
-        {session.completedAt && (
+        {session.completedAt && showCompletionSummary && (
+          <View style={[styles.summaryBlock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <Text style={styles.summaryTitle}>Session summary</Text>
+            <Text style={styles.summaryName}>{session.name}</Text>
+            <Text style={styles.summaryMeta}>
+              Duration: {session.sessionTime ?? (session.completedAt && session.createdAt
+                ? formatTime(Math.floor((new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()) / 1000))
+                : formatTime(elapsedTime))}
+            </Text>
+            <Text style={styles.summaryMeta}>
+              {session.sessionExercises.length} exercise(s), {allSets.filter(s => s.isCompleted).length}/{allSets.length} sets completed
+            </Text>
+            {templateError && (
+              <View style={styles.templateErrorBox}>
+                <Text style={styles.templateErrorText}>{templateError}</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={
+                    templateErrorSource === 'create'
+                      ? () => setShowCreateTemplateModal(true)
+                      : handleUpdateTemplate
+                  }
+                  disabled={templateLoading}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {templateSuccess && (
+              <Text style={styles.templateSuccessText}>Template {session.workoutId != null ? 'updated' : 'created'}.</Text>
+            )}
+            <View style={styles.summaryButtons}>
+              {session.workoutId != null && (
+                <TouchableOpacity
+                  style={[styles.templateActionButton, templateLoading && styles.buttonDisabled]}
+                  onPress={handleUpdateTemplate}
+                  disabled={templateLoading}
+                >
+                  {templateLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.templateActionButtonText}>Update Template</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.templateActionButton, templateLoading && styles.buttonDisabled]}
+                onPress={handleCreateTemplatePress}
+                disabled={templateLoading}
+              >
+                {templateLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.templateActionButtonText}>Create Template</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.goToTemplatesButton}
+                onPress={handleGoToTemplates}
+              >
+                <Text style={styles.goToTemplatesButtonText}>Go to Templates</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {session.completedAt && !showCompletionSummary && (
           <View style={styles.completedMessage}>
             <Text style={styles.completedMessageText}>Workout completed!</Text>
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showCreateTemplateModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCreateTemplateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>New template name</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newTemplateName}
+              onChangeText={setNewTemplateName}
+              placeholder="Template name"
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setShowCreateTemplateModal(false)
+                  setTemplateError(null)
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, (!newTemplateName.trim() || templateLoading) && styles.buttonDisabled]}
+                onPress={handleCreateTemplateConfirm}
+                disabled={!newTemplateName.trim() || templateLoading}
+              >
+                {templateLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalConfirmButtonText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -605,6 +834,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  loadingHeader: {
+    margin: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
   },
   headerContent: {
     marginBottom: 8,
@@ -781,6 +1020,146 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#059669',
+  },
+  summaryBlock: {
+    marginTop: 24,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  summaryName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  summaryMeta: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  templateErrorBox: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  templateErrorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  templateSuccessText: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  summaryButtons: {
+    marginTop: 16,
+    gap: 12,
+  },
+  templateActionButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  templateActionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  goToTemplatesButton: {
+    backgroundColor: '#059669',
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  goToTemplatesButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  modalCancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  modalCancelButtonText: {
+    color: '#6B7280',
+    fontSize: 16,
+  },
+  modalConfirmButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  modalConfirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 })
 

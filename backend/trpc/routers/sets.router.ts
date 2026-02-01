@@ -1,9 +1,10 @@
 import z from "zod"
 import { prisma } from "../../prisma/client"
-import { publicProcedure, router } from "../trpc"
+import { router } from "../trpc"
+import { protectedProcedure } from "../middleware/auth.middleware"
 
 export const setRouter = router({
-    update: publicProcedure
+    update: protectedProcedure
         .input(
             z.object({
                 setId: z.number(),

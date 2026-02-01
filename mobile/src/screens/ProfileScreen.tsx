@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -18,7 +18,7 @@ import { useAuth } from '../hooks/useAuth'
 const USERNAME_CHECK_DEBOUNCE_MS = 400
 
 function ProfileScreen() {
-  const { isAuthenticated, checkAuth } = useAuth()
+  const { isAuthenticated, serverDown, checkAuth, checkServerOnFocus } = useAuth()
   const navigation = useNavigation()
   const [user, setUser] = useState<{ id: number; username: string; email: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -27,6 +27,7 @@ function ProfileScreen() {
   const [email, setEmail] = useState('')
   const [usernameTaken, setUsernameTaken] = useState<boolean | null>(null)
   const usernameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevServerDownRef = useRef(serverDown)
 
   const fetchUser = useCallback(async () => {
     if (!isAuthenticated) {
@@ -51,6 +52,19 @@ function ProfileScreen() {
   useEffect(() => {
     fetchUser()
   }, [fetchUser])
+
+  useEffect(() => {
+    if (prevServerDownRef.current && !serverDown && isAuthenticated && !user) {
+      fetchUser()
+    }
+    prevServerDownRef.current = serverDown
+  }, [serverDown, isAuthenticated, user, fetchUser])
+
+  useFocusEffect(
+    useCallback(() => {
+      checkServerOnFocus()
+    }, [checkServerOnFocus])
+  )
 
   const checkUsername = useCallback(async (value: string) => {
     const trimmed = value.trim()
@@ -150,9 +164,20 @@ function ProfileScreen() {
   }
 
   if (!user) {
+    if (serverDown) {
+      return <View style={[styles.container, styles.centered, { backgroundColor: '#fff' }]} />
+    }
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.emptyText}>Could not load profile.</Text>
+        <Text style={styles.errorTitle}>Could not load profile.</Text>
+        <Text style={styles.emptyText}>The server may be unavailable. Tap Retry to try again.</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => fetchUser()}
+          disabled={loading}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     )
   }
@@ -265,6 +290,25 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  retryButton: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loginButton: {
     backgroundColor: '#2563EB',

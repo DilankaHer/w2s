@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, error } = useAuth()
+  const { isAuthenticated, isLoading, isRetrying, error } = useAuth()
   const navigation = useNavigation()
 
   useEffect(() => {
@@ -19,7 +19,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }, [isAuthenticated, isLoading, error, navigation])
 
-  if (isLoading) {
+  // Hide only during initial auth load; keep children visible during retry so form state is preserved
+  if (isLoading && !isRetrying) {
     return null
   }
 

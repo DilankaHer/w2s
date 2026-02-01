@@ -38,6 +38,7 @@ export const sessionsRouter = router({
                     data: {
                         name: workout!.name,
                         userId: ctx.user.userId,
+                        workoutId: input.workoutId,
                         createdAt: new Date(),
                         sessionExercises: {
                             create: workout!.workoutExercises.map(ex => ({
@@ -79,6 +80,7 @@ export const sessionsRouter = router({
                     data: {
                         name: session!.name,
                         userId: ctx.user.userId,
+                        workoutId: session!.workoutId ?? undefined,
                         createdAt: new Date(),
                         sessionExercises: {
                             create: session!.sessionExercises.map(ex => ({
@@ -129,6 +131,7 @@ export const sessionsRouter = router({
                 data: {
                     name: workout!.name,
                     userId: null,
+                    workoutId: input.workoutId,
                     createdAt: new Date(),
                     sessionExercises: {
                         create: workout!.workoutExercises.map(ex => ({
@@ -156,7 +159,7 @@ export const sessionsRouter = router({
             });
         }),
 
-    getById: publicProcedure
+    getById: protectedProcedure
         .input(z.object({
             id: z.number(),
         }))
@@ -174,7 +177,7 @@ export const sessionsRouter = router({
                 },
             })
         }),
-    getAll: publicProcedure
+    getAll: protectedProcedure
         .input(z.object({
             take: z.number().optional(),
             skip: z.number().optional(),
@@ -192,7 +195,7 @@ export const sessionsRouter = router({
                 },
             })
         }),
-    update: publicProcedure
+    update: protectedProcedure
         .input(z.object({
             id: z.number(),
             createdAt: z.coerce.date(),
@@ -222,6 +225,15 @@ export const sessionsRouter = router({
                     completedAt: input.completedAt,
                     sessionTime: formatTime((input.completedAt.getTime() - input.createdAt.getTime()) / 1000),
                     ...(input.userId !== undefined && { userId: input.userId }),
+                },
+                include: {
+                    sessionExercises: {
+                        include: {
+                            exercise: true,
+                            sessionSets: { orderBy: { setNumber: 'asc' } },
+                        },
+                        orderBy: { order: 'asc' },
+                    },
                 },
             })
         }),

@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native'
-import React, { useState } from 'react'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import React, { useCallback, useState } from 'react'
 import {
     Alert,
     RefreshControl,
@@ -22,10 +22,16 @@ interface Session {
 }
 
 function HistoryScreen() {
-  const { workoutInfo, isLoading, checkAuth, isAuthenticated } = useAuth()
+  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus } = useAuth()
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const navigation = useNavigation()
+
+  useFocusEffect(
+    useCallback(() => {
+      checkServerOnFocus()
+    }, [checkServerOnFocus])
+  )
 
   const onRefresh = async () => {
     setRefreshing(true)
@@ -35,8 +41,11 @@ function HistoryScreen() {
     setRefreshing(false)
   }
 
-  const handleSessionClick = (id: number) => {
-    navigation.navigate('SessionDetail' as never, { id } as never)
+  const handleSessionClick = (sessionItem: { id: number; createdAt: string }) => {
+    navigation.navigate('SessionDetail' as never, {
+      id: sessionItem.id,
+      initialCreatedAt: sessionItem.createdAt,
+    } as never)
   }
 
   const handleDeleteSession = (sessionId: number) => {
@@ -77,10 +86,16 @@ function HistoryScreen() {
     )
   }
 
-  const displaySessions = isAuthenticated && !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
+  const displaySessions = isAuthenticated && workoutInfo
+    ? (serverDown ? (workoutInfo.sessions ?? []) : !isLoading ? (workoutInfo.sessions ?? []) : [])
+    : []
   const hasNoSessions = isAuthenticated
-    ? !isLoading && workoutInfo !== null && displaySessions.length === 0
+    ? (serverDown && workoutInfo ? displaySessions.length === 0 : !isLoading && workoutInfo !== null && displaySessions.length === 0)
     : true
+
+  if (serverDown && isAuthenticated && workoutInfo === null) {
+    return <View style={[styles.container, { backgroundColor: '#fff' }]} />
+  }
 
   if (!isAuthenticated) {
     return (
@@ -100,7 +115,7 @@ function HistoryScreen() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading && !(serverDown && isAuthenticated && workoutInfo !== null)) {
     return <View style={styles.container} />
   }
 
@@ -125,7 +140,7 @@ function HistoryScreen() {
             <View key={session.id} style={styles.sessionCard}>
               <TouchableOpacity
                 style={styles.sessionContent}
-                onPress={() => handleSessionClick(session.id)}
+                onPress={() => handleSessionClick(session)}
               >
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionDate}>

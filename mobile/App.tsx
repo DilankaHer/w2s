@@ -3,7 +3,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native'
 import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack'
 import { StatusBar } from 'expo-status-bar'
 import React from 'react'
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
@@ -18,9 +18,9 @@ import TemplatesScreen from './src/screens/TemplatesScreen'
 
 export type RootStackParamList = {
   Login: { completeSessionId?: number; sessionCreatedAt?: string } | undefined
-  MainTabs: undefined
+  MainTabs: { screen?: keyof TabParamList } | undefined
   TemplateDetail: { id: number }
-  SessionDetail: { id: number }
+  SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string }
   CreateTemplate: undefined
 }
 
@@ -195,25 +195,184 @@ const stackScreenOptions = {
   },
   headerTintColor: '#fff',
   headerTitleStyle: {
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
   },
   cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
   transitionSpec: {
-    open: { animation: 'timing', config: { duration: 300 } },
-    close: { animation: 'timing', config: { duration: 300 } },
+    open: { animation: 'timing' as const, config: { duration: 300 } },
+    close: { animation: 'timing' as const, config: { duration: 300 } },
   },
 }
 
-function RootNavigator() {
-  const { isLoading, isAuthenticated } = useAuth()
+function SplashScreen() {
+  return (
+    <View style={splashStyles.container}>
+      <Text style={splashStyles.title}>W2S</Text>
+      <Text style={splashStyles.subtitle}>Workout to Session</Text>
+      <ActivityIndicator size="large" color="#2563EB" style={splashStyles.spinner} />
+    </View>
+  )
+}
 
-  // Only show full-screen loading on initial auth check (before we know auth state).
-  // Later checkAuth() calls (e.g. when switching to History tab) must not unmount the navigator.
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#2563EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 42,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 32,
+  },
+  spinner: {
+    marginTop: 16,
+  },
+})
+
+function ServerDownScreen() {
+  const { retryServer, isLoading } = useAuth()
+  return (
+    <View style={serverDownStyles.container}>
+      <Text style={serverDownStyles.title}>Server is down</Text>
+      <Text style={serverDownStyles.subtitle}>Please try again later.</Text>
+      <TouchableOpacity
+        style={[serverDownStyles.retryButton, isLoading && serverDownStyles.buttonDisabled]}
+        onPress={() => retryServer()}
+        disabled={isLoading}
+      >
+        <Text style={serverDownStyles.retryButtonText}>
+          {isLoading ? 'Connecting…' : 'Retry'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+const serverDownStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  retryButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+})
+
+function ServerDownOverlay() {
+  const insets = useSafeAreaInsets()
+  const { retryServer, isLoading } = useAuth()
+  return (
+    <View style={overlayStyles.backdrop} pointerEvents="auto">
+      <View style={[overlayStyles.toast, { marginTop: insets.top + 8 }]}>
+        <Text style={overlayStyles.toastText}>Server is down</Text>
+        <TouchableOpacity
+          style={[overlayStyles.retryButton, isLoading && overlayStyles.buttonDisabled]}
+          onPress={() => retryServer()}
+          disabled={isLoading}
+        >
+          <Text style={overlayStyles.retryButtonText}>
+            {isLoading ? 'Connecting…' : 'Retry'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+const overlayStyles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 24,
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+  },
+  retryButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+})
+
+function RootNavigator() {
+  const { isLoading, isAuthenticated, serverDown, hasEnteredApp } = useAuth()
+
+  if (serverDown && !hasEnteredApp) {
+    return <ServerDownScreen />
+  }
+
+  // Always show splash screen during initial auth check (before we know auth state).
   if (isLoading && isAuthenticated === null) {
-    return <View style={{ flex: 1, backgroundColor: '#F9FAFB' }} />
+    return <SplashScreen />
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <Stack.Navigator
       initialRouteName="MainTabs"
       screenOptions={stackScreenOptions}
@@ -252,6 +411,8 @@ function RootNavigator() {
         )}
       </Stack.Screen>
     </Stack.Navigator>
+    {serverDown && hasEnteredApp && <ServerDownOverlay />}
+    </View>
   )
 }
 
@@ -263,7 +424,7 @@ function App() {
           <StatusBar style="auto" />
           <RootNavigator />
         </NavigationContainer>
-        <Toast />
+        <Toast visibilityTime={3000} />
       </AuthProvider>
     </SafeAreaProvider>
   )

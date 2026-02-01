@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native'
-import React, { useEffect, useState } from 'react'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Modal,
@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
+import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
 import type { Exercise } from '../types'
 
@@ -28,29 +29,85 @@ interface WorkoutExercise {
   sets: Set[]
 }
 
+type CreateTemplatePhase = 'checking' | 'retry' | 'ready'
+
 function CreateTemplateScreen() {
   const navigation = useNavigation()
-  const { checkAuth } = useAuth()
+  const {
+    checkAuth,
+    serverDown,
+    isLoading: authLoading,
+    checkServerOnFocus,
+    registerOnRetrySuccess,
+    unregisterOnRetrySuccess,
+  } = useAuth()
+  const [phase, setPhase] = useState<CreateTemplatePhase>('checking')
   const [templateName, setTemplateName] = useState('')
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([])
   const [showExerciseList, setShowExerciseList] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
-  const [exercisesLoading, setExercisesLoading] = useState(true)
+  const [exercisesLoading, setExercisesLoading] = useState(false)
+  const prevServerDownRef = React.useRef(serverDown)
+  const initialCheckRunRef = React.useRef(false)
 
+  // First time: health check, then show form or white + retry
   useEffect(() => {
-    fetchExercises()
-  }, [])
+    if (phase !== 'checking' || initialCheckRunRef.current) return
+    initialCheckRunRef.current = true
 
-  const fetchExercises = async () => {
+    const runInitialCheck = async () => {
+      try {
+        await trpc.server.healthCheck.query()
+        setPhase('ready')
+        await fetchExercisesInternal(false)
+      } catch {
+        setPhase('retry')
+      }
+    }
+    runInitialCheck()
+  }, [phase])
+
+  // Transition from retry → ready only when user taps Retry (via callback), not when serverDown flips from another tab/screen
+  useEffect(() => {
+    if (phase !== 'retry') return
+    registerOnRetrySuccess(() => {
+      setPhase('ready')
+      fetchExercisesInternal(false)
+    })
+    return () => unregisterOnRetrySuccess()
+  }, [phase, registerOnRetrySuccess, unregisterOnRetrySuccess])
+
+  // When server comes back while already in form: silent refresh exercises only
+  useEffect(() => {
+    if (serverDown) {
+      prevServerDownRef.current = true
+      return
+    }
+    if (!prevServerDownRef.current) return
+    prevServerDownRef.current = false
+
+    if (phase === 'ready' && !authLoading) {
+      fetchExercisesInternal(true)
+    }
+  }, [serverDown, authLoading, phase])
+
+  useFocusEffect(
+    useCallback(() => {
+      checkServerOnFocus()
+    }, [checkServerOnFocus])
+  )
+
+  const fetchExercisesInternal = async (silent: boolean) => {
     try {
-      setExercisesLoading(true)
+      if (!silent) setExercisesLoading(true)
+      setError(null)
       const data = await trpc.exercises.list.query()
       setExercises(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Error fetching exercises:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load exercises')
+      setError(getApiErrorMessage(err, 'Failed to load exercises'))
     } finally {
       setExercisesLoading(false)
     }
@@ -174,7 +231,7 @@ function CreateTemplateScreen() {
       navigation.navigate('MainTabs' as never)
     } catch (err) {
       console.error('Error creating template:', err)
-      setError(err instanceof Error ? err.message : 'Failed to create template')
+      setError(getApiErrorMessage(err, 'Failed to create template'))
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -199,6 +256,11 @@ function CreateTemplateScreen() {
   const availableExercises = exercises.filter(
     (ex) => !workoutExercises.some((we) => we.id === ex.id)
   )
+
+  // First time: white until health check passes; then retry dialog (overlay) or form. Already in form + server down: keep form, overlay on top.
+  if (phase !== 'ready') {
+    return <View style={[styles.container, { backgroundColor: '#fff' }]} />
+  }
 
   return (
     <KeyboardAvoidingView

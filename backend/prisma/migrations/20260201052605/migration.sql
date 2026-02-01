@@ -22,7 +22,7 @@ CREATE TABLE "workouts" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "userId" INTEGER,
-    "isTemplate" BOOLEAN NOT NULL,
+    "isDefaultTemplate" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "workouts_pkey" PRIMARY KEY ("id")
@@ -54,6 +54,7 @@ CREATE TABLE "sessions" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "userId" INTEGER,
+    "workoutId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "completedAt" TIMESTAMP(3),
     "sessionTime" TEXT,
@@ -89,17 +90,20 @@ CREATE UNIQUE INDEX "exercises_name_key" ON "exercises"("name");
 -- CreateIndex
 CREATE UNIQUE INDEX "workoutexercises_workoutId_exerciseId_key" ON "workoutexercises"("workoutId", "exerciseId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "sets_setNumber_workoutExerciseId_key" ON "sets"("setNumber", "workoutExerciseId");
+
 -- AddForeignKey
 ALTER TABLE "workouts" ADD CONSTRAINT "workouts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "workoutexercises" ADD CONSTRAINT "workoutexercises_workoutId_fkey" FOREIGN KEY ("workoutId") REFERENCES "workouts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "workoutexercises" ADD CONSTRAINT "workoutexercises_workoutId_fkey" FOREIGN KEY ("workoutId") REFERENCES "workouts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "workoutexercises" ADD CONSTRAINT "workoutexercises_exerciseId_fkey" FOREIGN KEY ("exerciseId") REFERENCES "exercises"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "sets" ADD CONSTRAINT "sets_workoutExerciseId_fkey" FOREIGN KEY ("workoutExerciseId") REFERENCES "workoutexercises"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "sets" ADD CONSTRAINT "sets_workoutExerciseId_fkey" FOREIGN KEY ("workoutExerciseId") REFERENCES "workoutexercises"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

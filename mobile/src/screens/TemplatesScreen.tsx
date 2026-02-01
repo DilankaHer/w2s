@@ -1,5 +1,5 @@
-import { useNavigation } from '@react-navigation/native'
-import React, { useEffect, useState } from 'react'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import {
   RefreshControl,
   ScrollView,
@@ -13,12 +13,26 @@ import { useAuth } from '../hooks/useAuth'
 import type { Template } from '../types'
 
 function TemplatesScreen() {
-  const { workoutInfo, isLoading, checkAuth, isAuthenticated } = useAuth()
+  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
   const [defaultTemplates, setDefaultTemplates] = useState<Template[]>([])
   const [defaultTemplatesLoading, setDefaultTemplatesLoading] = useState(true)
   const [defaultTemplatesFetched, setDefaultTemplatesFetched] = useState(false)
   const navigation = useNavigation()
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () =>
+        !isAuthenticated ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Login' as never)}
+            style={styles.headerLoginButton}
+          >
+            <Text style={styles.headerLoginText}>Login</Text>
+          </TouchableOpacity>
+        ) : null,
+    })
+  }, [navigation, isAuthenticated])
 
   useEffect(() => {
     if (!isAuthenticated && !isLoading) {
@@ -40,6 +54,12 @@ function TemplatesScreen() {
     }
   }, [isAuthenticated, isLoading])
 
+  useFocusEffect(
+    useCallback(() => {
+      checkServerOnFocus()
+    }, [checkServerOnFocus])
+  )
+
   const onRefresh = async () => {
     setRefreshing(true)
     if (isAuthenticated) {
@@ -60,15 +80,19 @@ function TemplatesScreen() {
   }
 
   const displayTemplates = isAuthenticated
-    ? (!isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : [])
+    ? (serverDown && workoutInfo ? (workoutInfo.workouts ?? []) : !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : [])
     : defaultTemplates
   const effectiveDefaultLoading =
     !isAuthenticated && (!defaultTemplatesFetched || defaultTemplatesLoading)
   const hasNoTemplates = isAuthenticated
-    ? !isLoading && workoutInfo !== null && displayTemplates.length === 0
+    ? (serverDown && workoutInfo ? displayTemplates.length === 0 : !isLoading && workoutInfo !== null && displayTemplates.length === 0)
     : defaultTemplatesFetched && !defaultTemplatesLoading && displayTemplates.length === 0
 
-  if (isLoading && isAuthenticated) {
+  if (serverDown && isAuthenticated && workoutInfo === null) {
+    return <View style={[styles.container, { backgroundColor: '#fff' }]} />
+  }
+
+  if (isLoading && isAuthenticated && !(serverDown && workoutInfo !== null)) {
     return <View style={styles.container} />
   }
 
@@ -127,6 +151,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  headerLoginButton: {
+    marginRight: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  headerLoginText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
