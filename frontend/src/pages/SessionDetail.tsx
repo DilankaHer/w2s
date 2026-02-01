@@ -29,6 +29,7 @@ interface Session {
   createdAt: string
   completedAt: string | null
   sessionExercises: SessionExercise[]
+  workoutId?: number | null
 }
 
 // Helper function to map session data
@@ -40,6 +41,7 @@ const mapSessionData = (sessionData: any): Session | null => {
       name: sessionData.name,
       createdAt: sessionData.createdAt,
       completedAt: sessionData.completedAt,
+      workoutId: sessionData.workoutId ?? undefined,
       sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
         id: se.id,
         order: se.order,
@@ -73,6 +75,12 @@ function SessionDetail() {
   const [deleting, setDeleting] = useState(false)
   const [startingNew, setStartingNew] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
+  const [showCompletionSummary, setShowCompletionSummary] = useState(false)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+  const [templateLoading, setTemplateLoading] = useState(false)
+  const [templateSuccess, setTemplateSuccess] = useState(false)
+  const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
+  const [newTemplateName, setNewTemplateName] = useState('')
 
   useEffect(() => {
     const sessionId = id ? parseInt(id) : null
@@ -256,6 +264,19 @@ function SessionDetail() {
     }
   }
 
+  const showToast = (type: 'success' | 'error', text1: string, text2: string) => {
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: type,
+      title: text1,
+      text: text2,
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+    })
+  }
+
   const handleCompleteWorkout = async () => {
     if (!session) return
 
@@ -263,18 +284,22 @@ function SessionDetail() {
       setCompleting(true)
       setError(null)
 
-      // Update session completedAt
-      await trpc.sessions.update.mutate({
+      const updatedSession = await trpc.sessions.update.mutate({
         id: session.id,
         createdAt: new Date(session.createdAt),
         completedAt: new Date(),
       })
 
-      // Navigate back to templates or show success
-      navigate('/')
+      const mapped = mapSessionData(updatedSession)
+      if (mapped) {
+        setSession(mapped)
+      }
+      setShowCompletionSummary(true)
+      showToast('success', 'Success', 'Workout completed and saved.')
     } catch (err) {
       console.error('Error completing workout:', err)
       setError(err instanceof Error ? err.message : 'Failed to complete workout')
+      showToast('error', 'Error', 'Failed to complete workout. Please try again.')
     } finally {
       setCompleting(false)
     }
@@ -329,6 +354,64 @@ function SessionDetail() {
     } finally {
       setStartingNew(false)
     }
+  }
+
+  const handleUpdateTemplate = async () => {
+    if (!session || session.workoutId == null) return
+    try {
+      setTemplateLoading(true)
+      setTemplateError(null)
+      await trpc.workouts.updateBySession.mutate({
+        sessionId: session.id,
+        workoutId: session.workoutId,
+      })
+      setTemplateSuccess(true)
+      showToast('success', 'Success', 'Template updated.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update template'
+      setTemplateError(msg)
+      showToast('error', 'Error', 'Failed to update template. Please try again.')
+    } finally {
+      setTemplateLoading(false)
+    }
+  }
+
+  const handleCreateTemplate = async (name: string) => {
+    if (!session || !name.trim()) return
+    try {
+      setTemplateLoading(true)
+      setTemplateError(null)
+      await trpc.workouts.createBySession.mutate({
+        sessionId: session.id,
+        name: name.trim(),
+      })
+      setTemplateSuccess(true)
+      setShowCreateTemplateModal(false)
+      setNewTemplateName('')
+      showToast('success', 'Success', 'Template created.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create template'
+      setTemplateError(msg)
+      showToast('error', 'Error', 'Failed to create template. Please try again.')
+    } finally {
+      setTemplateLoading(false)
+    }
+  }
+
+  const openCreateTemplateModal = () => {
+    setTemplateError(null)
+    setTemplateSuccess(false)
+    setShowCreateTemplateModal(true)
+  }
+
+  const handleCreateTemplateConfirm = () => {
+    const name = newTemplateName.trim()
+    if (!name) return
+    handleCreateTemplate(name)
+  }
+
+  const handleGoToTemplates = () => {
+    navigate('/')
   }
 
 
@@ -623,9 +706,106 @@ function SessionDetail() {
           </div>
         )}
 
-        {session.completedAt && (
+        {session.completedAt && showCompletionSummary && (
+          <div className="mt-6 bg-white rounded-lg shadow-md p-6 border border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Session summary</h2>
+            <p className="text-gray-700 font-medium">{session.name}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Duration: {formatTime(elapsedTime)}
+            </p>
+            <p className="text-sm text-gray-500">
+              {session.sessionExercises.length} exercise(s), {allSets.filter((s) => s.isCompleted).length} set(s) completed
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3 items-center">
+              {templateSuccess ? (
+                <p className="text-green-600 font-medium">
+                  {session.workoutId != null ? 'Template updated.' : 'Template created.'}
+                </p>
+              ) : templateError ? (
+                <>
+                  <p className="text-red-600 text-sm">{templateError}</p>
+                  <button
+                    onClick={() =>
+                      session.workoutId != null
+                        ? handleUpdateTemplate()
+                        : openCreateTemplateModal()
+                    }
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-medium text-sm"
+                  >
+                    Retry
+                  </button>
+                </>
+              ) : (
+                <>
+                  {session.workoutId != null ? (
+                    <button
+                      onClick={handleUpdateTemplate}
+                      disabled={templateLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                    >
+                      {templateLoading ? 'Updating...' : 'Update Template'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={openCreateTemplateModal}
+                      disabled={templateLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                    >
+                      {templateLoading ? 'Creating...' : 'Create Template'}
+                    </button>
+                  )}
+                </>
+              )}
+              <button
+                onClick={handleGoToTemplates}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                Go to Templates
+              </button>
+            </div>
+          </div>
+        )}
+
+        {session.completedAt && !showCompletionSummary && (
           <div className="mt-6 text-center">
             <p className="text-green-600 font-medium">Workout completed!</p>
+          </div>
+        )}
+
+        {showCreateTemplateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Create Template</h3>
+              <p className="text-sm text-gray-500 mb-4">Enter a name for the new template.</p>
+              <input
+                type="text"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="Template name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 mb-4"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowCreateTemplateModal(false)
+                    setNewTemplateName('')
+                    setTemplateError(null)
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateTemplateConfirm}
+                  disabled={templateLoading || !newTemplateName.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                >
+                  {templateLoading ? 'Creating...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
