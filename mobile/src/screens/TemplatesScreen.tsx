@@ -25,7 +25,10 @@ function TemplatesScreen() {
       headerRight: () =>
         !isAuthenticated ? (
           <TouchableOpacity
-            onPress={() => navigation.navigate('Login' as never)}
+            onPress={() => {
+              const nav = navigation as any
+              nav.navigate('Login')
+            }}
             style={styles.headerLoginButton}
           >
             <Text style={styles.headerLoginText}>Login</Text>
@@ -76,7 +79,8 @@ function TemplatesScreen() {
   }
 
   const handleTemplateClick = (id: number) => {
-    navigation.navigate('TemplateDetail' as never, { id } as never)
+    const nav = navigation as any
+    nav.navigate('TemplateDetail', { id })
   }
 
   const displayTemplates = isAuthenticated
@@ -115,7 +119,10 @@ function TemplatesScreen() {
           {isAuthenticated && (
             <TouchableOpacity
               style={styles.createButton}
-              onPress={() => navigation.navigate('CreateTemplate' as never)}
+              onPress={() => {
+                const nav = navigation as any
+                nav.navigate('CreateTemplate')
+              }}
             >
               <Text style={styles.createButtonText}>Create Template</Text>
             </TouchableOpacity>
