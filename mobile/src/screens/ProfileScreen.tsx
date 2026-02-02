@@ -1,15 +1,15 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { clearStoredAuth, trpc } from '../api/client'
@@ -125,7 +125,6 @@ function ProfileScreen() {
       setUser((prev) => (prev ? { ...prev, username: trimmedUsername, email: email.trim() || null } : null))
       Toast.show({ type: 'success', text1: 'Saved', text2: 'Profile updated.' })
     } catch (err) {
-      console.error('Error updating profile:', err)
       Toast.show({
         type: 'error',
         text1: 'Error',

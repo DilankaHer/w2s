@@ -47,6 +47,7 @@ model Workout {
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt])
   @@map("workouts")
 }
 
@@ -60,6 +61,7 @@ model WorkoutExercise {
   exercise Exercise @relation(fields: [exerciseId], references: [id])
   sets     Set[]
 
+  @@index([workoutId, order])
   @@unique([workoutId, exerciseId])
   @@map("workoutexercises")
 }
@@ -73,6 +75,7 @@ model Set {
 
   workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
 
+  @@index([workoutExerciseId])
   @@unique([setNumber, workoutExerciseId])
   @@map("sets")
 }
@@ -90,6 +93,7 @@ model Session {
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt])
   @@map("sessions")
 }
 
@@ -104,6 +108,8 @@ model SessionExercise {
 
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@index([sessionId, order])
+  @@unique([sessionId, exerciseId])
   @@map("sessionexercises")
 }
 
@@ -117,5 +123,7 @@ model SessionSet {
 
   sessionExercise SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
 
+  @@index([sessionExerciseId])
+  @@unique([setNumber, sessionExerciseId])
   @@map("sessionsets")
 }

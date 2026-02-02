@@ -3,8 +3,8 @@ import { createTRPCProxyClient, httpLink } from '@trpc/client'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import type { AppRouter } from '../../../backend/trpc/types'
-import { triggerUnauthorized } from './onUnauthorized'
 import { triggerServerUnreachable } from './onServerUnreachable'
+import { triggerUnauthorized } from './onUnauthorized'
 
 const API_REQUEST_TIMEOUT_MS = 4_000
 
@@ -26,9 +26,6 @@ const getApiBaseUrl = (): string => {
 }
 
 const API_BASE_URL = getApiBaseUrl()
-
-// Log the API URL for debugging (remove in production)
-console.log('API Base URL:', API_BASE_URL)
 
 // Cookie storage key
 const COOKIE_STORAGE_KEY = '@w2s:cookies'
@@ -66,7 +63,7 @@ async function saveCookies(cookies: Record<string, string>) {
   try {
     await AsyncStorage.setItem(COOKIE_STORAGE_KEY, JSON.stringify(cookies))
   } catch (error) {
-    console.error('Error saving cookies:', error)
+    // Silent fail
   }
 }
 
@@ -75,7 +72,7 @@ export async function clearStoredAuth(): Promise<void> {
   try {
     await AsyncStorage.removeItem(COOKIE_STORAGE_KEY)
   } catch (error) {
-    console.error('Error clearing auth:', error)
+    // Silent fail
   }
 }
 
@@ -91,16 +88,16 @@ export const trpc = createTRPCProxyClient<AppRouter>({
     httpLink({
       url: `${API_BASE_URL}/trpc`,
       async fetch(url: string | Request | URL, options?: any) {
+        const startTime = Date.now()
+
         // Get stored cookies
         const storedCookies = await getStoredCookies()
         const cookieHeader = buildCookieHeader(storedCookies)
-        console.log('[API] Request:', typeof url === 'string' ? url : url.toString(), cookieHeader ? 'Cookie header present' : 'No cookie')
-
-        // Log token when sending (for login/getWorkoutInfo debugging)
         const urlStr = typeof url === 'string' ? url : url.toString()
-        if (storedCookies.auth_token && (urlStr.includes('users.login') || urlStr.includes('users.getWorkoutInfo'))) {
-          console.log('[API] Token being sent:', storedCookies.auth_token)
-        }
+
+        // Extract API name from URL (e.g., /trpc/sessions.getById -> sessions.getById)
+        const apiNameMatch = urlStr.match(/\/trpc\/([^?]+)/)
+        const apiName = apiNameMatch ? apiNameMatch[1] : 'unknown'
 
         // Make request with cookies and 4s timeout
         const controller = new AbortController()
@@ -122,21 +119,9 @@ export const trpc = createTRPCProxyClient<AppRouter>({
         }
         clearTimeout(timeoutId)
 
-        // Log response for login and getWorkoutInfo (clone so we don't consume body)
-        if (urlStr.includes('users.login') || urlStr.includes('users.getWorkoutInfo')) {
-          response
-            .clone()
-            .json()
-            .then((body) => {
-              console.log('[API] Response', urlStr.includes('users.login') ? 'login' : 'getWorkoutInfo', 'status:', response.status, 'body:', JSON.stringify(body))
-            })
-            .catch(() =>
-              response
-                .clone()
-                .text()
-                .then((text) => console.log('[API] Response', urlStr.includes('users.login') ? 'login' : 'getWorkoutInfo', 'status:', response.status, 'body (text):', text))
-            )
-        }
+        // Log API response time
+        const responseTime = Date.now() - startTime
+        console.log(`${apiName}: ${responseTime}ms`)
 
         if (response.status === 401) {
           await clearStoredAuth()
@@ -148,12 +133,11 @@ export const trpc = createTRPCProxyClient<AppRouter>({
           const authTokenHeader = response.headers.get('X-Auth-Token')
           if (authTokenHeader) {
             const newCookies = parseCookies(authTokenHeader)
-            console.log('[API] X-Auth-Token received, token:', newCookies.auth_token ?? '(no auth_token in header)')
             const updatedCookies = { ...storedCookies, ...newCookies }
             await saveCookies(updatedCookies)
           }
         } catch (err) {
-          console.warn('Could not persist X-Auth-Token:', err)
+          // Silent fail
         }
 
         return response

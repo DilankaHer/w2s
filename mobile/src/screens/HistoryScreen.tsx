@@ -71,7 +71,6 @@ function HistoryScreen() {
                 text2: 'Session deleted',
               })
             } catch (err) {
-              console.error('Error deleting session:', err)
               Toast.show({
                 type: 'error',
                 text1: 'Error',

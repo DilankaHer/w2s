@@ -1,5 +1,5 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
@@ -20,7 +20,8 @@ import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
-import type { Session, SessionSet } from '../types'
+import type { Exercise, Session, SessionExercise, SessionSet } from '../types'
+import { buildSessionUpdatePayload } from '../utils/buildSessionUpdatePayload'
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
 
@@ -49,7 +50,6 @@ const mapSessionData = (sessionData: any): Session | null => {
       })),
     }
   } catch (err) {
-    console.error('Error mapping session data:', err)
     return null
   }
 }
@@ -86,12 +86,41 @@ function SessionDetailScreen() {
   const [templateSuccess, setTemplateSuccess] = useState(false)
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false)
+  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [exercisesLoading, setExercisesLoading] = useState(false)
+  const [removedSessionExerciseIds, setRemovedSessionExerciseIds] = useState<number[]>([])
+  const nextTempIdRef = useRef(-1)
+  const exercisesFetchedRef = useRef(false)
 
   useEffect(() => {
     if (!id) return
     if (initialSessionParam && mapSessionData(initialSessionParam)) return
     fetchSession(id)
   }, [id, initialSessionParam])
+
+  const fetchExercises = async () => {
+    try {
+      setExercisesLoading(true)
+      const data = await trpc.exercises.list.query()
+      setExercises(Array.isArray(data) ? data : [])
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: getApiErrorMessage(err, 'Failed to load exercises'),
+      })
+    } finally {
+      setExercisesLoading(false)
+    }
+  }
+
+  // Pre-fetch exercises when session is loaded so "Add Exercise" uses cached list
+  useEffect(() => {
+    if (!session || exercisesFetchedRef.current) return
+    exercisesFetchedRef.current = true
+    fetchExercises()
+  }, [session])
 
   const fetchSession = async (sessionId: number) => {
     try {
@@ -110,7 +139,6 @@ function SessionDetailScreen() {
       }
     } catch (err) {
       setError(getApiErrorMessage(err, 'An error occurred'))
-      console.error('Error fetching session:', err)
     } finally {
       setLoading(false)
     }
@@ -141,33 +169,22 @@ function SessionDetailScreen() {
     return () => clearInterval(interval)
   }, [session, initialCreatedAtParam])
 
-  const toggleSetComplete = async (set: SessionSet) => {
+  const toggleSetComplete = (set: SessionSet) => {
     const newIsCompleted = !set.isCompleted
-    try {
-      await trpc.sessions.updateSessionSets.mutate({
-        setId: set.id,
-        setNumber: set.setNumber,
-        isCompleted: newIsCompleted,
-      })
-
-      setSession((prev) => {
-        if (!prev) return null
-        return {
-          ...prev,
-          sessionExercises: prev.sessionExercises.map((se) => ({
-            ...se,
-            sets: se.sets.map((s) =>
-              s.id === set.id
-                ? { ...s, isCompleted: newIsCompleted }
-                : s
-            ),
-          })),
-        }
-      })
-    } catch (err) {
-      console.error('Error updating set completion:', err)
-      setError(getApiErrorMessage(err, 'Failed to update set completion'))
-    }
+    setSession((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        sessionExercises: prev.sessionExercises.map((se) => ({
+          ...se,
+          sets: se.sets.map((s) =>
+            s.id === set.id
+              ? { ...s, isCompleted: newIsCompleted }
+              : s
+          ),
+        })),
+      }
+    })
   }
 
   const initializeEditingSet = (set: SessionSet) => {
@@ -204,47 +221,112 @@ function SessionDetailScreen() {
     })
   }
 
-  const saveSetUpdate = async (set: SessionSet) => {
+  const addExerciseToSession = (exercise: Exercise) => {
+    if (!session) return
+    const newOrder = session.sessionExercises.length > 0
+      ? Math.max(...session.sessionExercises.map(se => se.order)) + 1
+      : 1
+    const exerciseTempId = nextTempIdRef.current--
+    const firstSetId = nextTempIdRef.current--
+    const newSessionExercise: SessionExercise = {
+      id: exerciseTempId,
+      order: newOrder,
+      exercise,
+      sets: [
+        {
+          id: firstSetId,
+          setNumber: 1,
+          reps: 0,
+          weight: 0,
+          isCompleted: false,
+        },
+      ],
+    }
+    setSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            sessionExercises: [...prev.sessionExercises, newSessionExercise],
+          }
+        : null
+    )
+    setShowAddExerciseModal(false)
+  }
+
+  const addSetToExercise = (sessionExercise: SessionExercise) => {
+    if (!session) return
+    const maxSetNumber =
+      sessionExercise.sets.length === 0
+        ? 0
+        : Math.max(...sessionExercise.sets.map((s) => s.setNumber))
+    const prevSet = sessionExercise.sets[sessionExercise.sets.length - 1]
+    const prevEdited = prevSet ? editingSets.get(prevSet.id) : undefined
+    const defaultReps = prevEdited?.reps ?? prevSet?.reps ?? 0
+    const defaultWeight = prevEdited?.weight ?? prevSet?.weight ?? 0
+    const newSetId = nextTempIdRef.current--
+    const newSet: SessionSet = {
+      id: newSetId,
+      setNumber: maxSetNumber + 1,
+      reps: defaultReps,
+      weight: defaultWeight,
+      isCompleted: false,
+    }
+    setEditingSets((prev) => {
+      const next = new Map(prev)
+      next.set(newSetId, { reps: defaultReps, weight: defaultWeight })
+      return next
+    })
+    setSession((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        sessionExercises: prev.sessionExercises.map((se) =>
+          se.id === sessionExercise.id
+            ? { ...se, sets: [...se.sets, newSet] }
+            : se
+        ),
+      }
+    })
+  }
+
+  const removeExerciseFromSession = (sessionExercise: SessionExercise) => {
+    if (sessionExercise.id > 0) {
+      setRemovedSessionExerciseIds((prev) => [...prev, sessionExercise.id])
+    }
+    setSession((prev) => {
+      if (!prev) return null
+      const filtered = prev.sessionExercises.filter((se) => se.id !== sessionExercise.id)
+      return {
+        ...prev,
+        sessionExercises: filtered.map((se, index) => ({ ...se, order: index + 1 })),
+      }
+    })
+  }
+
+  const saveSetUpdate = (set: SessionSet) => {
     const edited = editingSets.get(set.id)
     if (!edited) return
 
-    try {
-      await trpc.sessions.updateSessionSets.mutate({
-        setId: set.id,
-        setNumber: set.setNumber,
-        reps: edited.reps,
-        weight: edited.weight,
-        isCompleted: set.isCompleted,
-      })
-
-      setSession((prev) => {
-        if (!prev) return null
-        return {
-          ...prev,
-          sessionExercises: prev.sessionExercises.map((se) => ({
-            ...se,
-            sets: se.sets.map((s) =>
-              s.id === set.id
-                ? {
-                    ...s,
-                    reps: edited.reps,
-                    weight: edited.weight,
-                  }
-                : s
-            ),
-          })),
-        }
-      })
-
-      setEditingSets((prev) => {
-        const newMap = new Map(prev)
-        newMap.delete(set.id)
-        return newMap
-      })
-    } catch (err) {
-      console.error('Error updating set:', err)
-      setError(getApiErrorMessage(err, 'Failed to update set'))
-    }
+    setSession((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        sessionExercises: prev.sessionExercises.map((se) => ({
+          ...se,
+          sets: se.sets.map((s) =>
+            s.id === set.id
+              ? {
+                  ...s,
+                  reps: edited.reps,
+                  weight: edited.weight,
+                }
+              : s
+          ),
+        })),
+      }
+    })
+    // Don't remove from editingSets here: when user moves to the other field (e.g. weight → reps),
+    // we'd re-initialize from stale session and the value they just typed would reset.
   }
 
   const handleCompleteWorkout = async () => {
@@ -265,7 +347,6 @@ function SessionDetailScreen() {
                 await trpc.sessions.delete.mutate({ id: session.id })
                 navigation.navigate('MainTabs' as never)
               } catch (err) {
-                console.error('Error deleting session:', err)
                 Toast.show({
                   type: 'error',
                   text1: 'Error',
@@ -282,6 +363,8 @@ function SessionDetailScreen() {
               navigation.navigate('Login' as never, {
                 completeSessionId: session.id,
                 sessionCreatedAt: session.createdAt,
+                session,
+                removedSessionExerciseIds,
               } as never)
             },
           },
@@ -294,11 +377,8 @@ function SessionDetailScreen() {
       setCompleting(true)
       setError(null)
 
-      const updatedSession = await trpc.sessions.update.mutate({
-        id: session.id,
-        createdAt: new Date(session.createdAt),
-        completedAt: new Date(),
-      })
+      const payload = buildSessionUpdatePayload(session, new Date(), editingSets, removedSessionExerciseIds)
+      const updatedSession = await trpc.sessions.update.mutate(payload)
 
       const mappedSession = mapSessionData(updatedSession)
       if (mappedSession) {
@@ -312,7 +392,6 @@ function SessionDetailScreen() {
         text2: 'Workout completed and saved.',
       })
     } catch (err) {
-      console.error('Error completing workout:', err)
       setError(getApiErrorMessage(err, 'Failed to complete workout'))
       Toast.show({
         type: 'error',
@@ -347,7 +426,6 @@ function SessionDetailScreen() {
               await checkAuth()
               navigation.navigate('MainTabs' as never)
             } catch (err) {
-              console.error('Error canceling workout:', err)
               setError(getApiErrorMessage(err, 'Failed to cancel workout'))
             } finally {
               setDeleting(false)
@@ -369,7 +447,6 @@ function SessionDetailScreen() {
 
       navigation.navigate('SessionDetail' as never, { id: newSession.id } as never)
     } catch (err) {
-      console.error('Error starting new workout:', err)
       setError(getApiErrorMessage(err, 'Failed to start new workout'))
       Toast.show({
         type: 'error',
@@ -550,14 +627,32 @@ function SessionDetailScreen() {
         {session.sessionExercises.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No exercises in this workout</Text>
+            {!session.completedAt && (
+              <TouchableOpacity
+                style={styles.addExerciseButton}
+                onPress={() => setShowAddExerciseModal(true)}
+              >
+                <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={styles.exercisesContainer}>
             {session.sessionExercises.map((sessionExercise) => (
               <View key={sessionExercise.id} style={styles.exerciseCard}>
-                <Text style={styles.exerciseName}>
-                  {sessionExercise.order + 1}. {sessionExercise.exercise.name}
-                </Text>
+                <View style={styles.exerciseCardHeader}>
+                  <Text style={styles.exerciseName}>
+                    {sessionExercise.order}. {sessionExercise.exercise.name}
+                  </Text>
+                  {!session.completedAt && (
+                    <TouchableOpacity
+                      style={styles.removeExerciseButton}
+                      onPress={() => removeExerciseFromSession(sessionExercise)}
+                    >
+                      <Text style={styles.removeExerciseButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
                 {sessionExercise.sets.length === 0 ? (
                   <Text style={styles.noSetsText}>No sets configured</Text>
@@ -575,6 +670,7 @@ function SessionDetailScreen() {
                       const edited = editingSets.get(set.id)
                       const displayWeight = edited?.weight ?? set.weight ?? 0
                       const displayReps = edited?.reps ?? set.reps ?? 0
+                      const canCompleteSet = displayWeight > 0 && displayReps > 0
 
                       return (
                         <View
@@ -631,6 +727,7 @@ function SessionDetailScreen() {
                             <Switch
                               value={set.isCompleted}
                               onValueChange={() => toggleSetComplete(set)}
+                              disabled={!canCompleteSet}
                               trackColor={{ false: '#D1D5DB', true: '#10B981' }}
                               thumbColor="#fff"
                             />
@@ -640,8 +737,24 @@ function SessionDetailScreen() {
                     })}
                   </View>
                 )}
+                {!session.completedAt && (
+                  <TouchableOpacity
+                    style={styles.addSetButton}
+                    onPress={() => addSetToExercise(sessionExercise)}
+                  >
+                    <Text style={styles.addSetButtonText}>Add Set</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
+            {!session.completedAt && (
+              <TouchableOpacity
+                style={styles.addExerciseButtonSecondary}
+                onPress={() => setShowAddExerciseModal(true)}
+              >
+                <Text style={styles.addExerciseButtonText}>+ Add Exercise</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -782,6 +895,55 @@ function SessionDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showAddExerciseModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddExerciseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }]}>Add Exercise</Text>
+              <TouchableOpacity onPress={() => setShowAddExerciseModal(false)}>
+                <Text style={styles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {exercisesLoading ? (
+              <View style={styles.modalEmpty}>
+                <ActivityIndicator size="small" color="#2563EB" />
+                <Text style={styles.modalEmptyText}>Loading exercises…</Text>
+              </View>
+            ) : (() => {
+              const availableExercises = exercises.filter(
+                (ex) => !session.sessionExercises.some((se) => se.exercise.id === ex.id)
+              )
+              return availableExercises.length > 0 ? (
+                <ScrollView style={styles.modalList}>
+                  {availableExercises.map((exercise) => (
+                    <TouchableOpacity
+                      key={exercise.id}
+                      style={styles.modalItem}
+                      onPress={() => addExerciseToSession(exercise)}
+                    >
+                      <Text style={styles.modalItemText}>{exercise.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.modalEmpty}>
+                  <Text style={styles.modalEmptyText}>
+                    {exercises.length === 0
+                      ? 'No exercises available'
+                      : 'All exercises already added'}
+                  </Text>
+                </View>
+              )
+            })()}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -917,11 +1079,61 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  exerciseCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   exerciseName: {
+    flex: 1,
     fontSize: 20,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 16,
+    marginRight: 8,
+  },
+  removeExerciseButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  removeExerciseButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addSetButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  addSetButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addExerciseButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  addExerciseButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addExerciseButtonSecondary: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
   },
   noSetsText: {
     fontSize: 14,
@@ -1128,6 +1340,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  modalList: {
+    maxHeight: 320,
+  },
+  modalItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  modalEmpty: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalEmptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   modalInput: {
     borderWidth: 1,

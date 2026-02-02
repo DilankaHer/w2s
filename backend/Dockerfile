@@ -16,4 +16,4 @@ RUN bunx prisma generate
 EXPOSE 3000
 USER bun
 
-ENTRYPOINT ["sh", "-c", "bunx prisma migrate reset --force && bunx prisma migrate deploy && bun run start"]
+ENTRYPOINT ["sh", "-c", "bunx prisma migrate deploy && bun run start"]

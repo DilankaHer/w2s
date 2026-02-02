@@ -52,7 +52,6 @@ function TemplateDetailScreen() {
       setEditingSets(new Map())
     } catch (err) {
       setError(getApiErrorMessage(err, 'An error occurred'))
-      console.error('Error fetching template:', err)
     } finally {
       setLoading(false)
     }
@@ -134,7 +133,6 @@ function TemplateDetailScreen() {
         return newMap
       })
     } catch (err) {
-      console.error('Error updating set:', err)
       setEditingSets((prev) => {
         const newMap = new Map(prev)
         newMap.delete(set.id)
@@ -158,7 +156,6 @@ function TemplateDetailScreen() {
         : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
       navigation.navigate('SessionDetail' as never, { id: session.id, initialSession: session } as never)
     } catch (err) {
-      console.error('Error creating session:', err)
       setError(getApiErrorMessage(err, 'Failed to create session'))
       Toast.show({
         type: 'error',
@@ -245,7 +242,7 @@ function TemplateDetailScreen() {
             {template.workoutExercises.map((templateExercise) => (
               <View key={templateExercise.id} style={styles.exerciseCard}>
                 <Text style={styles.exerciseName}>
-                  {templateExercise.order + 1}. {templateExercise.exercise.name}
+                  {templateExercise.order}. {templateExercise.exercise.name}
                 </Text>
 
                 {templateExercise.sets.length === 0 ? (

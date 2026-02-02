@@ -106,7 +106,6 @@ function CreateTemplateScreen() {
       const data = await trpc.exercises.list.query()
       setExercises(Array.isArray(data) ? data : [])
     } catch (err) {
-      console.error('Error fetching exercises:', err)
       setError(getApiErrorMessage(err, 'Failed to load exercises'))
     } finally {
       setExercisesLoading(false)
@@ -114,7 +113,9 @@ function CreateTemplateScreen() {
   }
 
   const addExercise = (exercise: Exercise) => {
-    const newOrder = workoutExercises.length
+    const newOrder = workoutExercises.length > 0
+      ? Math.max(...workoutExercises.map(ex => ex.order)) + 1
+      : 1
     const newExercise: WorkoutExercise = {
       id: exercise.id,
       order: newOrder,
@@ -133,7 +134,7 @@ function CreateTemplateScreen() {
   const removeExercise = (exerciseId: number) => {
     const updated = workoutExercises
       .filter((ex) => ex.id !== exerciseId)
-      .map((ex, index) => ({ ...ex, order: index }))
+      .map((ex, index) => ({ ...ex, order: index + 1 }))
     setWorkoutExercises(updated)
   }
 
@@ -230,7 +231,6 @@ function CreateTemplateScreen() {
       await checkAuth()
       navigation.navigate('MainTabs' as never)
     } catch (err) {
-      console.error('Error creating template:', err)
       setError(getApiErrorMessage(err, 'Failed to create template'))
       Toast.show({
         type: 'error',
@@ -306,7 +306,7 @@ function CreateTemplateScreen() {
               <View key={workoutExercise.id} style={styles.exerciseCard}>
                 <View style={styles.exerciseHeader}>
                   <Text style={styles.exerciseName}>
-                    {workoutExercise.order + 1}. {getExerciseName(workoutExercise.id)}
+                    {workoutExercise.order}. {getExerciseName(workoutExercise.id)}
                   </Text>
                   <TouchableOpacity
                     style={styles.removeExerciseButton}

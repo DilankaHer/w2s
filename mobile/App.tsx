@@ -17,7 +17,7 @@ import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
 import TemplatesScreen from './src/screens/TemplatesScreen'
 
 export type RootStackParamList = {
-  Login: { completeSessionId?: number; sessionCreatedAt?: string } | undefined
+  Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[] } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
   TemplateDetail: { id: number }
   SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string }

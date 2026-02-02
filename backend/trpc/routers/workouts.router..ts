@@ -82,7 +82,8 @@ export const workoutsRouter = router({
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return prisma.workout.findUnique({
+      let startTime = performance.now();
+      const workout = await prisma.workout.findUnique({
         where: { id: input.id },
         include: {
           workoutExercises: {
@@ -96,6 +97,11 @@ export const workoutsRouter = router({
           },
         },
       });
+      startTime = performance.now();
+      await prisma.workout.findUniqueOrThrow({
+        where: { id: input.id },
+      });
+      return workout;
     }),
 
   update: protectedProcedure

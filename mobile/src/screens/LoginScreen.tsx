@@ -1,20 +1,22 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+import type { Session } from '../types'
+import { buildSessionUpdatePayload } from '../utils/buildSessionUpdatePayload'
 
 const USERNAME_CHECK_DEBOUNCE_MS = 400
 
@@ -105,20 +107,18 @@ function LoginScreen() {
       if (result.success) {
         await checkAuth()
 
-        const completeSessionId = route.params?.completeSessionId
-        const sessionCreatedAt = route.params?.sessionCreatedAt
-        if (completeSessionId != null && sessionCreatedAt) {
+        const sessionToSave = route.params?.session as Session | undefined
+        const removedIds = route.params?.removedSessionExerciseIds
+        if (sessionToSave && route.params?.completeSessionId != null) {
           try {
             const user = await trpc.users.getUser.query()
+            const payload = buildSessionUpdatePayload(sessionToSave, new Date(), undefined, removedIds)
             await trpc.sessions.update.mutate({
-              id: completeSessionId,
-              createdAt: new Date(sessionCreatedAt),
-              completedAt: new Date(),
-              userId: user.userId,
+              ...payload,
+              userId: user?.id,
             })
             await checkAuth()
           } catch (err) {
-            console.error('Error saving session:', err)
             Toast.show({
               type: 'error',
               text1: 'Error',
@@ -136,7 +136,6 @@ function LoginScreen() {
         })
       }
     } catch (err) {
-      console.error(`Error ${isLogin ? 'logging in' : 'creating account'}:`, err)
       const errorMessage = getApiErrorMessage(err, '')
       // Show user-friendly error messages
       if (errorMessage.includes('not found') || errorMessage.includes('User not found')) {

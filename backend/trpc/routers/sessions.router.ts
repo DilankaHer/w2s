@@ -1,5 +1,6 @@
 import z from "zod"
 import { prisma } from "../../prisma/client"
+import { SessionUpdateInput } from "../interfaces/session.interface"
 import { protectedProcedure } from "../middleware/auth.middleware"
 import { publicProcedure, router } from "../trpc"
 
@@ -195,48 +196,124 @@ export const sessionsRouter = router({
                 },
             })
         }),
+    // update: protectedProcedure
+    //     .input(z.object({
+    //         id: z.number(),
+    //         createdAt: z.coerce.date(),
+    //         completedAt: z.coerce.date(),
+    //         userId: z.number().optional(),
+    //     }))
+    //     .mutation(async ({ input }) => {
+    //         await prisma.sessionSet.deleteMany({
+    //             where: {
+    //                 sessionExercise: {
+    //                     sessionId: input.id,
+    //                 },
+    //                 isCompleted: false,
+    //             }
+    //         });
+    //         await prisma.sessionExercise.deleteMany({
+    //             where: {
+    //                 sessionId: input.id,
+    //                 sessionSets: {
+    //                     none: {},
+    //                 },
+    //             },
+    //         });
+    //         return prisma.session.update({
+    //             where: { id: input.id },
+    //             data: {
+    //                 completedAt: input.completedAt,
+    //                 sessionTime: formatTime((input.completedAt.getTime() - input.createdAt.getTime()) / 1000),
+    //                 ...(input.userId !== undefined && { userId: input.userId }),
+    //             },
+    //             include: {
+    //                 sessionExercises: {
+    //                     include: {
+    //                         exercise: true,
+    //                         sessionSets: { orderBy: { setNumber: 'asc' } },
+    //                     },
+    //                     orderBy: { order: 'asc' },
+    //                 },
+    //             },
+    //         })
+    //     }),
+
     update: protectedProcedure
-        .input(z.object({
-            id: z.number(),
-            createdAt: z.coerce.date(),
-            completedAt: z.coerce.date(),
-            userId: z.number().optional(),
-        }))
+        .input(SessionUpdateInput)
         .mutation(async ({ input }) => {
-            await prisma.sessionSet.deleteMany({
-                where: {
-                    sessionExercise: {
-                        sessionId: input.id,
-                    },
-                    isCompleted: false,
-                }
-            });
-            await prisma.sessionExercise.deleteMany({
-                where: {
-                    sessionId: input.id,
-                    sessionSets: {
-                        none: {},
-                    },
-                },
-            });
-            return prisma.session.update({
-                where: { id: input.id },
-                data: {
-                    completedAt: input.completedAt,
-                    sessionTime: formatTime((input.completedAt.getTime() - input.createdAt.getTime()) / 1000),
-                    ...(input.userId !== undefined && { userId: input.userId }),
-                },
-                include: {
-                    sessionExercises: {
-                        include: {
-                            exercise: true,
-                            sessionSets: { orderBy: { setNumber: 'asc' } },
+            return await prisma.$transaction(async (tx) => {
+                await tx.sessionExercise.deleteMany({
+                    where: { id: { in: input.sessionExercisesRemove } },
+                });
+                await tx.sessionSet.deleteMany({
+                    where: { id: { in: input.sessionSetsRemove } },
+                });
+                await Promise.all(input.sessionExercisesAdd.map(ex =>
+                    tx.sessionExercise.create({
+                        data: {
+                            sessionId: input.sessionId,
+                            exerciseId: ex.exerciseId,
+                            order: ex.order,
+                            sessionSets: {
+                                create: ex.sessionSets.map(set => ({
+                                    setNumber: set.setNumber,
+                                    reps: set.reps,
+                                    weight: set.weight,
+                                })),
+                            },
                         },
-                        orderBy: { order: 'asc' },
+                    })
+                ));
+                await Promise.all(
+                    input.sessionExercisesUpdate.map(ex =>
+                        tx.sessionExercise.update({
+                            where: { id: ex.exerciseId },
+                            data: {
+                                order: ex.order,
+                                sessionSets: {
+                                    ...(ex.sessionSetsUpdate.length > 0 && {
+                                        update: ex.sessionSetsUpdate.map(set => ({
+                                            where: { id: set.sessionSetId },
+                                            data: {
+                                                setNumber: set.setNumber,
+                                                reps: set.reps,
+                                                weight: set.weight,
+                                            },
+                                        })),
+                                    }),
+                                    ...(ex.sessionSetsAdd.length > 0 && {
+                                        create: ex.sessionSetsAdd.map(set => ({
+                                            setNumber: set.setNumber,
+                                            reps: set.reps,
+                                            weight: set.weight,
+                                        })),
+                                    }),
+                                },
+                            },
+                        })
+                    )
+                );
+                return await tx.session.update({
+                    where: { id: input.sessionId },
+                    data: {
+                        completedAt: input.completedAt,
+                        sessionTime: formatTime((input.completedAt.getTime() - input.createdAt.getTime()) / 1000),
+                        ...(input.userId !== undefined && { userId: input.userId }),
                     },
-                },
-            })
+                    include: {
+                        sessionExercises: {
+                            include: {
+                                exercise: true,
+                                sessionSets: { orderBy: { setNumber: 'asc' } },
+                            },
+                            orderBy: { order: 'asc' },
+                        },
+                    },
+                });
+            });
         }),
+
     delete: publicProcedure
         .input(z.object({
             id: z.number(),

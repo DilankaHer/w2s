@@ -61,3 +61,41 @@ export interface WorkoutInfo {
     sessionTime: string | null
   }>
 }
+
+/** Matches backend SessionUpdateInput – used to save session (supports offline / continue when no internet). */
+export interface SessionUpdatePayload {
+  sessionId: number
+  workoutId?: number
+  createdAt: string | Date
+  completedAt: string | Date
+  userId?: number
+  name?: string
+  sessionExercisesAdd: Array<{
+    exerciseId: number
+    order: number
+    sessionSets: Array<{
+      setNumber: number
+      reps: number
+      weight: number
+    }>
+  }>
+  sessionExercisesUpdate: Array<{
+    /** Backend uses this as sessionExercise id. */
+    exerciseId: number
+    order: number
+    sessionSetsUpdate: Array<{
+      sessionSetId: number
+      setNumber: number
+      reps: number
+      weight: number
+      isCompleted: boolean
+    }>
+    sessionSetsAdd: Array<{
+      setNumber: number
+      reps: number
+      weight: number
+    }>
+  }>
+  sessionSetsRemove: number[]
+  sessionExercisesRemove: number[]
+}
