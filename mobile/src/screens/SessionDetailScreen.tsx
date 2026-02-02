@@ -8,7 +8,6 @@ import {
     Platform,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -36,6 +35,7 @@ const mapSessionData = (sessionData: any): Session | null => {
       completedAt: sessionData.completedAt,
       workoutId: sessionData.workoutId ?? undefined,
       sessionTime: sessionData.sessionTime ?? undefined,
+      isSyncedOnce: sessionData.isSyncedOnce ?? false,
       sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
         id: se.id,
         order: se.order,
@@ -45,7 +45,6 @@ const mapSessionData = (sessionData: any): Session | null => {
           setNumber: set.setNumber,
           reps: set.reps ?? set.targetReps ?? 0,
           weight: set.weight ?? set.targetWeight ?? 0,
-          isCompleted: set.isCompleted ?? false,
         })),
       })),
     }
@@ -82,7 +81,8 @@ function SessionDetailScreen() {
   const [showCompletionSummary, setShowCompletionSummary] = useState(false)
   const [templateError, setTemplateError] = useState<string | null>(null)
   const [templateErrorSource, setTemplateErrorSource] = useState<'update' | 'create' | null>(null)
-  const [templateLoading, setTemplateLoading] = useState(false)
+  const [templateUpdateLoading, setTemplateUpdateLoading] = useState(false)
+  const [templateCreateLoading, setTemplateCreateLoading] = useState(false)
   const [templateSuccess, setTemplateSuccess] = useState(false)
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
@@ -98,6 +98,13 @@ function SessionDetailScreen() {
     if (initialSessionParam && mapSessionData(initialSessionParam)) return
     fetchSession(id)
   }, [id, initialSessionParam])
+
+  // Automatically show completion summary if session is completed when loaded
+  useEffect(() => {
+    if (session?.completedAt && !showCompletionSummary) {
+      setShowCompletionSummary(true)
+    }
+  }, [session?.completedAt, showCompletionSummary])
 
   const fetchExercises = async () => {
     try {
@@ -169,24 +176,6 @@ function SessionDetailScreen() {
     return () => clearInterval(interval)
   }, [session, initialCreatedAtParam])
 
-  const toggleSetComplete = (set: SessionSet) => {
-    const newIsCompleted = !set.isCompleted
-    setSession((prev) => {
-      if (!prev) return null
-      return {
-        ...prev,
-        sessionExercises: prev.sessionExercises.map((se) => ({
-          ...se,
-          sets: se.sets.map((s) =>
-            s.id === set.id
-              ? { ...s, isCompleted: newIsCompleted }
-              : s
-          ),
-        })),
-      }
-    })
-  }
-
   const initializeEditingSet = (set: SessionSet) => {
     setEditingSets((prev) => {
       if (!prev.has(set.id)) {
@@ -238,7 +227,6 @@ function SessionDetailScreen() {
           setNumber: 1,
           reps: 0,
           weight: 0,
-          isCompleted: false,
         },
       ],
     }
@@ -269,7 +257,6 @@ function SessionDetailScreen() {
       setNumber: maxSetNumber + 1,
       reps: defaultReps,
       weight: defaultWeight,
-      isCompleted: false,
     }
     setEditingSets((prev) => {
       const next = new Map(prev)
@@ -333,43 +320,27 @@ function SessionDetailScreen() {
     if (!session) return
 
     if (!isAuthenticated) {
-      Alert.alert(
-        'Save session?',
-        'To save this session to your history, log in. Proceed without logging in? This session will not be saved.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: "Don't save",
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                setCompleting(true)
-                await trpc.sessions.delete.mutate({ id: session.id })
-                navigation.navigate('MainTabs' as never)
-              } catch (err) {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Error',
-                  text2: 'Failed to delete session. Please try again.',
-                })
-              } finally {
-                setCompleting(false)
-              }
-            },
-          },
-          {
-            text: 'Log in',
-            onPress: () => {
-              navigation.navigate('Login' as never, {
-                completeSessionId: session.id,
-                sessionCreatedAt: session.createdAt,
-                session,
-                removedSessionExerciseIds,
-              } as never)
-            },
-          },
-        ]
-      )
+      // For guests, mark session as completed locally and show summary
+      // They can save it later by logging in
+      try {
+        setCompleting(true)
+        const completedAt = new Date()
+        setSession((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            completedAt: completedAt.toISOString(),
+          }
+        })
+        setShowCompletionSummary(true)
+        Toast.show({
+          type: 'success',
+          text1: 'Workout completed',
+          text2: 'Log in to save this session and create templates.',
+        })
+      } finally {
+        setCompleting(false)
+      }
       return
     }
 
@@ -461,7 +432,7 @@ function SessionDetailScreen() {
   const handleUpdateTemplate = async () => {
     if (!session?.workoutId) return
     try {
-      setTemplateLoading(true)
+      setTemplateUpdateLoading(true)
       setTemplateError(null)
       setTemplateErrorSource(null)
       await trpc.workouts.updateBySession.mutate({
@@ -486,11 +457,40 @@ function SessionDetailScreen() {
         text2: 'Failed to update template. Please try again.',
       })
     } finally {
-      setTemplateLoading(false)
+      setTemplateUpdateLoading(false)
     }
   }
 
+  const handleSaveSessionPress = () => {
+    if (!session) return
+
+    // Show login dialog for guests
+    Alert.alert(
+      'Login required',
+      'To save this session to your history, please log in or create an account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log in / Sign up',
+          onPress: () => {
+            const nav = navigation as any
+            nav.navigate('Login', {
+              completeSessionId: session.id,
+              sessionCreatedAt: session.createdAt,
+              session,
+              removedSessionExerciseIds,
+              createTemplate: false,
+            })
+          },
+        },
+      ]
+    )
+  }
+
   const handleCreateTemplatePress = () => {
+    if (!session) return
+
+    // Show template name modal first (for both guests and authenticated users)
     setNewTemplateName(session?.name ?? '')
     setTemplateError(null)
     setShowCreateTemplateModal(true)
@@ -498,8 +498,37 @@ function SessionDetailScreen() {
 
   const handleCreateTemplateConfirm = async () => {
     if (!session || !newTemplateName.trim()) return
+
+    // If not authenticated, redirect to login with template name
+    if (!isAuthenticated) {
+      setShowCreateTemplateModal(false)
+      Alert.alert(
+        'Login required',
+        'To create a template, please log in or create an account.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Log in / Sign up',
+            onPress: () => {
+              const nav = navigation as any
+              nav.navigate('Login', {
+                completeSessionId: session.id,
+                sessionCreatedAt: session.createdAt,
+                session,
+                removedSessionExerciseIds,
+                createTemplate: true,
+                templateName: newTemplateName.trim(),
+              })
+            },
+          },
+        ]
+      )
+      return
+    }
+
+    // Authenticated users can create template directly
     try {
-      setTemplateLoading(true)
+      setTemplateCreateLoading(true)
       setTemplateError(null)
       setTemplateErrorSource(null)
       await trpc.workouts.createBySession.mutate({
@@ -526,7 +555,7 @@ function SessionDetailScreen() {
         text2: 'Failed to create template. Please try again.',
       })
     } finally {
-      setTemplateLoading(false)
+      setTemplateCreateLoading(false)
     }
   }
 
@@ -579,7 +608,7 @@ function SessionDetailScreen() {
   }
 
   const allSets = session.sessionExercises.flatMap((ex) => ex.sets)
-  const completedCount = allSets.filter(s => s.isCompleted).length
+  const totalSets = allSets.length
 
   return (
     <KeyboardAvoidingView
@@ -662,24 +691,14 @@ function SessionDetailScreen() {
                       <Text style={styles.tableHeaderText}>Set</Text>
                       <Text style={styles.tableHeaderText}>Weight (kg)</Text>
                       <Text style={styles.tableHeaderText}>Reps</Text>
-                      {!session.completedAt && (
-                        <Text style={styles.tableHeaderText}>Complete</Text>
-                      )}
                     </View>
                     {sessionExercise.sets.map((set) => {
                       const edited = editingSets.get(set.id)
                       const displayWeight = edited?.weight ?? set.weight ?? 0
                       const displayReps = edited?.reps ?? set.reps ?? 0
-                      const canCompleteSet = displayWeight > 0 && displayReps > 0
 
                       return (
-                        <View
-                          key={set.id}
-                          style={[
-                            styles.setRow,
-                            set.isCompleted && styles.completedSetRow,
-                          ]}
-                        >
+                        <View key={set.id} style={styles.setRow}>
                           <Text style={styles.setNumber}>{set.setNumber}</Text>
                           {!session.completedAt ? (
                             <TextInput
@@ -723,15 +742,6 @@ function SessionDetailScreen() {
                           ) : (
                             <Text style={styles.setValue}>{set.reps ?? 0}</Text>
                           )}
-                          {!session.completedAt && (
-                            <Switch
-                              value={set.isCompleted}
-                              onValueChange={() => toggleSetComplete(set)}
-                              disabled={!canCompleteSet}
-                              trackColor={{ false: '#D1D5DB', true: '#10B981' }}
-                              thumbColor="#fff"
-                            />
-                          )}
                         </View>
                       )
                     })}
@@ -772,11 +782,7 @@ function SessionDetailScreen() {
               onPress={handleCompleteWorkout}
               disabled={completing || deleting}
             >
-              <Text style={styles.completeButtonText}>
-                {completedCount > 0
-                  ? `Complete Workout (${completedCount}/${allSets.length})`
-                  : 'Complete Workout'}
-              </Text>
+              <Text style={styles.completeButtonText}>Complete Workout</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -791,7 +797,7 @@ function SessionDetailScreen() {
                 : formatTime(elapsedTime))}
             </Text>
             <Text style={styles.summaryMeta}>
-              {session.sessionExercises.length} exercise(s), {allSets.filter(s => s.isCompleted).length}/{allSets.length} sets completed
+              {session.sessionExercises.length} exercise(s), {totalSets} sets completed
             </Text>
             {templateError && (
               <View style={styles.templateErrorBox}>
@@ -803,23 +809,43 @@ function SessionDetailScreen() {
                       ? () => setShowCreateTemplateModal(true)
                       : handleUpdateTemplate
                   }
-                  disabled={templateLoading}
+                  disabled={templateUpdateLoading || templateCreateLoading}
                 >
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
               </View>
             )}
-            {templateSuccess && (
-              <Text style={styles.templateSuccessText}>Template {session.workoutId != null ? 'updated' : 'created'}.</Text>
+            {!isAuthenticated && (
+              <View style={styles.guestMessageBox}>
+                <Text style={styles.guestMessageText}>
+                  Log in to save this session and create templates.
+                </Text>
+              </View>
             )}
             <View style={styles.summaryButtons}>
-              {session.workoutId != null && (
+              {!isAuthenticated && (
+                <>
+                  <TouchableOpacity
+                    style={styles.saveSessionButton}
+                    onPress={handleSaveSessionPress}
+                  >
+                    <Text style={styles.saveSessionButtonText}>Save Session</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.goToTemplatesButton}
+                    onPress={handleGoToTemplates}
+                  >
+                    <Text style={styles.goToTemplatesButtonText}>Go to Templates</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {session.workoutId != null && isAuthenticated && !session.isSyncedOnce && (
                 <TouchableOpacity
-                  style={[styles.templateActionButton, templateLoading && styles.buttonDisabled]}
+                  style={[styles.templateActionButton, templateUpdateLoading && styles.buttonDisabled]}
                   onPress={handleUpdateTemplate}
-                  disabled={templateLoading}
+                  disabled={templateUpdateLoading}
                 >
-                  {templateLoading ? (
+                  {templateUpdateLoading ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <Text style={styles.templateActionButtonText}>Update Template</Text>
@@ -827,22 +853,24 @@ function SessionDetailScreen() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={[styles.templateActionButton, templateLoading && styles.buttonDisabled]}
+                style={[styles.templateActionButton, templateCreateLoading && styles.buttonDisabled]}
                 onPress={handleCreateTemplatePress}
-                disabled={templateLoading}
+                disabled={templateCreateLoading}
               >
-                {templateLoading ? (
+                {templateCreateLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Text style={styles.templateActionButtonText}>Create Template</Text>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.goToTemplatesButton}
-                onPress={handleGoToTemplates}
-              >
-                <Text style={styles.goToTemplatesButtonText}>Go to Templates</Text>
-              </TouchableOpacity>
+              {isAuthenticated && (
+                <TouchableOpacity
+                  style={styles.goToTemplatesButton}
+                  onPress={handleGoToTemplates}
+                >
+                  <Text style={styles.goToTemplatesButtonText}>Go to Templates</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -881,11 +909,11 @@ function SessionDetailScreen() {
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalConfirmButton, (!newTemplateName.trim() || templateLoading) && styles.buttonDisabled]}
+                style={[styles.modalConfirmButton, (!newTemplateName.trim() || templateCreateLoading) && styles.buttonDisabled]}
                 onPress={handleCreateTemplateConfirm}
-                disabled={!newTemplateName.trim() || templateLoading}
+                disabled={!newTemplateName.trim() || templateCreateLoading}
               >
-                {templateLoading ? (
+                {templateCreateLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Text style={styles.modalConfirmButtonText}>Confirm</Text>
@@ -1293,6 +1321,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 8,
   },
+  guestMessageBox: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  guestMessageText: {
+    color: '#92400E',
+    fontSize: 14,
+    textAlign: 'center',
+  },
   summaryButtons: {
     marginTop: 16,
     gap: 12,
@@ -1305,6 +1347,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   templateActionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveSessionButton: {
+    backgroundColor: '#059669',
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  saveSessionButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

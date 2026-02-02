@@ -81,13 +81,14 @@ model Set {
 }
 
 model Session {
-  id          Int       @id @default(autoincrement())
-  name        String
-  userId      Int?
-  workoutId   Int?
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-  sessionTime String?
+  id            Int       @id @default(autoincrement())
+  name          String
+  userId        Int?
+  workoutId     Int?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+  sessionTime   String?
+  isSyncedOnce  Boolean @default(false)
 
   sessionExercises SessionExercise[]
 
@@ -119,7 +120,6 @@ model SessionSet {
   setNumber         Int
   reps              Int?
   weight            Float?
-  isCompleted       Boolean @default(false)
 
   sessionExercise SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
 

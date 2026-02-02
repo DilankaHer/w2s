@@ -24,7 +24,6 @@ export const SessionUpdateInput = z.object({
             setNumber: z.number(),
             reps: z.number(),
             weight: z.number(),
-            isCompleted: z.boolean(),
         })),
         sessionSetsAdd: z.array(z.object({
             setNumber: z.number(),

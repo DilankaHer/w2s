@@ -119,9 +119,6 @@ export const trpc = createTRPCProxyClient<AppRouter>({
         }
         clearTimeout(timeoutId)
 
-        // Log API response time
-        const responseTime = Date.now() - startTime
-        console.log(`${apiName}: ${responseTime}ms`)
 
         if (response.status === 401) {
           await clearStoredAuth()

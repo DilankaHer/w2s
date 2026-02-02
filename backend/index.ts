@@ -57,5 +57,3 @@ Bun.serve({
     return new Response('OK', { status: 200 });
   }
 });
-
-console.log('🚀 tRPC server running');

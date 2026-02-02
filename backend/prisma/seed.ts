@@ -104,7 +104,7 @@ async function main() {
 
   // Create sets for Full Body workout exercises
   const setsData = []
-  
+
   // Squat: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({

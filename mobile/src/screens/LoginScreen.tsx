@@ -109,15 +109,76 @@ function LoginScreen() {
 
         const sessionToSave = route.params?.session as Session | undefined
         const removedIds = route.params?.removedSessionExerciseIds
+        const shouldCreateTemplate = route.params?.createTemplate === true
+        const templateName = route.params?.templateName || sessionToSave?.name || ''
+
         if (sessionToSave && route.params?.completeSessionId != null) {
           try {
             const user = await trpc.users.getUser.query()
-            const payload = buildSessionUpdatePayload(sessionToSave, new Date(), undefined, removedIds)
-            await trpc.sessions.update.mutate({
+            // Use the session's completedAt if it exists (for guests who completed locally),
+            // otherwise use current time
+            const completedAt = sessionToSave.completedAt 
+              ? new Date(sessionToSave.completedAt) 
+              : new Date()
+            const payload = buildSessionUpdatePayload(sessionToSave, completedAt, undefined, removedIds)
+            const updatedSession = await trpc.sessions.update.mutate({
               ...payload,
               userId: user?.id,
             })
             await checkAuth()
+            
+            // If user wanted to create template, do it now
+            if (shouldCreateTemplate && templateName.trim()) {
+              try {
+                await trpc.workouts.createBySession.mutate({
+                  sessionId: updatedSession.id,
+                  name: templateName.trim(),
+                })
+                await checkAuth()
+                
+                // Navigate to Templates screen since template was created
+                const nav = navigation as any
+                nav.navigate('MainTabs', {
+                  screen: 'Templates',
+                })
+
+                Toast.show({
+                  type: 'success',
+                  text1: 'Success',
+                  text2: 'Session saved and template created!',
+                })
+                return
+              } catch (templateErr) {
+                // Template creation failed, but session is saved
+                // Navigate back and let user retry template creation
+                const nav = navigation as any
+                nav.navigate('SessionDetail', {
+                  id: updatedSession.id,
+                  initialSession: updatedSession,
+                })
+
+                Toast.show({
+                  type: 'error',
+                  text1: 'Template creation failed',
+                  text2: 'Session saved. You can create template from the summary.',
+                })
+                return
+              }
+            }
+            
+            // Navigate back to SessionDetail with the completed session
+            const nav = navigation as any
+            nav.navigate('SessionDetail', {
+              id: updatedSession.id,
+              initialSession: updatedSession,
+            })
+
+            Toast.show({
+              type: 'success',
+              text1: 'Success',
+              text2: 'Session saved successfully!',
+            })
+            return
           } catch (err) {
             Toast.show({
               type: 'error',

@@ -22,9 +22,15 @@ export function buildSessionUpdatePayload(
   const getWeight = (setId: number, fallback: number) =>
     editingSets?.get(setId)?.weight ?? fallback ?? 0
 
+  const hasData = (s: { id: number; reps: number | null; weight: number | null }) => {
+    const r = editingSets?.get(s.id)?.reps ?? s.reps ?? 0
+    const w = editingSets?.get(s.id)?.weight ?? s.weight ?? 0
+    return r > 0 || w > 0
+  }
+
   for (const se of session.sessionExercises) {
     const isNewExercise = se.id <= 0
-    const completedSets = se.sets.filter((s) => s.isCompleted)
+    const completedSets = se.sets.filter(hasData)
 
     if (isNewExercise) {
       if (completedSets.length === 0) continue
@@ -43,18 +49,17 @@ export function buildSessionUpdatePayload(
     const existingSets = se.sets.filter((s) => s.id > 0)
     const newSets = se.sets.filter((s) => s.id <= 0)
     for (const s of existingSets) {
-      if (!s.isCompleted) sessionSetsRemove.push(s.id)
+      if (!hasData(s)) sessionSetsRemove.push(s.id)
     }
     const sessionSetsUpdate = existingSets
-      .filter((s) => s.isCompleted)
+      .filter(hasData)
       .map((s) => ({
         sessionSetId: s.id,
         setNumber: s.setNumber,
         reps: getReps(s.id, s.reps ?? 0),
         weight: getWeight(s.id, s.weight ?? 0),
-        isCompleted: true,
       }))
-    const sessionSetsAdd = newSets.filter((s) => s.isCompleted).map((s) => ({
+    const sessionSetsAdd = newSets.filter(hasData).map((s) => ({
       setNumber: s.setNumber,
       reps: getReps(s.id, s.reps ?? 0),
       weight: getWeight(s.id, s.weight ?? 0),

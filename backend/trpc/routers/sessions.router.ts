@@ -330,7 +330,6 @@ export const sessionsRouter = router({
             setNumber: z.number(),
             reps: z.number().optional(),
             weight: z.number().optional(),
-            isCompleted: z.boolean(),
         }))
         .mutation(async ({ input }) => {
             return prisma.sessionSet.update({
@@ -339,7 +338,6 @@ export const sessionsRouter = router({
                     setNumber: input.setNumber,
                     ...(input.reps !== undefined && { reps: input.reps }),
                     ...(input.weight !== undefined && { weight: input.weight }),
-                    isCompleted: input.isCompleted,
                 },
             })
         })

@@ -82,7 +82,6 @@ export const workoutsRouter = router({
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      let startTime = performance.now();
       const workout = await prisma.workout.findUnique({
         where: { id: input.id },
         include: {
@@ -97,7 +96,6 @@ export const workoutsRouter = router({
           },
         },
       });
-      startTime = performance.now();
       await prisma.workout.findUniqueOrThrow({
         where: { id: input.id },
       });
@@ -186,6 +184,10 @@ export const workoutsRouter = router({
             }
           }
         }
+        await tx.session.update({
+          where: { id: input.sessionId },
+          data: { isSyncedOnce: true },
+        });
       });
     }),
 
@@ -231,7 +233,7 @@ export const workoutsRouter = router({
         });
         await tx.session.update({
           where: { id: input.sessionId },
-          data: { name: input.name, workoutId: workout.id },
+          data: { name: input.name, workoutId: workout.id, isSyncedOnce: true },
         });
       });
       return "Workout created successfully";
