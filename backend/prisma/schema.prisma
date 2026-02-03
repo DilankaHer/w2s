@@ -89,6 +89,7 @@ model Session {
   completedAt   DateTime?
   sessionTime   String?
   isSyncedOnce  Boolean @default(false)
+  isFromDefaultTemplate Boolean @default(false)
 
   sessionExercises SessionExercise[]
 

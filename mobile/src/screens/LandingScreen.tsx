@@ -35,10 +35,11 @@ function LandingScreen() {
     navigation.navigate('TemplateDetail' as never, { id } as never)
   }
 
-  const handleSessionClick = (sessionItem: { id: number; createdAt: string }) => {
+  const handleSessionClick = (sessionItem: { id: number; createdAt: string; completedAt: string | null }) => {
     navigation.navigate('SessionDetail' as never, {
       id: sessionItem.id,
       initialCreatedAt: sessionItem.createdAt,
+      initialCompletedAt: sessionItem.completedAt ?? undefined,
     } as never)
   }
 

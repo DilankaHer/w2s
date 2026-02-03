@@ -20,7 +20,7 @@ export type RootStackParamList = {
   Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createTemplate?: boolean; templateName?: string } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
   TemplateDetail: { id: number }
-  SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string }
+  SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string }
   CreateTemplate: undefined
 }
 

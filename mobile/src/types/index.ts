@@ -15,6 +15,7 @@ export interface SessionSet {
   setNumber: number
   reps: number | null
   weight: number | null
+  isCompleted?: boolean
 }
 
 export interface TemplateExercise {
@@ -47,6 +48,7 @@ export interface Session {
   workoutId?: number | null
   sessionTime?: string | null
   isSyncedOnce?: boolean
+  isFromDefaultTemplate?: boolean
   sessionExercises: SessionExercise[]
 }
 

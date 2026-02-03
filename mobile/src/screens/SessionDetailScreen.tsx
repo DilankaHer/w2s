@@ -36,6 +36,7 @@ const mapSessionData = (sessionData: any): Session | null => {
       workoutId: sessionData.workoutId ?? undefined,
       sessionTime: sessionData.sessionTime ?? undefined,
       isSyncedOnce: sessionData.isSyncedOnce ?? false,
+      isFromDefaultTemplate: sessionData.isFromDefaultTemplate ?? false,
       sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
         id: se.id,
         order: se.order,
@@ -45,6 +46,7 @@ const mapSessionData = (sessionData: any): Session | null => {
           setNumber: set.setNumber,
           reps: set.reps ?? set.targetReps ?? 0,
           weight: set.weight ?? set.targetWeight ?? 0,
+          isCompleted: set.isCompleted ?? false,
         })),
       })),
     }
@@ -58,7 +60,7 @@ function SessionDetailScreen() {
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
   const { checkAuth, isAuthenticated } = useAuth()
-  const { id, initialSession: initialSessionParam, initialCreatedAt: initialCreatedAtParam } = route.params
+  const { id, initialSession: initialSessionParam, initialCreatedAt: initialCreatedAtParam, initialCompletedAt: initialCompletedAtParam } = route.params
   const [session, setSession] = useState<Session | null>(() =>
     initialSessionParam ? mapSessionData(initialSessionParam) : null
   )
@@ -78,7 +80,10 @@ function SessionDetailScreen() {
   const [deleting, setDeleting] = useState(false)
   const [startingNew, setStartingNew] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
-  const [showCompletionSummary, setShowCompletionSummary] = useState(false)
+  const [showCompletionSummary, setShowCompletionSummary] = useState(() => {
+    // If we're loading a completed session from history, show summary immediately
+    return !!initialCompletedAtParam
+  })
   const [templateError, setTemplateError] = useState<string | null>(null)
   const [templateErrorSource, setTemplateErrorSource] = useState<'update' | 'create' | null>(null)
   const [templateUpdateLoading, setTemplateUpdateLoading] = useState(false)
@@ -227,6 +232,7 @@ function SessionDetailScreen() {
           setNumber: 1,
           reps: 0,
           weight: 0,
+          isCompleted: false,
         },
       ],
     }
@@ -257,6 +263,7 @@ function SessionDetailScreen() {
       setNumber: maxSetNumber + 1,
       reps: defaultReps,
       weight: defaultWeight,
+      isCompleted: false,
     }
     setEditingSets((prev) => {
       const next = new Map(prev)
@@ -294,6 +301,9 @@ function SessionDetailScreen() {
     const edited = editingSets.get(set.id)
     if (!edited) return
 
+    // If weight or reps become zero, uncomplete the set
+    const shouldUncomplete = edited.reps === 0 || edited.weight === 0
+
     setSession((prev) => {
       if (!prev) return null
       return {
@@ -306,6 +316,7 @@ function SessionDetailScreen() {
                   ...s,
                   reps: edited.reps,
                   weight: edited.weight,
+                  isCompleted: shouldUncomplete ? false : s.isCompleted,
                 }
               : s
           ),
@@ -314,6 +325,36 @@ function SessionDetailScreen() {
     })
     // Don't remove from editingSets here: when user moves to the other field (e.g. weight → reps),
     // we'd re-initialize from stale session and the value they just typed would reset.
+  }
+
+  const canSetBeCompleted = (set: SessionSet): boolean => {
+    const edited = editingSets.get(set.id)
+    const weight = edited?.weight ?? set.weight ?? 0
+    const reps = edited?.reps ?? set.reps ?? 0
+    return weight > 0 && reps > 0
+  }
+
+  const toggleSetComplete = (set: SessionSet) => {
+    // If trying to complete, check if weight and reps are both > 0
+    if (!set.isCompleted && !canSetBeCompleted(set)) {
+      return
+    }
+    
+    const newIsCompleted = !set.isCompleted
+    setSession((prev) => {
+      if (!prev) return null
+      return {
+        ...prev,
+        sessionExercises: prev.sessionExercises.map((se) => ({
+          ...se,
+          sets: se.sets.map((s) =>
+            s.id === set.id
+              ? { ...s, isCompleted: newIsCompleted }
+              : s
+          ),
+        })),
+      }
+    })
   }
 
   const handleCompleteWorkout = async () => {
@@ -593,8 +634,9 @@ function SessionDetailScreen() {
   }
 
   // Show nothing while loading unless we have initialCreatedAt (then show timer immediately)
+  // But don't show timer if session is completed (from history)
   if (loading && !session) {
-    if (initialCreatedAtParam) {
+    if (initialCreatedAtParam && !initialCompletedAtParam) {
       return (
         <View style={styles.container}>
           <View style={[styles.headerCard, styles.loadingHeader]}>
@@ -609,6 +651,8 @@ function SessionDetailScreen() {
 
   const allSets = session.sessionExercises.flatMap((ex) => ex.sets)
   const totalSets = allSets.length
+  const completedSetsCount = allSets.filter((s) => s.isCompleted === true).length
+  const hasAtLeastOneCompletedSet = completedSetsCount > 0
 
   return (
     <KeyboardAvoidingView
@@ -691,14 +735,25 @@ function SessionDetailScreen() {
                       <Text style={styles.tableHeaderText}>Set</Text>
                       <Text style={styles.tableHeaderText}>Weight (kg)</Text>
                       <Text style={styles.tableHeaderText}>Reps</Text>
+                      {!session.completedAt && (
+                        <Text style={styles.tableHeaderText}>Done</Text>
+                      )}
                     </View>
                     {sessionExercise.sets.map((set) => {
                       const edited = editingSets.get(set.id)
                       const displayWeight = edited?.weight ?? set.weight ?? 0
                       const displayReps = edited?.reps ?? set.reps ?? 0
+                      const isCompleted = set.isCompleted ?? false
+                      const canComplete = canSetBeCompleted(set)
 
                       return (
-                        <View key={set.id} style={styles.setRow}>
+                        <View 
+                          key={set.id} 
+                          style={[
+                            styles.setRow,
+                            isCompleted && styles.completedSetRow
+                          ]}
+                        >
                           <Text style={styles.setNumber}>{set.setNumber}</Text>
                           {!session.completedAt ? (
                             <TextInput
@@ -742,6 +797,23 @@ function SessionDetailScreen() {
                           ) : (
                             <Text style={styles.setValue}>{set.reps ?? 0}</Text>
                           )}
+                          {!session.completedAt && (
+                            <TouchableOpacity
+                              style={styles.checkboxContainer}
+                              onPress={() => toggleSetComplete(set)}
+                              disabled={!canComplete && !isCompleted}
+                            >
+                              <View style={[
+                                styles.checkbox,
+                                isCompleted && styles.checkboxChecked,
+                                (!canComplete && !isCompleted) && styles.checkboxDisabled
+                              ]}>
+                                {isCompleted && (
+                                  <Text style={styles.checkboxCheckmark}>✓</Text>
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       )
                     })}
@@ -778,9 +850,12 @@ function SessionDetailScreen() {
               <Text style={styles.cancelButtonText}>Cancel Workout</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.completeButton, (completing || deleting) && styles.buttonDisabled]}
+              style={[
+                styles.completeButton, 
+                (!hasAtLeastOneCompletedSet || completing || deleting) && styles.buttonDisabled
+              ]}
               onPress={handleCompleteWorkout}
-              disabled={completing || deleting}
+              disabled={!hasAtLeastOneCompletedSet || completing || deleting}
             >
               <Text style={styles.completeButtonText}>Complete Workout</Text>
             </TouchableOpacity>
@@ -789,8 +864,20 @@ function SessionDetailScreen() {
 
         {session.completedAt && showCompletionSummary && (
           <View style={[styles.summaryBlock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <Text style={styles.summaryTitle}>Session summary</Text>
-            <Text style={styles.summaryName}>{session.name}</Text>
+            <View style={styles.summaryTitleRow}>
+              <Text style={styles.summaryTitle}>Session summary</Text>
+              <TouchableOpacity
+                style={[styles.performAgainButton, startingNew && styles.buttonDisabled]}
+                onPress={handleStartNewWorkout}
+                disabled={startingNew}
+              >
+                {startingNew ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.performAgainButtonText}>Perform Again</Text>
+                )}
+              </TouchableOpacity>
+            </View>
             <Text style={styles.summaryMeta}>
               Duration: {session.sessionTime ?? (session.completedAt && session.createdAt
                 ? formatTime(Math.floor((new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()) / 1000))
@@ -839,7 +926,7 @@ function SessionDetailScreen() {
                   </TouchableOpacity>
                 </>
               )}
-              {session.workoutId != null && isAuthenticated && !session.isSyncedOnce && (
+              {session.workoutId != null && isAuthenticated && !session.isSyncedOnce && !session.isFromDefaultTemplate && (
                 <TouchableOpacity
                   style={[styles.templateActionButton, templateUpdateLoading && styles.buttonDisabled]}
                   onPress={handleUpdateTemplate}
@@ -1204,6 +1291,35 @@ const styles = StyleSheet.create({
     color: '#111827',
     textAlign: 'center',
   },
+  checkboxContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  checkboxDisabled: {
+    opacity: 0.4,
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+  },
+  checkboxCheckmark: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   setInput: {
     flex: 1,
     borderWidth: 1,
@@ -1272,17 +1388,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  summaryTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   summaryTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 8,
-  },
-  summaryName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
   },
   summaryMeta: {
     fontSize: 14,
