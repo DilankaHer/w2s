@@ -96,9 +96,6 @@ export const workoutsRouter = router({
           },
         },
       });
-      await prisma.workout.findUniqueOrThrow({
-        where: { id: input.id },
-      });
       return workout;
     }),
 
