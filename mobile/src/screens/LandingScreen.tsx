@@ -11,6 +11,7 @@ import {
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
+import { colors } from '../theme/colors'
 
 interface Session {
   id: number
@@ -98,30 +99,30 @@ function LandingScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Get Started</Text>
           <Text style={styles.infoText}>
-            You don't have any workout templates or sessions yet. Create your first template to get started!
+            You don't have any workouts or sessions yet. Create your first workout to get started!
           </Text>
           <TouchableOpacity
             style={styles.infoButton}
             onPress={() => navigation.navigate('CreateTemplate' as never)}
           >
-            <Text style={styles.infoButtonText}>Create Your First Template</Text>
+            <Text style={styles.infoButtonText}>Create Your First Workout</Text>
           </TouchableOpacity>
         </View>
       )}
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Workout Templates</Text>
+        <Text style={styles.headerTitle}>Workouts</Text>
         <TouchableOpacity
           style={styles.createButton}
           onPress={() => navigation.navigate('CreateTemplate' as never)}
         >
-          <Text style={styles.createButtonText}>Create Template</Text>
+          <Text style={styles.createButtonText}>Create Workout</Text>
         </TouchableOpacity>
       </View>
 
       {templates.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No templates found</Text>
+          <Text style={styles.emptyText}>No workouts found</Text>
         </View>
       ) : (
         <View style={styles.templatesContainer}>
@@ -199,15 +200,15 @@ function LandingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
   },
   content: {
     padding: 16,
   },
   infoBox: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.cardElevated,
     borderWidth: 1,
-    borderColor: '#93C5FD',
+    borderColor: colors.primary,
     borderRadius: 8,
     padding: 16,
     marginBottom: 32,
@@ -215,22 +216,22 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E40AF',
+    color: colors.primary,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: '#1E3A8A',
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   infoButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
   },
   infoButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -243,16 +244,16 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
   },
   createButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   createButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -260,12 +261,12 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   templateCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -275,12 +276,12 @@ const styles = StyleSheet.create({
   templateName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 4,
   },
   templateDate: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   sessionsSection: {
     marginTop: 16,
@@ -294,10 +295,10 @@ const styles = StyleSheet.create({
   sessionsTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
   },
   viewAllText: {
-    color: '#2563EB',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -305,12 +306,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sessionCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -329,21 +330,21 @@ const styles = StyleSheet.create({
   },
   sessionDate: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   sessionTime: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: colors.textMuted,
     marginLeft: 8,
   },
   completedText: {
     fontSize: 14,
-    color: '#059669',
+    color: colors.success,
     marginTop: 4,
   },
   inProgressText: {
     fontSize: 14,
-    color: '#D97706',
+    color: colors.warning,
     marginTop: 4,
   },
   deleteButton: {
@@ -352,7 +353,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: 24,
-    color: '#DC2626',
+    color: colors.error,
     fontWeight: 'bold',
   },
   emptyContainer: {
@@ -361,7 +362,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
 })
 

@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await trpc.users.getWorkoutInfo.mutate()
 
       if (result) {
-        setWorkoutInfo(result)
+        setWorkoutInfo(result as unknown as WorkoutInfo)
         setIsAuthenticated(true)
         setServerDown(false)
       } else {

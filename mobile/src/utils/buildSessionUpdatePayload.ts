@@ -11,9 +11,10 @@ export function buildSessionUpdatePayload(
   session: Session,
   completedAt: Date,
   editingSets?: Map<number, { reps: number; weight: number }>,
-  sessionExercisesRemove?: number[]
+  sessionExercisesRemove?: number[],
+  removedSessionSetIds?: number[]
 ): SessionUpdatePayload {
-  const sessionSetsRemove: number[] = []
+  const sessionSetsRemove: number[] = [...(removedSessionSetIds ?? [])]
   const sessionExercisesAdd: SessionUpdatePayload['sessionExercisesAdd'] = []
   const sessionExercisesUpdate: SessionUpdatePayload['sessionExercisesUpdate'] = []
 

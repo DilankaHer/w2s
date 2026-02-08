@@ -15,6 +15,7 @@ import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+import { colors } from '../theme/colors'
 import type { Set, Template } from '../types'
 
 type TemplateDetailRouteProp = RouteProp<RootStackParamList, 'TemplateDetail'>
@@ -169,10 +170,10 @@ function TemplateDetailScreen() {
 
   // Only show white when server is up and we have no template yet. When server is down always show content we have so overlay is the only change.
   if (!serverDown && !template && loading) {
-    return <View style={[styles.container, styles.errorContainer, { backgroundColor: '#fff' }]} />
+    return <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.screen }]} />
   }
   if (serverDown && !template) {
-    return <View style={[styles.container, styles.errorContainer, { backgroundColor: '#F9FAFB' }]} />
+    return <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.screen }]} />
   }
 
   // Only show error if we're not loading
@@ -194,14 +195,14 @@ function TemplateDetailScreen() {
   if (!loading && !template) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Template not found</Text>
+        <Text style={styles.errorText}>Workout not found</Text>
       </View>
     )
   }
 
   // Show gray container while loading and no template (dialog takes priority; no content update until resolved)
   if (loading && !template) {
-    return <View style={[styles.container, { backgroundColor: '#F9FAFB' }]} />
+    return <View style={[styles.container, { backgroundColor: colors.screen }]} />
   }
 
   return (
@@ -214,6 +215,12 @@ function TemplateDetailScreen() {
         <View style={styles.headerCard}>
           <View style={styles.headerContent}>
             <Text style={styles.templateName}>{template.name}</Text>
+            {template.workoutExercises.length > 0 && (
+              <Text style={styles.templateSummary}>
+                {template.workoutExercises.length} exercise{template.workoutExercises.length !== 1 ? 's' : ''},{' '}
+                {template.workoutExercises.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0)} sets
+              </Text>
+            )}
             <Text style={styles.templateDate}>
               Created: {new Date(template.createdAt).toLocaleDateString()}
             </Text>
@@ -235,14 +242,14 @@ function TemplateDetailScreen() {
 
         {template.workoutExercises.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No exercises in this template</Text>
+            <Text style={styles.emptyText}>No exercises in this workout</Text>
           </View>
         ) : (
           <View style={styles.exercisesContainer}>
             {template.workoutExercises.map((templateExercise) => (
               <View key={templateExercise.id} style={styles.exerciseCard}>
                 <Text style={styles.exerciseName}>
-                  {templateExercise.order}. {templateExercise.exercise.name}
+                  {(templateExercise.order ?? 0) + 1}. {templateExercise.exercise.name}
                 </Text>
 
                 {templateExercise.sets.length === 0 ? (
@@ -289,6 +296,7 @@ function TemplateDetailScreen() {
                                 }}
                                 keyboardType="numeric"
                                 placeholder="0"
+                                placeholderTextColor={colors.placeholder}
                               />
                               <TextInput
                                 style={styles.setInput}
@@ -309,6 +317,7 @@ function TemplateDetailScreen() {
                                 }}
                                 keyboardType="numeric"
                                 placeholder="0"
+                                placeholderTextColor={colors.placeholder}
                               />
                             </>
                           )}
@@ -329,7 +338,7 @@ function TemplateDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
   },
   scrollView: {
     flex: 1,
@@ -339,13 +348,13 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
   },
   errorText: {
-    color: '#DC2626',
+    color: colors.error,
     fontSize: 16,
     marginBottom: 16,
     textAlign: 'center',
@@ -355,13 +364,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   button: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -369,7 +378,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   headerCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
@@ -385,34 +394,39 @@ const styles = StyleSheet.create({
   templateName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  templateSummary: {
+    fontSize: 15,
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   templateDate: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textMuted,
   },
   startButton: {
-    backgroundColor: '#059669',
+    backgroundColor: colors.success,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
   },
   startButtonText: {
-    color: '#fff',
+    color: colors.successText,
     fontSize: 16,
     fontWeight: '600',
   },
   errorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.errorBorder,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
   errorBoxText: {
-    color: '#DC2626',
+    color: colors.errorText,
     fontSize: 14,
   },
   emptyContainer: {
@@ -421,13 +435,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   exercisesContainer: {
     gap: 16,
   },
   exerciseCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -439,19 +453,19 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 16,
   },
   noSetsText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   setsContainer: {
     marginTop: 8,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.cardElevated,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 8,
@@ -461,7 +475,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
@@ -470,31 +484,32 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
     alignItems: 'center',
   },
   setNumber: {
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
   },
   setInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 8,
     fontSize: 16,
     textAlign: 'center',
     marginHorizontal: 4,
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBg,
+    color: colors.text,
   },
   setValue: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
   },
 })

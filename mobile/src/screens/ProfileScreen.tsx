@@ -11,9 +11,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
 import { clearStoredAuth, trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
+import { colors } from '../theme/colors'
 
 const USERNAME_CHECK_DEBOUNCE_MS = 400
 
@@ -157,14 +159,14 @@ function ProfileScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     )
   }
 
   if (!user) {
     if (serverDown) {
-      return <View style={[styles.container, styles.centered, { backgroundColor: '#fff' }]} />
+      return <View style={[styles.container, styles.centered, { backgroundColor: colors.screen }]} />
     }
     return (
       <View style={[styles.container, styles.centered]}>
@@ -183,6 +185,13 @@ function ProfileScreen() {
 
   const hasChanges = username.trim() !== user.username || email.trim() !== (user.email ?? '')
 
+  const mockStats = {
+    totalWorkouts: 3,
+    dayStreak: 3,
+    totalExercises: 36,
+    favoriteWorkout: 'Full Body Workout',
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -194,6 +203,41 @@ function ProfileScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.userCard}>
+          <View style={styles.userAvatar}>
+            <Ionicons name="person" size={32} color={colors.primaryText} />
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{user.username}</Text>
+            <Text style={styles.memberSince}>Member since Feb 2026</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsCard}>
+          <Text style={styles.statsTitle}>Statistics</Text>
+          <View style={styles.statsRow}>
+            <View style={[styles.statBox, styles.statBoxPrimary]}>
+              <Ionicons name="trending-up" size={20} color={colors.primary} />
+              <Text style={styles.statLabel}>Total Workouts</Text>
+              <Text style={styles.statValue}>{mockStats.totalWorkouts}</Text>
+            </View>
+            <View style={[styles.statBox, styles.statBoxSuccess]}>
+              <Ionicons name="trophy" size={20} color={colors.success} />
+              <Text style={[styles.statLabel, styles.statLabelGreen]}>Day Streak</Text>
+              <Text style={styles.statValue}>{mockStats.dayStreak}</Text>
+            </View>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statRowLabel}>Total Exercises</Text>
+            <Text style={styles.statRowValue}>{mockStats.totalExercises}</Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text style={styles.statRowLabel}>Favorite Workout</Text>
+            <Text style={styles.statRowValue}>{mockStats.favoriteWorkout}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionLabel}>My profile</Text>
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Username</Text>
           <TextInput
@@ -201,7 +245,7 @@ function ProfileScreen() {
             value={username}
             onChangeText={setUsername}
             placeholder="Username"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.placeholder}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -220,7 +264,7 @@ function ProfileScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="Email (optional)"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.placeholder}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -235,7 +279,7 @@ function ProfileScreen() {
             disabled={saving || usernameTaken === true}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.primaryText} />
             ) : (
               <Text style={styles.saveButtonText}>Save changes</Text>
             )}
@@ -259,7 +303,7 @@ function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
   },
   centered: {
     justifyContent: 'center',
@@ -272,6 +316,106 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  userAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  memberSince: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  statsCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  statBox: {
+    flex: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  statBoxPrimary: {
+    backgroundColor: '#1E3A5F',
+  },
+  statBoxSuccess: {
+    backgroundColor: colors.successBgDark,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  statLabelGreen: {
+    color: colors.success,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 4,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  statRowLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  statRowValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -281,42 +425,42 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 16,
   },
   errorTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   retryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
     marginTop: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   loginButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   loginButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -326,42 +470,42 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    color: '#111827',
+    color: colors.text,
   },
   inputError: {
-    borderColor: '#DC2626',
+    borderColor: colors.error,
   },
   hint: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.placeholder,
     marginTop: 4,
     marginLeft: 2,
   },
   hintError: {
     fontSize: 12,
-    color: '#DC2626',
+    color: colors.error,
     marginTop: 4,
     marginLeft: 2,
   },
   hintOk: {
     fontSize: 12,
-    color: '#059669',
+    color: colors.success,
     marginTop: 4,
     marginLeft: 2,
   },
   saveButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -371,7 +515,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   saveButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -381,11 +525,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#DC2626',
+    borderColor: colors.error,
     backgroundColor: 'transparent',
   },
   logOutButtonText: {
-    color: '#DC2626',
+    color: colors.error,
     fontSize: 16,
     fontWeight: '600',
   },

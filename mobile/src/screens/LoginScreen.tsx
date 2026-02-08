@@ -15,6 +15,7 @@ import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+import { colors } from '../theme/colors'
 import type { Session } from '../types'
 import { buildSessionUpdatePayload } from '../utils/buildSessionUpdatePayload'
 
@@ -145,7 +146,7 @@ function LoginScreen() {
                 Toast.show({
                   type: 'success',
                   text1: 'Success',
-                  text2: 'Session saved and template created!',
+                  text2: 'Session saved and workout created!',
                 })
                 return
               } catch (templateErr) {
@@ -159,8 +160,8 @@ function LoginScreen() {
 
                 Toast.show({
                   type: 'error',
-                  text1: 'Template creation failed',
-                  text2: 'Session saved. You can create template from the summary.',
+                  text1: 'Workout creation failed',
+                  text2: 'Session saved. You can create a workout from the summary.',
                 })
                 return
               }
@@ -251,6 +252,7 @@ function LoginScreen() {
             <TextInput
               style={[styles.input, usernameTaken === true && styles.inputError]}
               placeholder="Username"
+              placeholderTextColor={colors.placeholder}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
@@ -265,6 +267,7 @@ function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
+              placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -306,7 +309,7 @@ function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
   },
   scrollContent: {
     flexGrow: 1,
@@ -321,13 +324,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#4B5563',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
   },
@@ -335,32 +338,32 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 16,
-    color: '#111827',
+    color: colors.text,
   },
   inputError: {
-    borderColor: '#DC2626',
+    borderColor: colors.error,
   },
   usernameTakenText: {
-    color: '#DC2626',
+    color: colors.error,
     fontSize: 14,
     marginTop: -12,
     marginBottom: 16,
   },
   usernameAvailableText: {
-    color: '#059669',
+    color: colors.success,
     fontSize: 14,
     marginTop: -12,
     marginBottom: 16,
   },
   button: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
@@ -370,7 +373,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -379,7 +382,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toggleText: {
-    color: '#2563EB',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },

@@ -61,6 +61,11 @@ export interface WorkoutInfo {
     createdAt: string
     completedAt: string | null
     sessionTime: string | null
+    /** Session/workout name; when provided by API, shown as card title instead of "Workout" */
+    name?: string
+    /** When provided by API, shown on session card as "X exercises • Y sets" */
+    exerciseCount?: number
+    setCount?: number
   }>
 }
 

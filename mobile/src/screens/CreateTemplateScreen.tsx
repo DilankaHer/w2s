@@ -15,6 +15,7 @@ import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+import { colors } from '../theme/colors'
 import type { Exercise } from '../types'
 
 interface Set {
@@ -202,7 +203,7 @@ function CreateTemplateScreen() {
 
   const handleSubmit = async () => {
     if (!templateName.trim()) {
-      setError('Template name is required')
+      setError('Workout name is required')
       return
     }
 
@@ -231,11 +232,11 @@ function CreateTemplateScreen() {
       await checkAuth()
       navigation.navigate('MainTabs' as never)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to create template'))
+      setError(getApiErrorMessage(err, 'Failed to create workout'))
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to create template. Please try again.',
+        text2: 'Failed to create workout. Please try again.',
       })
     } finally {
       setSubmitting(false)
@@ -259,7 +260,7 @@ function CreateTemplateScreen() {
 
   // First time: white until health check passes; then retry dialog (overlay) or form. Already in form + server down: keep form, overlay on top.
   if (phase !== 'ready') {
-    return <View style={[styles.container, { backgroundColor: '#fff' }]} />
+    return <View style={[styles.container, { backgroundColor: colors.screen }]} />
   }
 
   return (
@@ -269,15 +270,15 @@ function CreateTemplateScreen() {
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.headerCard}>
-          <Text style={styles.title}>Create Template</Text>
+          <Text style={styles.title}>Create Workout</Text>
           <View style={styles.nameInputContainer}>
-            <Text style={styles.label}>Template Name</Text>
+            <Text style={styles.label}>Workout Name</Text>
             <TextInput
               style={styles.nameInput}
               value={templateName}
               onChangeText={setTemplateName}
-              placeholder="Enter template name"
-              placeholderTextColor="#9CA3AF"
+              placeholder="Enter workout name"
+              placeholderTextColor={colors.placeholder}
             />
           </View>
 
@@ -343,7 +344,7 @@ function CreateTemplateScreen() {
                             }
                             keyboardType="numeric"
                             placeholder="0"
-                            placeholderTextColor="#9CA3AF"
+                            placeholderTextColor={colors.placeholder}
                           />
                           <TextInput
                             style={styles.setInput}
@@ -358,7 +359,7 @@ function CreateTemplateScreen() {
                             }
                             keyboardType="numeric"
                             placeholder="0"
-                            placeholderTextColor="#9CA3AF"
+                            placeholderTextColor={colors.placeholder}
                           />
                           <TouchableOpacity
                             style={[
@@ -454,7 +455,7 @@ function CreateTemplateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
   },
   scrollView: {
     flex: 1,
@@ -463,7 +464,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   headerCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
@@ -476,7 +477,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 16,
   },
   nameInputContainer: {
@@ -485,32 +486,32 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   nameInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#fff',
+    color: colors.text,
+    backgroundColor: colors.inputBg,
   },
   errorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.errorBorder,
     borderRadius: 8,
     padding: 12,
     marginTop: 16,
   },
   errorBoxText: {
-    color: '#DC2626',
+    color: colors.errorText,
     fontSize: 14,
   },
   emptyContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 32,
     alignItems: 'center',
@@ -523,12 +524,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginBottom: 16,
     textAlign: 'center',
   },
   exerciseCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
@@ -547,30 +548,30 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     flex: 1,
   },
   removeExerciseButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.error,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   removeExerciseButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
   },
   noSetsText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   setsContainer: {
     marginTop: 8,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.cardElevated,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 8,
@@ -580,7 +581,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
@@ -589,26 +590,27 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
     alignItems: 'center',
   },
   setNumber: {
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
   },
   setInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 8,
     fontSize: 16,
     textAlign: 'center',
     marginHorizontal: 4,
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBg,
+    color: colors.text,
   },
   removeSetButton: {
     padding: 8,
@@ -618,59 +620,59 @@ const styles = StyleSheet.create({
   },
   removeSetButtonText: {
     fontSize: 24,
-    color: '#DC2626',
+    color: colors.error,
     fontWeight: 'bold',
   },
   removeSetButtonTextDisabled: {
-    color: '#9CA3AF',
+    color: colors.placeholder,
   },
   addSetButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
     marginTop: 8,
   },
   addSetButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
   },
   addExerciseButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     marginBottom: 16,
   },
   addExerciseButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#059669',
+    backgroundColor: colors.success,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     marginTop: 16,
   },
   saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: colors.disabled,
     opacity: 0.5,
   },
   saveButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 18,
     fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.modal,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
@@ -683,16 +685,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
   },
   modalCloseText: {
     fontSize: 16,
-    color: '#2563EB',
+    color: colors.primary,
     fontWeight: '600',
   },
   modalList: {
@@ -701,11 +703,11 @@ const styles = StyleSheet.create({
   modalItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
   },
   modalItemText: {
     fontSize: 16,
-    color: '#111827',
+    color: colors.text,
   },
   modalEmpty: {
     padding: 32,
@@ -713,7 +715,7 @@ const styles = StyleSheet.create({
   },
   modalEmptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
 })
 

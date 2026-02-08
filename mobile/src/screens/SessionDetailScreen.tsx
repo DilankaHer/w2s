@@ -13,12 +13,15 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native'
+import { Swipeable } from 'react-native-gesture-handler'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import type { RootStackParamList } from '../../App'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+import { colors } from '../theme/colors'
 import type { Exercise, Session, SessionExercise, SessionSet } from '../types'
 import { buildSessionUpdatePayload } from '../utils/buildSessionUpdatePayload'
 
@@ -95,6 +98,7 @@ function SessionDetailScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [exercisesLoading, setExercisesLoading] = useState(false)
   const [removedSessionExerciseIds, setRemovedSessionExerciseIds] = useState<number[]>([])
+  const [removedSessionSetIds, setRemovedSessionSetIds] = useState<number[]>([])
   const nextTempIdRef = useRef(-1)
   const exercisesFetchedRef = useRef(false)
 
@@ -297,6 +301,27 @@ function SessionDetailScreen() {
     })
   }
 
+  const removeSetFromSession = (sessionExercise: SessionExercise, set: SessionSet) => {
+    if (set.id > 0) {
+      setRemovedSessionSetIds((prev) => [...prev, set.id])
+    }
+    setSession((prev) => {
+      if (!prev) return null
+      const newSets = sessionExercise.sets.filter((s) => s.id !== set.id).map((s, i) => ({ ...s, setNumber: i + 1 }))
+      return {
+        ...prev,
+        sessionExercises: prev.sessionExercises.map((se) =>
+          se.id === sessionExercise.id ? { ...se, sets: newSets } : se
+        ),
+      }
+    })
+    setEditingSets((prev) => {
+      const next = new Map(prev)
+      next.delete(set.id)
+      return next
+    })
+  }
+
   const saveSetUpdate = (set: SessionSet) => {
     const edited = editingSets.get(set.id)
     if (!edited) return
@@ -377,7 +402,7 @@ function SessionDetailScreen() {
         Toast.show({
           type: 'success',
           text1: 'Workout completed',
-          text2: 'Log in to save this session and create templates.',
+          text2: 'Log in to save this session and create workouts.',
         })
       } finally {
         setCompleting(false)
@@ -389,7 +414,7 @@ function SessionDetailScreen() {
       setCompleting(true)
       setError(null)
 
-      const payload = buildSessionUpdatePayload(session, new Date(), editingSets, removedSessionExerciseIds)
+      const payload = buildSessionUpdatePayload(session, new Date(), editingSets, removedSessionExerciseIds, removedSessionSetIds)
       const updatedSession = await trpc.sessions.update.mutate(payload)
 
       const mappedSession = mapSessionData(updatedSession)
@@ -484,18 +509,18 @@ function SessionDetailScreen() {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'Template updated.',
+        text2: 'Workout updated.',
       })
       await checkAuth()
       handleGoToTemplates()
     } catch (err) {
-      const msg = getApiErrorMessage(err, 'Failed to update template. Please try again.')
+      const msg = getApiErrorMessage(err, 'Failed to update workout. Please try again.')
       setTemplateError(msg)
       setTemplateErrorSource('update')
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to update template. Please try again.',
+        text2: 'Failed to update workout. Please try again.',
       })
     } finally {
       setTemplateUpdateLoading(false)
@@ -545,7 +570,7 @@ function SessionDetailScreen() {
       setShowCreateTemplateModal(false)
       Alert.alert(
         'Login required',
-        'To create a template, please log in or create an account.',
+        'To create a workout, please log in or create an account.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -581,19 +606,19 @@ function SessionDetailScreen() {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'Template created.',
+        text2: 'Workout created.',
       })
       await checkAuth()
       handleGoToTemplates()
     } catch (err) {
-      const msg = getApiErrorMessage(err, 'Failed to create template. Please try again.')
+      const msg = getApiErrorMessage(err, 'Failed to create workout. Please try again.')
       setTemplateError(msg)
       setTemplateErrorSource('create')
       setShowCreateTemplateModal(false)
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to create template. Please try again.',
+        text2: 'Failed to create workout. Please try again.',
       })
     } finally {
       setTemplateCreateLoading(false)
@@ -666,13 +691,30 @@ function SessionDetailScreen() {
         <View style={styles.headerCard}>
           <View style={styles.headerContent}>
             <Text style={styles.sessionName}>{session.name}</Text>
-            <Text style={styles.sessionDate}>
-              Session started: {new Date(session.createdAt).toLocaleString()}
-            </Text>
-            {session.completedAt && (
-              <Text style={styles.completedDate}>
-                Completed: {new Date(session.completedAt).toLocaleString()}
+            {!session.completedAt ? (
+              <Text style={styles.sessionDate}>
+                Session started: {new Date(session.createdAt).toLocaleString()}
               </Text>
+            ) : (
+              <>
+                <View style={styles.headerMetaRow}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.headerMetaText}>
+                    {new Date(session.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </Text>
+                </View>
+                <View style={styles.headerMetaRow}>
+                  <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.headerMetaText}>
+                    {session.sessionTime ?? (session.completedAt && session.createdAt
+                      ? formatTime(Math.floor((new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()) / 1000))
+                      : formatTime(elapsedTime))}
+                  </Text>
+                </View>
+                <Text style={styles.setsCompletedLine}>
+                  {session.completedAt ? totalSets : completedSetsCount} set{(session.completedAt ? totalSets : completedSetsCount) !== 1 ? 's' : ''} completed
+                </Text>
+              </>
             )}
           </View>
           <View style={styles.headerRight}>
@@ -711,11 +753,14 @@ function SessionDetailScreen() {
           </View>
         ) : (
           <View style={styles.exercisesContainer}>
-            {session.sessionExercises.map((sessionExercise) => (
+            {session.completedAt && (
+              <Text style={styles.exercisesSectionTitle}>Exercises</Text>
+            )}
+            {session.sessionExercises.map((sessionExercise, index) => (
               <View key={sessionExercise.id} style={styles.exerciseCard}>
                 <View style={styles.exerciseCardHeader}>
                   <Text style={styles.exerciseName}>
-                    {sessionExercise.order}. {sessionExercise.exercise.name}
+                    {index + 1}. {sessionExercise.exercise.name}
                   </Text>
                   {!session.completedAt && (
                     <TouchableOpacity
@@ -733,7 +778,7 @@ function SessionDetailScreen() {
                   <View style={styles.setsContainer}>
                     <View style={styles.tableHeader}>
                       <Text style={styles.tableHeaderText}>Set</Text>
-                      <Text style={styles.tableHeaderText}>Weight (kg)</Text>
+                      <Text style={styles.tableHeaderText}>kg</Text>
                       <Text style={styles.tableHeaderText}>Reps</Text>
                       {!session.completedAt && (
                         <Text style={styles.tableHeaderText}>Done</Text>
@@ -746,12 +791,11 @@ function SessionDetailScreen() {
                       const isCompleted = set.isCompleted ?? false
                       const canComplete = canSetBeCompleted(set)
 
-                      return (
-                        <View 
-                          key={set.id} 
+                      const setRowContent = (
+                        <View
                           style={[
                             styles.setRow,
-                            isCompleted && styles.completedSetRow
+                            isCompleted && styles.completedSetRow,
                           ]}
                         >
                           <Text style={styles.setNumber}>{set.setNumber}</Text>
@@ -765,13 +809,12 @@ function SessionDetailScreen() {
                                 updateSetValue(set.id, 'weight', val)
                               }}
                               onBlur={() => {
-                                const edited = editingSets.get(set.id)
-                                if (edited) {
-                                  saveSetUpdate(set)
-                                }
+                                const ed = editingSets.get(set.id)
+                                if (ed) saveSetUpdate(set)
                               }}
                               keyboardType="numeric"
                               placeholder="0"
+                              placeholderTextColor={colors.placeholder}
                             />
                           ) : (
                             <Text style={styles.setValue}>{set.weight ?? 0}</Text>
@@ -786,13 +829,12 @@ function SessionDetailScreen() {
                                 updateSetValue(set.id, 'reps', val)
                               }}
                               onBlur={() => {
-                                const edited = editingSets.get(set.id)
-                                if (edited) {
-                                  saveSetUpdate(set)
-                                }
+                                const ed = editingSets.get(set.id)
+                                if (ed) saveSetUpdate(set)
                               }}
                               keyboardType="numeric"
                               placeholder="0"
+                              placeholderTextColor={colors.placeholder}
                             />
                           ) : (
                             <Text style={styles.setValue}>{set.reps ?? 0}</Text>
@@ -803,11 +845,13 @@ function SessionDetailScreen() {
                               onPress={() => toggleSetComplete(set)}
                               disabled={!canComplete && !isCompleted}
                             >
-                              <View style={[
-                                styles.checkbox,
-                                isCompleted && styles.checkboxChecked,
-                                (!canComplete && !isCompleted) && styles.checkboxDisabled
-                              ]}>
+                              <View
+                                style={[
+                                  styles.checkbox,
+                                  isCompleted && styles.checkboxChecked,
+                                  !canComplete && !isCompleted && styles.checkboxDisabled,
+                                ]}
+                              >
                                 {isCompleted && (
                                   <Text style={styles.checkboxCheckmark}>✓</Text>
                                 )}
@@ -816,6 +860,28 @@ function SessionDetailScreen() {
                           )}
                         </View>
                       )
+
+                      if (!session.completedAt) {
+                        return (
+                          <Swipeable
+                            key={set.id}
+                            renderRightActions={() => (
+                              <TouchableOpacity
+                                style={styles.swipeSetDelete}
+                                onPress={() => removeSetFromSession(sessionExercise, set)}
+                              >
+                                <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
+                                <Text style={styles.swipeSetDeleteText}>Delete</Text>
+                              </TouchableOpacity>
+                            )}
+                            friction={2}
+                            rightThreshold={40}
+                          >
+                            {setRowContent}
+                          </Swipeable>
+                        )
+                      }
+                      return <View key={set.id}>{setRowContent}</View>
                     })}
                   </View>
                 )}
@@ -824,6 +890,7 @@ function SessionDetailScreen() {
                     style={styles.addSetButton}
                     onPress={() => addSetToExercise(sessionExercise)}
                   >
+                    <Ionicons name="add" size={20} color={colors.primaryText} />
                     <Text style={styles.addSetButtonText}>Add Set</Text>
                   </TouchableOpacity>
                 )}
@@ -834,7 +901,8 @@ function SessionDetailScreen() {
                 style={styles.addExerciseButtonSecondary}
                 onPress={() => setShowAddExerciseModal(true)}
               >
-                <Text style={styles.addExerciseButtonText}>+ Add Exercise</Text>
+                <Ionicons name="add" size={22} color={colors.primaryText} />
+                <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -864,28 +932,6 @@ function SessionDetailScreen() {
 
         {session.completedAt && showCompletionSummary && (
           <View style={[styles.summaryBlock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <View style={styles.summaryTitleRow}>
-              <Text style={styles.summaryTitle}>Session summary</Text>
-              <TouchableOpacity
-                style={[styles.performAgainButton, startingNew && styles.buttonDisabled]}
-                onPress={handleStartNewWorkout}
-                disabled={startingNew}
-              >
-                {startingNew ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.performAgainButtonText}>Perform Again</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.summaryMeta}>
-              Duration: {session.sessionTime ?? (session.completedAt && session.createdAt
-                ? formatTime(Math.floor((new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()) / 1000))
-                : formatTime(elapsedTime))}
-            </Text>
-            <Text style={styles.summaryMeta}>
-              {session.sessionExercises.length} exercise(s), {totalSets} sets completed
-            </Text>
             {templateError && (
               <View style={styles.templateErrorBox}>
                 <Text style={styles.templateErrorText}>{templateError}</Text>
@@ -905,11 +951,22 @@ function SessionDetailScreen() {
             {!isAuthenticated && (
               <View style={styles.guestMessageBox}>
                 <Text style={styles.guestMessageText}>
-                  Log in to save this session and create templates.
+                  Log in to save this session and create workouts.
                 </Text>
               </View>
             )}
             <View style={styles.summaryButtons}>
+              <TouchableOpacity
+                style={[styles.performAgainButton, styles.performAgainButtonBlock, startingNew && styles.buttonDisabled]}
+                onPress={handleStartNewWorkout}
+                disabled={startingNew}
+              >
+                {startingNew ? (
+                  <ActivityIndicator color={colors.primaryText} size="small" />
+                ) : (
+                  <Text style={styles.performAgainButtonText}>Perform Again</Text>
+                )}
+              </TouchableOpacity>
               {!isAuthenticated && (
                 <>
                   <TouchableOpacity
@@ -922,7 +979,7 @@ function SessionDetailScreen() {
                     style={styles.goToTemplatesButton}
                     onPress={handleGoToTemplates}
                   >
-                    <Text style={styles.goToTemplatesButtonText}>Go to Templates</Text>
+                    <Text style={styles.goToTemplatesButtonText}>Go to Workouts</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -933,9 +990,9 @@ function SessionDetailScreen() {
                   disabled={templateUpdateLoading}
                 >
                   {templateUpdateLoading ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={colors.primaryText} size="small" />
                   ) : (
-                    <Text style={styles.templateActionButtonText}>Update Template</Text>
+                    <Text style={styles.templateActionButtonText}>Update Workout</Text>
                   )}
                 </TouchableOpacity>
               )}
@@ -945,9 +1002,9 @@ function SessionDetailScreen() {
                 disabled={templateCreateLoading}
               >
                 {templateCreateLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.primaryText} size="small" />
                 ) : (
-                  <Text style={styles.templateActionButtonText}>Create Template</Text>
+                  <Text style={styles.templateActionButtonText}>Create Workout</Text>
                 )}
               </TouchableOpacity>
               {isAuthenticated && (
@@ -955,7 +1012,7 @@ function SessionDetailScreen() {
                   style={styles.goToTemplatesButton}
                   onPress={handleGoToTemplates}
                 >
-                  <Text style={styles.goToTemplatesButtonText}>Go to Templates</Text>
+                  <Text style={styles.goToTemplatesButtonText}>Go to Workouts</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -977,12 +1034,13 @@ function SessionDetailScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>New template name</Text>
+            <Text style={styles.modalTitle}>New workout name</Text>
             <TextInput
               style={styles.modalInput}
               value={newTemplateName}
               onChangeText={setNewTemplateName}
-              placeholder="Template name"
+              placeholder="Workout name"
+              placeholderTextColor={colors.placeholder}
               autoFocus
             />
             <View style={styles.modalButtons}>
@@ -1001,7 +1059,7 @@ function SessionDetailScreen() {
                 disabled={!newTemplateName.trim() || templateCreateLoading}
               >
                 {templateCreateLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.primaryText} size="small" />
                 ) : (
                   <Text style={styles.modalConfirmButtonText}>Confirm</Text>
                 )}
@@ -1027,7 +1085,7 @@ function SessionDetailScreen() {
             </View>
             {exercisesLoading ? (
               <View style={styles.modalEmpty}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={colors.primary} />
                 <Text style={styles.modalEmptyText}>Loading exercises…</Text>
               </View>
             ) : (() => {
@@ -1066,7 +1124,7 @@ function SessionDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
   },
   scrollView: {
     flex: 1,
@@ -1076,25 +1134,25 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.screen,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
   },
   errorText: {
-    color: '#DC2626',
+    color: colors.error,
     fontSize: 16,
     marginBottom: 16,
     textAlign: 'center',
   },
   button: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1102,7 +1160,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   headerCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
@@ -1120,10 +1178,25 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   headerContent: {
     marginBottom: 8,
+  },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  headerMetaText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  setsCompletedLine: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 6,
   },
   headerRight: {
     alignItems: 'flex-end',
@@ -1131,46 +1204,46 @@ const styles = StyleSheet.create({
   sessionName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 8,
   },
   sessionDate: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   completedDate: {
     fontSize: 14,
-    color: '#059669',
+    color: colors.success,
     marginTop: 4,
   },
   timer: {
     fontSize: 24,
     fontFamily: 'monospace',
     fontWeight: '600',
-    color: '#374151',
+    color: colors.textSecondary,
   },
   performAgainButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   performAgainButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   errorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.errorBorder,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
   errorBoxText: {
-    color: '#DC2626',
+    color: colors.errorText,
     fontSize: 14,
   },
   emptyContainer: {
@@ -1179,13 +1252,19 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   exercisesContainer: {
     gap: 16,
   },
+  exercisesSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+  },
   exerciseCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -1204,34 +1283,53 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     marginRight: 8,
   },
   removeExerciseButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.error,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   removeExerciseButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
   },
   addSetButton: {
-    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
-    alignItems: 'center',
   },
   addSetButtonText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
+  swipeSetDelete: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 72,
+    marginVertical: 0,
+    marginRight: 0,
+  },
+  swipeSetDeleteText: {
+    color: colors.primaryText,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
   addExerciseButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -1239,27 +1337,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addExerciseButtonText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
+  performAgainButtonBlock: {
+    width: '100%',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
   addExerciseButtonSecondary: {
-    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 8,
     padding: 16,
-    alignItems: 'center',
     marginTop: 8,
   },
   noSetsText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
   },
   setsContainer: {
     marginTop: 8,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.cardElevated,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderRadius: 8,
@@ -1269,7 +1377,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
@@ -1278,17 +1386,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
     alignItems: 'center',
   },
   completedSetRow: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successBgDark,
   },
   setNumber: {
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
   },
   checkboxContainer: {
@@ -1300,41 +1408,42 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBg,
   },
   checkboxChecked: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: colors.success,
+    borderColor: colors.success,
   },
   checkboxDisabled: {
     opacity: 0.4,
-    backgroundColor: '#F3F4F6',
-    borderColor: '#D1D5DB',
+    backgroundColor: colors.disabledBg,
+    borderColor: colors.border,
   },
   checkboxCheckmark: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: 'bold',
   },
   setInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 8,
     fontSize: 16,
     textAlign: 'center',
     marginHorizontal: 4,
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBg,
+    color: colors.text,
   },
   setValue: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
   },
   actionButtons: {
@@ -1343,7 +1452,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   cancelButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.error,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -1351,12 +1460,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cancelButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 18,
     fontWeight: '600',
   },
   completeButton: {
-    backgroundColor: '#059669',
+    backgroundColor: colors.success,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -1364,7 +1473,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   completeButtonText: {
-    color: '#fff',
+    color: colors.successText,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -1375,11 +1484,11 @@ const styles = StyleSheet.create({
   completedMessageText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#059669',
+    color: colors.success,
   },
   summaryBlock: {
     marginTop: 24,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
@@ -1397,56 +1506,56 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
   },
   summaryMeta: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   templateErrorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.errorBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.errorBorder,
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
     marginBottom: 8,
   },
   templateErrorText: {
-    color: '#DC2626',
+    color: colors.errorText,
     fontSize: 14,
     marginBottom: 8,
   },
   retryButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.error,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
   },
   templateSuccessText: {
     fontSize: 14,
-    color: '#059669',
+    color: colors.success,
     fontWeight: '600',
     marginTop: 8,
   },
   guestMessageBox: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningBg,
     borderWidth: 1,
-    borderColor: '#FCD34D',
+    borderColor: colors.warningBorder,
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
     marginBottom: 8,
   },
   guestMessageText: {
-    color: '#92400E',
+    color: colors.warningText,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -1455,50 +1564,50 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   templateActionButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignItems: 'center',
   },
   templateActionButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   saveSessionButton: {
-    backgroundColor: '#059669',
+    backgroundColor: colors.success,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignItems: 'center',
   },
   saveSessionButtonText: {
-    color: '#fff',
+    color: colors.successText,
     fontSize: 16,
     fontWeight: '600',
   },
   goToTemplatesButton: {
-    backgroundColor: '#059669',
+    backgroundColor: colors.success,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignItems: 'center',
   },
   goToTemplatesButtonText: {
-    color: '#fff',
+    color: colors.successText,
     fontSize: 16,
     fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.modal,
     borderRadius: 8,
     padding: 20,
     width: '100%',
@@ -1507,7 +1616,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 12,
   },
   modalHeader: {
@@ -1518,7 +1627,7 @@ const styles = StyleSheet.create({
   },
   modalCloseText: {
     fontSize: 16,
-    color: '#2563EB',
+    color: colors.primary,
     fontWeight: '600',
   },
   modalList: {
@@ -1528,11 +1637,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
   },
   modalItemText: {
     fontSize: 16,
-    color: '#111827',
+    color: colors.text,
   },
   modalEmpty: {
     padding: 24,
@@ -1540,16 +1649,18 @@ const styles = StyleSheet.create({
   },
   modalEmptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 16,
+    backgroundColor: colors.inputBg,
+    color: colors.text,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -1561,17 +1672,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   modalCancelButtonText: {
-    color: '#6B7280',
+    color: colors.textSecondary,
     fontSize: 16,
   },
   modalConfirmButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
   modalConfirmButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
