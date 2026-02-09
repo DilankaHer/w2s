@@ -79,9 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!silent) setIsLoading(true)
       setError(null)
-      console.log('users.getWorkoutInfo called (mobile - checkAuth)')
       const result = await trpc.users.getWorkoutInfo.mutate()
-      console.log('users.getWorkoutInfo result (mobile - checkAuth)', result)
 
       if (result) {
         // During retry, only update state if retry succeeds (will be handled by retryServer)
@@ -151,9 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setServerDown(false)
 
       if (isAuthenticatedRef.current) {
-        console.log('users.getWorkoutInfo called (mobile - retryServer)')
         const result = await trpc.users.getWorkoutInfo.mutate()
-        console.log('users.getWorkoutInfo result (mobile - retryServer)', result)
         if (result) {
           // Type assertion: API returns WorkoutInfo structure, but TypeScript infers optional properties
           // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Template[]
@@ -171,7 +167,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (err) {
-      console.log('retryServer error', err)
       // Retry failed - restore all preserved state exactly as it was before retry
       setServerDown(preservedServerDownRef.current)
       setWorkoutInfo(preservedWorkoutInfoRef.current)

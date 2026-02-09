@@ -51,7 +51,6 @@ function TemplateDetail() {
       setTemplate(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
-      console.error('Error fetching template:', err)
     } finally {
       setLoading(false)
     }
@@ -129,7 +128,6 @@ function TemplateDetail() {
         return newMap
       })
     } catch (err) {
-      console.error('Error updating set:', err)
       setError(err instanceof Error ? err.message : 'Failed to update set')
     }
   }
@@ -146,7 +144,6 @@ function TemplateDetail() {
       // Navigate to session page with session data
       navigate(`/session/${session.id}`, { state: { session } })
     } catch (err) {
-      console.error('Error creating session:', err)
       setError(err instanceof Error ? err.message : 'Failed to create session')
     } finally {
       setCreatingSession(false)

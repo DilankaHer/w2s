@@ -292,7 +292,6 @@ function CreateTemplateScreen() {
         }
       } catch (err) {
         // If check fails, continue anyway (might be network issue)
-        console.log('checkWorkoutName error:', err)
       }
     }
 
@@ -311,7 +310,6 @@ function CreateTemplateScreen() {
           })),
         },
       }
-      console.log('workouts.create payload:', JSON.stringify(workoutPayload, null, 2))
       await trpc.workouts.create.mutate(workoutPayload)
 
       // Refresh workout info to get the new template
@@ -398,7 +396,8 @@ function CreateTemplateScreen() {
           </View>
         ) : (
           <>
-            {workoutExercises.map((workoutExercise) => (
+            {workoutExercises.map((workoutExercise) => {
+              return (
               <View key={workoutExercise.id} style={styles.exerciseCard}>
                 <View style={styles.exerciseHeader}>
                   <Text style={styles.exerciseName}>
@@ -511,7 +510,8 @@ function CreateTemplateScreen() {
                   </>
                 )}
               </View>
-            ))}
+              )
+            })}
 
             <TouchableOpacity
               style={styles.addExerciseButton}

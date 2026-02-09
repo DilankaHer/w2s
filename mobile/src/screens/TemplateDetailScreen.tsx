@@ -48,9 +48,7 @@ function TemplateDetailScreen() {
     try {
       setLoading(true)
       setError(null)
-      console.log('workouts.getById called (mobile)', { id: templateId })
       const data = await trpc.workouts.getById.query({ id: templateId })
-      console.log('workouts.getById result (mobile)', data)
       setTemplate(data)
       setEditingSets(new Map())
     } catch (err) {

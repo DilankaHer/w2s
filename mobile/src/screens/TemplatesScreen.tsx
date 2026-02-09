@@ -47,7 +47,6 @@ function TemplatesScreen() {
   }, [navigation, isAuthenticated])
 
   useEffect(() => {
-    console.log('TemplatesScreen useEffect', isLoading, isRetrying)
     // Don't react to loading state changes during retry - preserve templates
     if (isRetrying) return
     
@@ -72,7 +71,6 @@ function TemplatesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('TemplatesScreen useFocusEffect', isRetrying)
       // Don't do anything during retry - freeze the screen completely
       if (isRetrying) return
       if (serverDown) return

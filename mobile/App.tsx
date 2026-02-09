@@ -49,9 +49,9 @@ function AddButtonTab(props: any) {
 
   const handlePress = () => {
     // Resolve root navigator (stack); custom tab bar can run in a context where getParent() is null
-    let rootNav: ReturnType<typeof useNavigation> | undefined = navigation
+    let rootNav: any = navigation
     while (rootNav?.getParent?.()) {
-      rootNav = rootNav.getParent() as ReturnType<typeof useNavigation>
+      rootNav = rootNav.getParent()
     }
     if (!rootNav) return
     if (!isAuthenticated) {
@@ -60,7 +60,7 @@ function AddButtonTab(props: any) {
         'You need to log in to create a workout.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Login', onPress: () => rootNav!.navigate('Login' as never) },
+          { text: 'Login', onPress: () => rootNav.navigate('Login' as never) },
         ]
       )
       return

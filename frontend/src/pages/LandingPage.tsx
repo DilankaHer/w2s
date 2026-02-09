@@ -31,7 +31,7 @@ function LandingPage() {
   // One-off: call stats router and log result (for inspection only)
   useEffect(() => {
     const t = trpc as { stats: { getStats: { query: () => Promise<unknown> } } }
-    t.stats.getStats.query().then((r) => console.log('Stats result:', r)).catch((e) => console.warn('Stats call failed:', e))
+    t.stats.getStats.query().catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -101,7 +101,6 @@ function LandingPage() {
         timerProgressBar: true,
       })
     } catch (err) {
-      console.error('Error deleting session:', err)
       await Swal.fire({
         title: 'Error!',
         text: err instanceof Error ? err.message : 'Failed to delete session',

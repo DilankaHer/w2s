@@ -70,7 +70,6 @@ Timer.displayName = 'Timer'
 const mapSessionData = (sessionData: any): Session | null => {
   if (!sessionData) return null
   try {
-    console.log('mapSessionData - raw sessionExercises:', sessionData.sessionExercises)
     const mapped = {
       id: sessionData.id,
       name: sessionData.name,
@@ -81,9 +80,6 @@ const mapSessionData = (sessionData: any): Session | null => {
       isSyncedOnce: sessionData.isSyncedOnce ?? false,
       isFromDefaultTemplate: sessionData.isFromDefaultTemplate ?? false,
       sessionExercises: (sessionData.sessionExercises || []).map((se: any) => {
-        console.log('mapSessionData - mapping exercise:', se)
-        console.log('mapSessionData - se.exercise:', se.exercise)
-        console.log('mapSessionData - se.sessionSets:', se.sessionSets)
         return {
           id: se.id,
           order: se.order,
@@ -98,10 +94,8 @@ const mapSessionData = (sessionData: any): Session | null => {
         }
       }),
     }
-    console.log('mapSessionData - mapped result:', mapped)
     return mapped
   } catch (err) {
-    console.log('mapSessionData - error:', err)
     return null
   }
 }
@@ -207,16 +201,12 @@ function SessionDetailScreen() {
     try {
       setLoading(true)
       setError(null)
-      console.log('sessions.getById called (mobile)', { id: sessionId })
       const data = await trpc.sessions.getById.query({ id: sessionId })
-      console.log('sessions.getById result (mobile)', data)
       if (!data) {
         setError('Session not found')
         return
       }
       const mappedSession = mapSessionData(data)
-      console.log('mappedSession (mobile)', mappedSession)
-      console.log('mappedSession.sessionExercises (mobile)', mappedSession?.sessionExercises)
       if (mappedSession) {
         setSession(mappedSession)
       } else {
@@ -438,13 +428,6 @@ function SessionDetailScreen() {
     }
     
     const newIsCompleted = !set.isCompleted
-    console.log('Complete Set clicked:', {
-      setId: set.id,
-      setNumber: set.setNumber,
-      reps: set.reps,
-      weight: set.weight,
-      isCompleted: newIsCompleted,
-    })
     setSession((prev) => {
       if (!prev) return null
       return {
@@ -728,7 +711,6 @@ function SessionDetailScreen() {
       }
     } catch (err) {
       // If check fails, continue anyway (might be network issue)
-      console.log('checkWorkoutName error:', err)
     }
 
     try {
@@ -739,7 +721,6 @@ function SessionDetailScreen() {
         sessionId: session.id,
         name: newTemplateName.trim(),
       })
-      console.log('workouts.createBySession response:', JSON.stringify(createResponse, null, 2))
       setTemplateSuccess(true)
       setShowCreateTemplateModal(false)
       Toast.show({
@@ -750,7 +731,6 @@ function SessionDetailScreen() {
       await checkAuth()
       handleGoToTemplates()
     } catch (err) {
-      console.log('workouts.createBySession error:', err)
       const msg = getApiErrorMessage(err, 'Failed to create workout. Please try again.')
       setTemplateError(msg)
       setTemplateErrorSource('create')

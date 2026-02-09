@@ -51,7 +51,6 @@ function LoginPage() {
         })
       }
     } catch (err) {
-      console.error(`Error ${isLogin ? 'logging in' : 'creating account'}:`, err)
       await Swal.fire({
         title: 'Error!',
         text: err instanceof Error ? err.message : `Failed to ${isLogin ? 'log in' : 'create account'}`,

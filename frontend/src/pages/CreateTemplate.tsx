@@ -39,7 +39,6 @@ function CreateTemplate() {
       const data = await trpc.exercises.list.query()
       setExercises(Array.isArray(data) ? data : [])
     } catch (err) {
-      console.error('Error fetching exercises:', err)
       setError(err instanceof Error ? err.message : 'Failed to load exercises')
     } finally {
       setExercisesLoading(false)
@@ -150,7 +149,6 @@ function CreateTemplate() {
       await trpc.workouts.create.mutate({
         workout: {
           name: templateName.trim(),
-          isTemplate: true,
           workoutExercises: workoutExercises.map((ex) => ({
             id: ex.id,
             order: ex.order,
@@ -161,7 +159,6 @@ function CreateTemplate() {
 
       navigate('/')
     } catch (err) {
-      console.error('Error creating template:', err)
       setError(err instanceof Error ? err.message : 'Failed to create template')
     } finally {
       setSubmitting(false)

@@ -104,7 +104,6 @@ export const usersRouter = router({
     }),
 
     getWorkoutInfo: protectedProcedure.mutation(async ({ ctx }) => {
-        console.log('users.getWorkoutInfo called', { userId: ctx.user.userId });
         const user = await prisma.user.findUnique({
             where: { id: ctx.user.userId },
             select: {

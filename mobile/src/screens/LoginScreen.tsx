@@ -150,9 +150,7 @@ function LoginScreen() {
                   sessionId: updatedSession.id,
                   name: templateName.trim(),
                 }
-                console.log('workouts.createBySession payload:', JSON.stringify(createPayload, null, 2))
                 const createResponse = await trpc.workouts.createBySession.mutate(createPayload)
-                console.log('workouts.createBySession response:', JSON.stringify(createResponse, null, 2))
                 await checkAuth()
                 
                 // Navigate to Templates screen
@@ -168,7 +166,6 @@ function LoginScreen() {
                 })
                 return
               } catch (templateErr) {
-                console.log('workouts.createBySession error:', templateErr)
                 // Template creation failed, but session is saved
                 // Navigate back and let user retry template creation
                 const nav = navigation as any

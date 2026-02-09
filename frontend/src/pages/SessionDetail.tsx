@@ -56,7 +56,6 @@ const mapSessionData = (sessionData: any): Session | null => {
       })),
     }
   } catch (err) {
-    console.error('Error mapping session data:', err)
     return null
   }
 }
@@ -123,7 +122,6 @@ function SessionDetail() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
-      console.error('Error fetching session:', err)
     } finally {
       setLoading(false)
     }
@@ -179,7 +177,6 @@ function SessionDetail() {
         }
       })
     } catch (err) {
-      console.error('Error updating set completion:', err)
       setError(err instanceof Error ? err.message : 'Failed to update set completion')
     }
   }
@@ -259,7 +256,6 @@ function SessionDetail() {
         return newMap
       })
     } catch (err) {
-      console.error('Error updating set:', err)
       setError(err instanceof Error ? err.message : 'Failed to update set')
     }
   }
@@ -297,7 +293,6 @@ function SessionDetail() {
       setShowCompletionSummary(true)
       showToast('success', 'Success', 'Workout completed and saved.')
     } catch (err) {
-      console.error('Error completing workout:', err)
       setError(err instanceof Error ? err.message : 'Failed to complete workout')
       showToast('error', 'Error', 'Failed to complete workout. Please try again.')
     } finally {
@@ -329,7 +324,6 @@ function SessionDetail() {
       await trpc.sessions.delete.mutate({ id: session.id })
       navigate('/')
     } catch (err) {
-      console.error('Error canceling workout:', err)
       setError(err instanceof Error ? err.message : 'Failed to cancel workout')
     } finally {
       setDeleting(false)
@@ -349,7 +343,6 @@ function SessionDetail() {
       // Navigate to the new session with session data (similar to TemplateDetail)
       navigate(`/session/${newSession.id}`, { state: { session: newSession } })
     } catch (err) {
-      console.error('Error starting new workout:', err)
       setError(err instanceof Error ? err.message : 'Failed to start new workout')
     } finally {
       setStartingNew(false)

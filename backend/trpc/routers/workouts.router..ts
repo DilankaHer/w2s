@@ -199,7 +199,6 @@ export const workoutsRouter = router({
     .input(z.object({ sessionId: z.number(), name: z.string().regex(/^[a-zA-Z0-9\s-]+$/, "Workout name can only contain letters, numbers, spaces, and hyphens") }))
     .mutation(async ({ input, ctx }) => {
       await prisma.$transaction(async (tx) => {
-        console.log(input);
         const existingWorkout = await tx.workout.findFirst({
           where: {
             userId: ctx.user.userId,
@@ -210,15 +209,11 @@ export const workoutsRouter = router({
           },
           orderBy: { createdAt: "desc" },
         });
-        console.log(existingWorkout);
         if (existingWorkout) {
-          console.log(existingWorkout);
           const match = existingWorkout.name.match(/\((\d+)\)/);
-          console.log(match, match?.[1]);
           const runningNo = match?.[1] ?? "0";
           input.name = `${input.name} (${parseInt(runningNo) + 1})`;
         }
-        console.log("Starting session update");
         const session = await tx.session.findUnique({
           where: { id: input.sessionId },
           include: {
@@ -233,9 +228,7 @@ export const workoutsRouter = router({
             },
           },
         });
-        console.log(session);
         if (session === null) {
-          console.log("Session not found");
           throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
         }
         const workout = await tx.workout.create({
@@ -257,12 +250,10 @@ export const workoutsRouter = router({
             },
           },
         });
-        console.log(workout);
         await tx.session.update({
           where: { id: input.sessionId },
           data: { name: input.name, workoutId: workout.id, isSyncedOnce: true },
         });
-        console.log("Session updated successfully");
       });
       return "Workout created successfully";
     }),
