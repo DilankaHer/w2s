@@ -425,9 +425,9 @@ function CreateTemplateScreen() {
                   <>
                     <View style={styles.setsContainer}>
                       <View style={styles.tableHeaderContainer}>
-                        <Text style={[styles.tableHeaderText, { width: 40 }]}>Set</Text>
-                        <Text style={[styles.tableHeaderText, { flex: 1, maxWidth: 80, marginLeft: 8 }]}>KG</Text>
-                        <Text style={[styles.tableHeaderText, { flex: 1, maxWidth: 80, marginLeft: 8 }]}>Reps</Text>
+                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Set</Text>
+                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>KG</Text>
+                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
                         <View style={styles.tableHeaderActions} />
                       </View>
                       {workoutExercise.sets.map((set) => (
@@ -685,6 +685,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 8,
+    gap: 8,
   },
   tableHeader: {
     flex: 1,
@@ -701,6 +702,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
+  tableHeaderColumn: {
+    flex: 1,
+  },
   setRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -713,9 +717,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 12,
     alignItems: 'center',
+    gap: 8,
   },
   setNumber: {
-    width: 40,
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
@@ -723,17 +728,15 @@ const styles = StyleSheet.create({
   },
   setInput: {
     flex: 1,
-    maxWidth: 80,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 8,
     paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     fontSize: 16,
     textAlign: 'center',
     backgroundColor: colors.inputBg,
     color: colors.text,
-    marginLeft: 8,
   },
   setRowActions: {
     width: 24,
