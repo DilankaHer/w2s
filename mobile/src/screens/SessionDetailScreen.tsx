@@ -1,5 +1,5 @@
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
@@ -26,6 +26,45 @@ import type { Exercise, Session, SessionExercise, SessionSet } from '../types'
 import { buildSessionUpdatePayload } from '../utils/buildSessionUpdatePayload'
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
+
+// Timer component that only re-renders itself
+const Timer = React.memo(({ startTimeMs, completedAt }: { startTimeMs: number | null, completedAt?: string }) => {
+  const [elapsedTime, setElapsedTime] = useState(() => {
+    if (completedAt && startTimeMs) {
+      const endTime = new Date(completedAt).getTime()
+      return Math.max(0, Math.floor((endTime - startTimeMs) / 1000))
+    }
+    if (startTimeMs) {
+      return Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000))
+    }
+    return 0
+  })
+
+  useEffect(() => {
+    if (completedAt || !startTimeMs) return
+    
+    const updateElapsed = () => {
+      setElapsedTime(Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000)))
+    }
+    updateElapsed()
+    const interval = setInterval(updateElapsed, 1000)
+    return () => clearInterval(interval)
+  }, [startTimeMs, completedAt])
+
+  const formatTime = (seconds: number) => {
+    const s = Math.max(0, Math.floor(seconds))
+    const hrs = Math.floor(s / 3600)
+    const mins = Math.floor((s % 3600) / 60)
+    const secs = s % 60
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  return <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
+})
+Timer.displayName = 'Timer'
 
 // Helper function to map session data
 const mapSessionData = (sessionData: any): Session | null => {
@@ -79,16 +118,6 @@ function SessionDetailScreen() {
   const [loading, setLoading] = useState(() => !initialSessionParam)
   const [error, setError] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
-  const [elapsedTime, setElapsedTime] = useState(() => {
-    const s = initialSessionParam ? mapSessionData(initialSessionParam) : null
-    if (s && !s.completedAt) {
-      return Math.max(0, Math.floor((Date.now() - new Date(s.createdAt).getTime()) / 1000))
-    }
-    if (initialCreatedAtParam) {
-      return Math.max(0, Math.floor((Date.now() - new Date(initialCreatedAtParam).getTime()) / 1000))
-    }
-    return 0
-  })
   const [deleting, setDeleting] = useState(false)
   const [startingNew, setStartingNew] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
@@ -200,30 +229,6 @@ function SessionDetailScreen() {
     }
   }
 
-  // Timer effect: run when we have session (and not completed) or when loading with initialCreatedAt (e.g. from History)
-  useEffect(() => {
-    if (session?.completedAt) {
-      const startTime = new Date(session.createdAt).getTime()
-      const endTime = new Date(session.completedAt).getTime()
-      setElapsedTime(Math.max(0, Math.floor((endTime - startTime) / 1000)))
-      return
-    }
-
-    const startTimeMs = session
-      ? new Date(session.createdAt).getTime()
-      : initialCreatedAtParam
-        ? new Date(initialCreatedAtParam).getTime()
-        : null
-
-    if (startTimeMs === null) return
-
-    const updateElapsed = () => {
-      setElapsedTime(Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000)))
-    }
-    updateElapsed()
-    const interval = setInterval(updateElapsed, 1000)
-    return () => clearInterval(interval)
-  }, [session, initialCreatedAtParam])
 
   const initializeEditingSet = (set: SessionSet) => {
     setEditingSets((prev) => {
@@ -797,6 +802,21 @@ function SessionDetailScreen() {
     )
   }
 
+  // Memoize exercises list structure to prevent re-rendering when only elapsedTime changes
+  // Note: editingSets is used inside the render, so we still re-render when it changes,
+  // but this prevents the map from running unnecessarily when only the timer updates
+  // Must be called before any early returns to maintain hook order
+  const exercisesList = useMemo(() => {
+    if (!session?.sessionExercises) return []
+    return session.sessionExercises.map((sessionExercise, index) => {
+      // Show all sets - isCompleted is only for client-side tracking during active sessions
+      // For completed sessions from DB, all sets should be shown
+      const displaySets = sessionExercise.sets
+      
+      return { sessionExercise, index, displaySets }
+    })
+  }, [session?.sessionExercises])
+
   // Only show "Session not found" if we're not loading and there's no session
   if (!loading && !session) {
     return (
@@ -814,7 +834,9 @@ function SessionDetailScreen() {
         <View style={styles.container}>
           <View style={[styles.headerCard, styles.loadingHeader]}>
             <Text style={styles.loadingText}>Loading session…</Text>
-            <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
+            {initialCreatedAtParam && (
+              <Timer startTimeMs={new Date(initialCreatedAtParam).getTime()} />
+            )}
           </View>
         </View>
       )
@@ -860,7 +882,7 @@ function SessionDetailScreen() {
                   <Text style={styles.headerMetaText}>
                     {session.sessionTime ?? (session.completedAt && session.createdAt
                       ? formatTime(Math.floor((new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()) / 1000))
-                      : formatTime(elapsedTime))}
+                      : '')}
                   </Text>
                 </View>
                 <Text style={styles.setsCompletedLine}>
@@ -871,7 +893,7 @@ function SessionDetailScreen() {
           </View>
           <View style={styles.headerRight}>
             {!session.completedAt && (
-              <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
+              <Timer startTimeMs={new Date(session.createdAt).getTime()} />
             )}
             {session.completedAt && !showCompletionSummary && (
               <TouchableOpacity
@@ -912,13 +934,7 @@ function SessionDetailScreen() {
             {session.completedAt && (
               <Text style={styles.exercisesSectionTitle}>Exercises</Text>
             )}
-            {session.sessionExercises.map((sessionExercise, index) => {
-              console.log('Rendering exercise:', sessionExercise, 'exercise object:', sessionExercise.exercise)
-              // Show all sets - isCompleted is only for client-side tracking during active sessions
-              // For completed sessions from DB, all sets should be shown
-              const displaySets = sessionExercise.sets
-              console.log('displaySets:', displaySets)
-              
+            {exercisesList.map(({ sessionExercise, index, displaySets }) => {
               return (
               <View key={sessionExercise.id} style={styles.exerciseCard}>
                 <View style={styles.exerciseCardHeader}>
@@ -947,13 +963,14 @@ function SessionDetailScreen() {
                   <Text style={styles.noSetsText}>No sets configured</Text>
                 ) : (
                   <View style={styles.setsContainer}>
-                    <View style={styles.tableHeader}>
-                      <Text style={styles.tableHeaderText}>Set</Text>
-                      <Text style={styles.tableHeaderText}>kg</Text>
-                      <Text style={styles.tableHeaderText}>Reps</Text>
+                    <View style={styles.tableHeaderContainer}>
+                      <Text style={[styles.tableHeaderText, { width: 40 }]}>Set</Text>
+                      <Text style={[styles.tableHeaderText, { flex: 1, marginLeft: 8 }]}>kg</Text>
+                      <Text style={[styles.tableHeaderText, { flex: 1, marginLeft: 8 }]}>Reps</Text>
                       {!session.completedAt && (
-                        <Text style={styles.tableHeaderText}>Done</Text>
+                        <Text style={[styles.tableHeaderText, { flex: 1, marginLeft: 8 }]}>Done</Text>
                       )}
+                      <View style={styles.tableHeaderActions} />
                     </View>
                     {displaySets.map((set) => {
                       const edited = editingSets.get(set.id)
@@ -963,68 +980,80 @@ function SessionDetailScreen() {
                       const canComplete = canSetBeCompleted(set)
 
                       const setRowContent = (
-                        <View
-                          style={styles.setRow}
-                        >
-                          <Text style={styles.setNumber}>{set.setNumber}</Text>
-                          {!session.completedAt ? (
-                            <TextInput
-                              style={styles.setInput}
-                              value={displayWeight === 0 ? '' : displayWeight.toString()}
-                              onFocus={() => initializeEditingSet(set)}
-                              onChangeText={(text) => {
-                                const val = text === '' ? 0 : parseFloat(text) || 0
-                                updateSetValue(set.id, 'weight', val)
-                              }}
-                              onBlur={() => {
-                                const ed = editingSets.get(set.id)
-                                if (ed) saveSetUpdate(set)
-                              }}
-                              keyboardType="numeric"
-                              placeholder="0"
-                              placeholderTextColor={colors.placeholder}
-                            />
-                          ) : (
-                            <Text style={styles.setValue}>{set.weight ?? 0}</Text>
-                          )}
-                          {!session.completedAt ? (
-                            <TextInput
-                              style={styles.setInput}
-                              value={displayReps === 0 ? '' : displayReps.toString()}
-                              onFocus={() => initializeEditingSet(set)}
-                              onChangeText={(text) => {
-                                const val = text === '' ? 0 : parseInt(text) || 0
-                                updateSetValue(set.id, 'reps', val)
-                              }}
-                              onBlur={() => {
-                                const ed = editingSets.get(set.id)
-                                if (ed) saveSetUpdate(set)
-                              }}
-                              keyboardType="numeric"
-                              placeholder="0"
-                              placeholderTextColor={colors.placeholder}
-                            />
-                          ) : (
-                            <Text style={styles.setValue}>{set.reps ?? 0}</Text>
-                          )}
-                          {!session.completedAt && (
-                            <TouchableOpacity
-                              style={styles.checkboxContainer}
-                              onPress={() => toggleSetComplete(set)}
-                              disabled={!canComplete && !isCompleted}
-                            >
-                              <View
-                                style={[
-                                  styles.checkbox,
-                                  isCompleted && styles.checkboxChecked,
-                                  !canComplete && !isCompleted && styles.checkboxDisabled,
-                                ]}
+                        <View style={styles.setRowContainer}>
+                          <View
+                            style={styles.setRow}
+                          >
+                            <Text style={styles.setNumber}>{set.setNumber}</Text>
+                            {!session.completedAt ? (
+                              <TextInput
+                                style={styles.setInput}
+                                value={displayWeight === 0 ? '' : displayWeight.toString()}
+                                onFocus={() => initializeEditingSet(set)}
+                                onChangeText={(text) => {
+                                  const val = text === '' ? 0 : parseFloat(text) || 0
+                                  updateSetValue(set.id, 'weight', val)
+                                }}
+                                onBlur={() => {
+                                  const ed = editingSets.get(set.id)
+                                  if (ed) saveSetUpdate(set)
+                                }}
+                                keyboardType="numeric"
+                                placeholder="0"
+                                placeholderTextColor={colors.placeholder}
+                              />
+                            ) : (
+                              <Text style={styles.setValue}>{set.weight ?? 0}</Text>
+                            )}
+                            {!session.completedAt ? (
+                              <TextInput
+                                style={styles.setInput}
+                                value={displayReps === 0 ? '' : displayReps.toString()}
+                                onFocus={() => initializeEditingSet(set)}
+                                onChangeText={(text) => {
+                                  const val = text === '' ? 0 : parseInt(text) || 0
+                                  updateSetValue(set.id, 'reps', val)
+                                }}
+                                onBlur={() => {
+                                  const ed = editingSets.get(set.id)
+                                  if (ed) saveSetUpdate(set)
+                                }}
+                                keyboardType="numeric"
+                                placeholder="0"
+                                placeholderTextColor={colors.placeholder}
+                              />
+                            ) : (
+                              <Text style={styles.setValue}>{set.reps ?? 0}</Text>
+                            )}
+                            {!session.completedAt && (
+                              <TouchableOpacity
+                                style={styles.checkboxContainer}
+                                onPress={() => toggleSetComplete(set)}
+                                disabled={!canComplete && !isCompleted}
                               >
-                                {isCompleted && (
-                                  <Text style={styles.checkboxCheckmark}>✓</Text>
-                                )}
-                              </View>
-                            </TouchableOpacity>
+                                <View
+                                  style={[
+                                    styles.checkbox,
+                                    isCompleted && styles.checkboxChecked,
+                                    !canComplete && !isCompleted && styles.checkboxDisabled,
+                                  ]}
+                                >
+                                  {isCompleted && (
+                                    <Text style={styles.checkboxCheckmark}>✓</Text>
+                                  )}
+                                </View>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                          {!session.completedAt && sessionExercise.sets.length > 1 && (
+                            <View style={styles.setRowActions}>
+                              <Ionicons 
+                                name="chevron-back-outline" 
+                                size={16} 
+                                color={colors.error} 
+                                style={styles.swipeIconHint}
+                              />
+                            </View>
                           )}
                         </View>
                       )
@@ -1538,35 +1567,57 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginTop: 8,
   },
-  tableHeader: {
+  tableHeaderContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
     backgroundColor: colors.cardElevated,
+    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    borderRadius: 8,
-    marginBottom: 8,
+  },
+  tableHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tableHeaderActions: {
+    width: 24,
   },
   tableHeaderText: {
-    flex: 1,
     fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  setRow: {
+  setRowContainer: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    paddingHorizontal: 8,
+  },
+  setRow: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 12,
     alignItems: 'center',
+  },
+  setRowActions: {
+    width: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  swipeIconHint: {
+    opacity: 0.4,
   },
   completedSetRow: {
     backgroundColor: colors.successBgDark,
   },
   setNumber: {
-    flex: 1,
+    width: 40,
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
@@ -1576,6 +1627,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
   checkbox: {
     width: 24,
@@ -1606,18 +1658,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 8,
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     fontSize: 16,
     textAlign: 'center',
-    marginHorizontal: 4,
     backgroundColor: colors.inputBg,
     color: colors.text,
+    marginLeft: 8,
   },
   setValue: {
     flex: 1,
     fontSize: 16,
     color: colors.text,
     textAlign: 'center',
+    marginLeft: 8,
   },
   actionButtons: {
     flexDirection: 'column',

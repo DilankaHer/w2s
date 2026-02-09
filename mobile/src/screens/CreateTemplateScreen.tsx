@@ -424,62 +424,57 @@ function CreateTemplateScreen() {
                 ) : (
                   <>
                     <View style={styles.setsContainer}>
-                      <View style={styles.tableHeader}>
-                        <Text style={styles.tableHeaderText}>Set</Text>
-                        <Text style={styles.tableHeaderText}>Weight (kg)</Text>
-                        <Text style={styles.tableHeaderText}>Reps</Text>
-                        <Text style={styles.tableHeaderText}></Text>
+                      <View style={styles.tableHeaderContainer}>
+                        <Text style={[styles.tableHeaderText, { width: 40 }]}>Set</Text>
+                        <Text style={[styles.tableHeaderText, { flex: 1, maxWidth: 80, marginLeft: 8 }]}>KG</Text>
+                        <Text style={[styles.tableHeaderText, { flex: 1, maxWidth: 80, marginLeft: 8 }]}>Reps</Text>
+                        <View style={styles.tableHeaderActions} />
                       </View>
                       {workoutExercise.sets.map((set) => (
-                        <View key={set.setNumber} style={styles.setRow}>
-                          <Text style={styles.setNumber}>{set.setNumber}</Text>
-                          <TextInput
-                            style={styles.setInput}
-                            value={set.targetWeight === 0 ? '' : set.targetWeight.toString()}
-                            onChangeText={(text) =>
-                              updateSet(
-                                workoutExercise.id,
-                                set.setNumber,
-                                'targetWeight',
-                                parseFloat(text) || 0
-                              )
-                            }
-                            keyboardType="numeric"
-                            placeholder="0"
-                            placeholderTextColor={colors.placeholder}
-                          />
-                          <TextInput
-                            style={styles.setInput}
-                            value={set.targetReps === 0 ? '' : set.targetReps.toString()}
-                            onChangeText={(text) =>
-                              updateSet(
-                                workoutExercise.id,
-                                set.setNumber,
-                                'targetReps',
-                                parseInt(text) || 0
-                              )
-                            }
-                            keyboardType="numeric"
-                            placeholder="0"
-                            placeholderTextColor={colors.placeholder}
-                          />
-                          <TouchableOpacity
-                            style={[
-                              styles.removeSetButton,
-                              workoutExercise.sets.length === 1 && styles.removeSetButtonDisabled,
-                            ]}
-                            onPress={() => removeSet(workoutExercise.id, set.setNumber)}
-                            disabled={workoutExercise.sets.length === 1}
-                          >
-                            <Text
-                              style={[
-                                styles.removeSetButtonText,
-                                workoutExercise.sets.length === 1 && styles.removeSetButtonTextDisabled,
-                              ]}
-                            >
-                              ×
-                            </Text>
-                          </TouchableOpacity>
+                        <View key={set.setNumber} style={styles.setRowContainer}>
+                          <View style={styles.setRow}>
+                            <Text style={styles.setNumber}>{set.setNumber}</Text>
+                            <TextInput
+                              style={styles.setInput}
+                              value={set.targetWeight === 0 ? '' : set.targetWeight.toString()}
+                              onChangeText={(text) =>
+                                updateSet(
+                                  workoutExercise.id,
+                                  set.setNumber,
+                                  'targetWeight',
+                                  parseFloat(text) || 0
+                                )
+                              }
+                              keyboardType="numeric"
+                              placeholder="0"
+                              placeholderTextColor={colors.placeholder}
+                            />
+                            <TextInput
+                              style={styles.setInput}
+                              value={set.targetReps === 0 ? '' : set.targetReps.toString()}
+                              onChangeText={(text) =>
+                                updateSet(
+                                  workoutExercise.id,
+                                  set.setNumber,
+                                  'targetReps',
+                                  parseInt(text) || 0
+                                )
+                              }
+                              keyboardType="numeric"
+                              placeholder="0"
+                              placeholderTextColor={colors.placeholder}
+                            />
+                          </View>
+                          <View style={styles.setRowActions}>
+                            {workoutExercise.sets.length > 1 && (
+                              <Ionicons 
+                                name="chevron-back-outline" 
+                                size={16} 
+                                color={colors.error} 
+                                style={styles.swipeIconHint}
+                              />
+                            )}
+                          </View>
                         </View>
                       ))}
                     </View>
@@ -682,32 +677,45 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginTop: 8,
   },
-  tableHeader: {
+  tableHeaderContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
     backgroundColor: colors.cardElevated,
+    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    borderRadius: 8,
-    marginBottom: 8,
+  },
+  tableHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tableHeaderActions: {
+    width: 24,
   },
   tableHeaderText: {
-    flex: 1,
     fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  setRow: {
+  setRowContainer: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    paddingHorizontal: 8,
+  },
+  setRow: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 12,
     alignItems: 'center',
   },
   setNumber: {
-    flex: 1,
+    width: 40,
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
@@ -715,15 +723,26 @@ const styles = StyleSheet.create({
   },
   setInput: {
     flex: 1,
+    maxWidth: 80,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 8,
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     fontSize: 16,
     textAlign: 'center',
-    marginHorizontal: 4,
     backgroundColor: colors.inputBg,
     color: colors.text,
+    marginLeft: 8,
+  },
+  setRowActions: {
+    width: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  swipeIconHint: {
+    opacity: 0.4,
   },
   removeSetButton: {
     padding: 8,
