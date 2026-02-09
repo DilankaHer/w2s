@@ -20,9 +20,12 @@ import { colors } from '../theme/colors'
 const USERNAME_CHECK_DEBOUNCE_MS = 400
 
 function ProfileScreen() {
-  const { isAuthenticated, serverDown, checkAuth, checkServerOnFocus } = useAuth()
+  const { isAuthenticated, serverDown, checkAuth, checkServerOnFocus, isRetrying } = useAuth()
   const navigation = useNavigation()
   const [user, setUser] = useState<{ id: number; username: string; email: string | null } | null>(null)
+  const [favoriteWorkout, setFavoriteWorkout] = useState<string>('')
+  const [totalSessions, setTotalSessions] = useState<number>(0)
+  const [totalExercises, setTotalExercises] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [username, setUsername] = useState('')
@@ -31,41 +34,67 @@ function ProfileScreen() {
   const usernameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevServerDownRef = useRef(serverDown)
 
-  const fetchUser = useCallback(async () => {
+  const fetchUser = useCallback(async (showLoading = true) => {
     if (!isAuthenticated) {
       setLoading(false)
       return
     }
     try {
-      setLoading(true)
-      const data = await trpc.users.getUser.query()
-      if (data) {
-        setUser(data)
-        setUsername(data.username)
-        setEmail(data.email ?? '')
+      if (showLoading) setLoading(true)
+      const [userData, statsData] = await Promise.all([
+        trpc.users.getUser.query(),
+        trpc.stats.getStats.query(),
+      ])
+      if (userData) {
+        setUser(userData)
+        setUsername(userData.username)
+        setEmail(userData.email ?? '')
+      }
+      if (statsData) {
+        if (statsData.favoriteWorkout != null) setFavoriteWorkout(statsData.favoriteWorkout)
+        if (typeof statsData.totalSessions === 'number') setTotalSessions(statsData.totalSessions)
+        if (typeof statsData.totalExercises === 'number') setTotalExercises(statsData.totalExercises)
       }
     } catch {
-      setUser(null)
+      // Don't clear user state on error - preserve cached data
+      // This ensures the profile screen maintains its state even when API calls fail
     } finally {
+      if (showLoading) setLoading(false)
+    }
+  }, [isAuthenticated, serverDown])
+
+  useEffect(() => {
+    // Don't react to state changes during retry - freeze the screen
+    if (isRetrying) return
+    // Only fetch if server is not down - preserve cached data when offline
+    if (!serverDown) {
+      fetchUser()
+    } else {
       setLoading(false)
     }
-  }, [isAuthenticated])
+  }, [fetchUser, serverDown, isRetrying])
 
   useEffect(() => {
-    fetchUser()
-  }, [fetchUser])
-
-  useEffect(() => {
+    // Don't react to state changes during retry - freeze the screen
+    if (isRetrying) return
+    if (serverDown) return
     if (prevServerDownRef.current && !serverDown && isAuthenticated && !user) {
       fetchUser()
     }
     prevServerDownRef.current = serverDown
-  }, [serverDown, isAuthenticated, user, fetchUser])
+  }, [serverDown, isAuthenticated, user, fetchUser, isRetrying])
 
   useFocusEffect(
     useCallback(() => {
+      // Don't do anything during retry - freeze the screen completely
+      if (isRetrying) return
+      if (serverDown) return
       checkServerOnFocus()
-    }, [checkServerOnFocus])
+      // Only fetch user data if server is not down - preserve cached data when offline
+      if (isAuthenticated && !serverDown) {
+        fetchUser(false)
+      }
+    }, [checkServerOnFocus, isAuthenticated, serverDown, fetchUser, isRetrying])
   )
 
   const checkUsername = useCallback(async (value: string) => {
@@ -137,7 +166,9 @@ function ProfileScreen() {
     }
   }
 
-  if (!isAuthenticated) {
+  // Show login message only if not authenticated AND server is not down
+  // If server is down but user has stored credentials, they're still considered authenticated
+  if (!isAuthenticated && !serverDown) {
     return (
       <View style={styles.container}>
         <View style={styles.emptyContainer}>
@@ -156,7 +187,10 @@ function ProfileScreen() {
     )
   }
 
-  if (loading) {
+  // If server is down and authenticated, show profile page (even if user data not loaded)
+  // If loading and not serverDown, show loading spinner
+  // Don't show loading during retry - freeze the screen
+  if (!isRetrying && loading && !serverDown) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -164,10 +198,49 @@ function ProfileScreen() {
     )
   }
 
-  if (!user) {
-    if (serverDown) {
-      return <View style={[styles.container, styles.centered, { backgroundColor: colors.screen }]} />
-    }
+  // During retry, freeze the screen - don't react to any state changes
+  // Only show black screen conditions when NOT retrying
+  if (!isRetrying && loading && serverDown) {
+    return <View style={[styles.container, styles.centered, { backgroundColor: colors.screen }]} />
+  }
+
+  // If no user data but authenticated and serverDown, show unavailable message
+  // But if user data exists (cached), continue to show normal profile page below
+  // Don't show this during retry - preserve current state
+  if (!isRetrying && !user && serverDown && isAuthenticated) {
+    // Show profile page structure with unavailable message when server is down and no cached data
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={100}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.userCard}>
+            <View style={styles.userAvatar}>
+              <Ionicons name="person" size={32} color={colors.primaryText} />
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>—</Text>
+              <Text style={styles.memberSince}>Connection unavailable</Text>
+            </View>
+          </View>
+          <Text style={styles.emptyText}>Profile data unavailable while server is down.</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    )
+  }
+  
+  // If user data exists (even if serverDown), show normal profile page with cached data
+  // This allows users to see their profile even when server is temporarily down
+
+  // If no user and server is up, show error with retry
+  // Don't show this during retry - preserve current state
+  if (!isRetrying && !user && !serverDown) {
     return (
       <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorTitle}>Could not load profile.</Text>
@@ -183,13 +256,47 @@ function ProfileScreen() {
     )
   }
 
+  // TypeScript guard: user must exist at this point (all early returns checked)
+  // During retry, preserve state - if user was null, show unavailable message
+  if (!user) {
+    if (isRetrying && isAuthenticated) {
+      // During retry, show unavailable message to preserve state
+      return (
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.userCard}>
+              <View style={styles.userAvatar}>
+                <Ionicons name="person" size={32} color={colors.primaryText} />
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>—</Text>
+                <Text style={styles.memberSince}>Connection unavailable</Text>
+              </View>
+            </View>
+            <Text style={styles.emptyText}>Profile data unavailable while server is down.</Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )
+    }
+    // This shouldn't happen, but handle it gracefully
+    return <View style={styles.container} />
+  }
+
   const hasChanges = username.trim() !== user.username || email.trim() !== (user.email ?? '')
 
-  const mockStats = {
-    totalWorkouts: 3,
+  const stats = {
+    totalSessions,
     dayStreak: 3,
-    totalExercises: 36,
-    favoriteWorkout: 'Full Body Workout',
+    totalExercises,
+    favoriteWorkout: favoriteWorkout || '—',
   }
 
   return (
@@ -218,22 +325,22 @@ function ProfileScreen() {
           <View style={styles.statsRow}>
             <View style={[styles.statBox, styles.statBoxPrimary]}>
               <Ionicons name="trending-up" size={20} color={colors.primary} />
-              <Text style={styles.statLabel}>Total Workouts</Text>
-              <Text style={styles.statValue}>{mockStats.totalWorkouts}</Text>
+              <Text style={styles.statLabel}>Total Sessions</Text>
+              <Text style={styles.statValue}>{stats.totalSessions}</Text>
             </View>
             <View style={[styles.statBox, styles.statBoxSuccess]}>
               <Ionicons name="trophy" size={20} color={colors.success} />
               <Text style={[styles.statLabel, styles.statLabelGreen]}>Day Streak</Text>
-              <Text style={styles.statValue}>{mockStats.dayStreak}</Text>
+              <Text style={styles.statValue}>{stats.dayStreak}</Text>
             </View>
           </View>
           <View style={styles.statRow}>
             <Text style={styles.statRowLabel}>Total Exercises</Text>
-            <Text style={styles.statRowValue}>{mockStats.totalExercises}</Text>
+            <Text style={styles.statRowValue}>{stats.totalExercises}</Text>
           </View>
           <View style={styles.statRow}>
             <Text style={styles.statRowLabel}>Favorite Workout</Text>
-            <Text style={styles.statRowValue}>{mockStats.favoriteWorkout}</Text>
+            <Text style={styles.statRowValue}>{stats.favoriteWorkout}</Text>
           </View>
         </View>
 

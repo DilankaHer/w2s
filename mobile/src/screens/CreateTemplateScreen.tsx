@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Modal,
@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
@@ -41,15 +42,19 @@ function CreateTemplateScreen() {
     checkServerOnFocus,
     registerOnRetrySuccess,
     unregisterOnRetrySuccess,
+    isAuthenticated,
   } = useAuth()
   const [phase, setPhase] = useState<CreateTemplatePhase>('checking')
   const [templateName, setTemplateName] = useState('')
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([])
   const [showExerciseList, setShowExerciseList] = useState(false)
+  const [replacingExerciseId, setReplacingExerciseId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [exercisesLoading, setExercisesLoading] = useState(false)
+  const [workoutNameExists, setWorkoutNameExists] = useState<boolean | null>(null)
+  const workoutNameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevServerDownRef = React.useRef(serverDown)
   const initialCheckRunRef = React.useRef(false)
 
@@ -113,23 +118,87 @@ function CreateTemplateScreen() {
     }
   }
 
-  const addExercise = (exercise: Exercise) => {
-    const newOrder = workoutExercises.length > 0
-      ? Math.max(...workoutExercises.map(ex => ex.order)) + 1
-      : 1
-    const newExercise: WorkoutExercise = {
-      id: exercise.id,
-      order: newOrder,
-      sets: [
-        {
-          setNumber: 1,
-          targetReps: 0,
-          targetWeight: 0,
-        },
-      ],
+  const checkWorkoutName = useCallback(async (value: string) => {
+    if (!isAuthenticated) {
+      setWorkoutNameExists(null)
+      return
     }
-    setWorkoutExercises([...workoutExercises, newExercise])
+    const trimmed = value.trim()
+    if (!trimmed) {
+      setWorkoutNameExists(null)
+      return
+    }
+    try {
+      const result = await trpc.workouts.checkWorkoutName.mutate({ name: trimmed })
+      setWorkoutNameExists(result.exists)
+    } catch {
+      setWorkoutNameExists(null)
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (isAuthenticated && phase === 'ready') {
+      if (workoutNameCheckTimeoutRef.current) {
+        clearTimeout(workoutNameCheckTimeoutRef.current)
+        workoutNameCheckTimeoutRef.current = null
+      }
+      const trimmed = templateName.trim()
+      if (!trimmed) {
+        setWorkoutNameExists(null)
+        return
+      }
+      workoutNameCheckTimeoutRef.current = setTimeout(() => {
+        checkWorkoutName(trimmed)
+        workoutNameCheckTimeoutRef.current = null
+      }, 500) // 500ms debounce
+      return () => {
+        if (workoutNameCheckTimeoutRef.current) {
+          clearTimeout(workoutNameCheckTimeoutRef.current)
+        }
+      }
+    } else {
+      setWorkoutNameExists(null)
+    }
+  }, [templateName, isAuthenticated, phase, checkWorkoutName])
+
+  const addExercise = (exercise: Exercise) => {
+    if (replacingExerciseId !== null) {
+      // Replace existing exercise
+      setWorkoutExercises(
+        workoutExercises.map((ex) =>
+          ex.id === replacingExerciseId
+            ? {
+                ...ex,
+                id: exercise.id,
+              }
+            : ex
+        )
+      )
+      setReplacingExerciseId(null)
+    } else {
+      // Add new exercise
+      const newOrder = workoutExercises.length > 0
+        ? Math.max(...workoutExercises.map(ex => ex.order)) + 1
+        : 1
+      const newExercise: WorkoutExercise = {
+        id: exercise.id,
+        order: newOrder,
+        sets: [
+          {
+            setNumber: 1,
+            targetReps: 0,
+            targetWeight: 0,
+          },
+        ],
+      }
+      setWorkoutExercises([...workoutExercises, newExercise])
+    }
     setShowExerciseList(false)
+  }
+
+  const replaceExercise = (exerciseId: number) => {
+    setReplacingExerciseId(exerciseId)
+    setShowExerciseList(true)
   }
 
   const removeExercise = (exerciseId: number) => {
@@ -212,11 +281,25 @@ function CreateTemplateScreen() {
       return
     }
 
+    // Check if workout name already exists (for authenticated users)
+    if (isAuthenticated) {
+      try {
+        const nameCheck = await trpc.workouts.checkWorkoutName.mutate({ name: templateName.trim() })
+        if (nameCheck.exists) {
+          setError('A workout with this name already exists')
+          return
+        }
+      } catch (err) {
+        // If check fails, continue anyway (might be network issue)
+        console.log('checkWorkoutName error:', err)
+      }
+    }
+
     try {
       setSubmitting(true)
       setError(null)
 
-      await trpc.workouts.create.mutate({
+      const workoutPayload = {
         workout: {
           name: templateName.trim(),
           isTemplate: true,
@@ -226,7 +309,9 @@ function CreateTemplateScreen() {
             sets: ex.sets,
           })),
         },
-      })
+      }
+      console.log('workouts.create payload:', JSON.stringify(workoutPayload, null, 2))
+      await trpc.workouts.create.mutate(workoutPayload)
 
       // Refresh workout info to get the new template
       await checkAuth()
@@ -274,19 +359,24 @@ function CreateTemplateScreen() {
           <View style={styles.nameInputContainer}>
             <Text style={styles.label}>Workout Name</Text>
             <TextInput
-              style={styles.nameInput}
+              style={[
+                styles.nameInput,
+                (workoutNameExists === true && isAuthenticated) || error
+                  ? styles.nameInputError
+                  : null,
+              ]}
               value={templateName}
               onChangeText={setTemplateName}
               placeholder="Enter workout name"
               placeholderTextColor={colors.placeholder}
             />
+            {workoutNameExists === true && isAuthenticated && (
+              <Text style={styles.errorText}>A workout with this name already exists</Text>
+            )}
+            {error && (
+              <Text style={styles.errorText}>{error}</Text>
+            )}
           </View>
-
-          {error && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorBoxText}>{error}</Text>
-            </View>
-          )}
         </View>
 
         {workoutExercises.length === 0 ? (
@@ -296,8 +386,12 @@ function CreateTemplateScreen() {
             </Text>
             <TouchableOpacity
               style={styles.addExerciseButton}
-              onPress={() => setShowExerciseList(true)}
+              onPress={() => {
+                setReplacingExerciseId(null)
+                setShowExerciseList(true)
+              }}
             >
+              <Ionicons name="add" size={20} color={colors.success} />
               <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
             </TouchableOpacity>
           </View>
@@ -309,12 +403,20 @@ function CreateTemplateScreen() {
                   <Text style={styles.exerciseName}>
                     {workoutExercise.order}. {getExerciseName(workoutExercise.id)}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.removeExerciseButton}
-                    onPress={() => removeExercise(workoutExercise.id)}
-                  >
-                    <Text style={styles.removeExerciseButtonText}>Remove</Text>
-                  </TouchableOpacity>
+                  <View style={styles.exerciseActionButtons}>
+                    <TouchableOpacity
+                      style={styles.exerciseActionButton}
+                      onPress={() => replaceExercise(workoutExercise.id)}
+                    >
+                      <Ionicons name="swap-horizontal-outline" size={20} color={colors.success} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.exerciseActionButton}
+                      onPress={() => removeExercise(workoutExercise.id)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {workoutExercise.sets.length === 0 ? (
@@ -385,6 +487,7 @@ function CreateTemplateScreen() {
                       style={styles.addSetButton}
                       onPress={() => addSet(workoutExercise.id)}
                     >
+                      <Ionicons name="add" size={18} color={colors.success} />
                       <Text style={styles.addSetButtonText}>Add Set</Text>
                     </TouchableOpacity>
                   </>
@@ -394,8 +497,12 @@ function CreateTemplateScreen() {
 
             <TouchableOpacity
               style={styles.addExerciseButton}
-              onPress={() => setShowExerciseList(true)}
+              onPress={() => {
+                setReplacingExerciseId(null)
+                setShowExerciseList(true)
+              }}
             >
+              <Ionicons name="add" size={20} color={colors.success} />
               <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
             </TouchableOpacity>
           </>
@@ -408,7 +515,7 @@ function CreateTemplateScreen() {
               styles.saveButtonDisabled,
           ]}
           onPress={handleSubmit}
-          disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled()}
+          disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled() || workoutNameExists === true}
         >
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
@@ -481,7 +588,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   nameInputContainer: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   label: {
     fontSize: 14,
@@ -497,6 +604,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     backgroundColor: colors.inputBg,
+    marginBottom: 0,
+  },
+  nameInputError: {
+    borderColor: colors.error,
   },
   errorBox: {
     backgroundColor: colors.errorBg,
@@ -509,6 +620,12 @@ const styles = StyleSheet.create({
   errorBoxText: {
     color: colors.errorText,
     fontSize: 14,
+  },
+  errorText: {
+    fontSize: 14,
+    color: colors.error,
+    marginTop: 0,
+    marginBottom: 8,
   },
   emptyContainer: {
     backgroundColor: colors.card,
@@ -551,16 +668,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     flex: 1,
   },
-  removeExerciseButton: {
-    backgroundColor: colors.error,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  exerciseActionButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  removeExerciseButtonText: {
-    color: colors.primaryText,
-    fontSize: 14,
-    fontWeight: '600',
+  exerciseActionButton: {
+    padding: 6,
   },
   noSetsText: {
     fontSize: 14,
@@ -627,26 +740,28 @@ const styles = StyleSheet.create({
     color: colors.placeholder,
   },
   addSetButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 12,
     marginTop: 8,
   },
   addSetButtonText: {
-    color: colors.primaryText,
+    color: colors.success,
     fontSize: 14,
     fontWeight: '600',
   },
   addExerciseButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
     marginBottom: 16,
   },
   addExerciseButtonText: {
-    color: colors.primaryText,
+    color: colors.success,
     fontSize: 16,
     fontWeight: '600',
   },

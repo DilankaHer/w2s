@@ -3,6 +3,7 @@ import { prisma } from "../../prisma/client"
 import { SessionUpdateInput } from "../interfaces/session.interface"
 import { protectedProcedure } from "../middleware/auth.middleware"
 import { publicProcedure, router } from "../trpc"
+import { TRPCError } from "@trpc/server"
 
 const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)
@@ -23,6 +24,15 @@ export const sessionsRouter = router({
             sessionId: z.number().optional(),
         }))
         .mutation(async ({ input, ctx }) => {
+            const activeSession = await prisma.session.findFirst({
+                where: {
+                    userId: ctx.user.userId,
+                    completedAt: null,
+                },
+            });
+            if (activeSession != null) {
+                throw new TRPCError({ code: "CONFLICT", message: "You have an active session" });
+            }
             if (input.workoutId) {
                 const workout = await prisma.workout.findUnique({
                     where: { id: input.workoutId },

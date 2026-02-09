@@ -47,16 +47,19 @@ function formatDuration(session: SessionListItem): string {
 }
 
 function HistoryScreen() {
-  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus } = useAuth()
+  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus, isRetrying } = useAuth()
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const navigation = useNavigation()
 
   useFocusEffect(
     useCallback(() => {
+      // Don't do anything during retry - freeze the screen completely
+      if (isRetrying) return
       checkServerOnFocus()
-      if (isAuthenticated) checkAuth({ silent: true })
-    }, [checkServerOnFocus, checkAuth, isAuthenticated])
+      // Don't call checkAuth when server is down - preserve state until user retries
+      if (isAuthenticated && !serverDown) checkAuth({ silent: true })
+    }, [checkServerOnFocus, checkAuth, isAuthenticated, serverDown, isRetrying])
   )
 
   const onRefresh = async () => {
@@ -66,11 +69,11 @@ function HistoryScreen() {
   }
 
   const handleSessionClick = (session: SessionListItem) => {
-    navigation.navigate('SessionDetail' as never, {
+    ;(navigation as any).navigate('SessionDetail', {
       id: session.id,
       initialCreatedAt: session.createdAt,
       initialCompletedAt: session.completedAt ?? undefined,
-    } as never)
+    })
   }
 
   const handleDeleteSession = (sessionId: number) => {
@@ -116,7 +119,8 @@ function HistoryScreen() {
     isAuthenticated &&
     (serverDown && workoutInfo ? displaySessions.length === 0 : !isLoading && workoutInfo !== null && displaySessions.length === 0)
 
-  if (serverDown && isAuthenticated && workoutInfo === null) {
+  // During retry, freeze the screen - don't react to any state changes
+  if (!isRetrying && serverDown && isAuthenticated && workoutInfo === null) {
     return <View style={[styles.container, { backgroundColor: colors.screen }]} />
   }
 
@@ -138,7 +142,7 @@ function HistoryScreen() {
     )
   }
 
-  if (isLoading && !(serverDown && isAuthenticated && workoutInfo !== null)) {
+  if (!isRetrying && isLoading && !(serverDown && isAuthenticated && workoutInfo !== null)) {
     return <View style={styles.container} />
   }
 

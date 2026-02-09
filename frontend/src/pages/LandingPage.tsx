@@ -28,6 +28,12 @@ function LandingPage() {
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const navigate = useNavigate()
 
+  // One-off: call stats router and log result (for inspection only)
+  useEffect(() => {
+    const t = trpc as { stats: { getStats: { query: () => Promise<unknown> } } }
+    t.stats.getStats.query().then((r) => console.log('Stats result:', r)).catch((e) => console.warn('Stats call failed:', e))
+  }, [])
+
   useEffect(() => {
     // Only use workoutInfo from getWorkoutInfo - no fallback to other endpoints
     if (!isLoading) {

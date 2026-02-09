@@ -21,6 +21,11 @@ export const colors = {
   // Primary accent (blue)
   primary: '#3B82F6',
   primaryText: '#FFFFFF',
+  
+  // Accent (purple)
+  accent: '#A855F7',
+  accentText: '#FFFFFF',
+  accentLight: '#C084FC',
 
   // Semantic
   success: '#10B981',
@@ -50,7 +55,7 @@ export const colors = {
   // Tab bar
   tabBar: '#1A1A1A',
   tabBarBorder: '#374151',
-  tabActive: '#3B82F6',
+  tabActive: '#064E3B',
   tabInactive: '#6B7280',
 
   // Input

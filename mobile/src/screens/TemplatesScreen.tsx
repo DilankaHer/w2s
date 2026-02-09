@@ -20,7 +20,7 @@ import type { Template } from '../types'
 type Filter = 'all' | 'default' | 'custom'
 
 function TemplatesScreen() {
-  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus } = useAuth()
+  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus, isRetrying } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [defaultTemplates, setDefaultTemplates] = useState<Template[]>([])
@@ -47,7 +47,11 @@ function TemplatesScreen() {
   }, [navigation, isAuthenticated])
 
   useEffect(() => {
-    if (!isLoading) {
+    console.log('TemplatesScreen useEffect', isLoading, isRetrying)
+    // Don't react to loading state changes during retry - preserve templates
+    if (isRetrying) return
+    
+    if (!isLoading && !serverDown) {
       setDefaultTemplatesFetched(false)
       setDefaultTemplatesLoading(true)
       trpc.workouts.getTemplates
@@ -61,16 +65,21 @@ function TemplatesScreen() {
           setDefaultTemplatesLoading(false)
         })
     } else {
-      if (isAuthenticated) setDefaultTemplatesFetched(false)
+      if (isAuthenticated && !serverDown) setDefaultTemplatesFetched(false)
       setDefaultTemplatesLoading(false)
     }
-  }, [isAuthenticated, isLoading])
+  }, [isAuthenticated, isLoading, isRetrying])
 
   useFocusEffect(
     useCallback(() => {
+      console.log('TemplatesScreen useFocusEffect', isRetrying)
+      // Don't do anything during retry - freeze the screen completely
+      if (isRetrying) return
+      if (serverDown) return
       checkServerOnFocus()
-      if (isAuthenticated) checkAuth({ silent: true })
-    }, [checkServerOnFocus, checkAuth, isAuthenticated])
+      // Don't call checkAuth when server is down - preserve state until user retries
+      if (isAuthenticated && !serverDown) checkAuth({ silent: true })
+    }, [checkServerOnFocus, checkAuth, isAuthenticated, serverDown, isRetrying])
   )
 
   const onRefresh = async () => {
@@ -87,7 +96,9 @@ function TemplatesScreen() {
     setRefreshing(false)
   }
 
-  const userTemplates = isAuthenticated && (serverDown ? workoutInfo : !isLoading && workoutInfo) ? (workoutInfo?.workouts ?? []) : []
+  // During retry, use the last known workoutInfo to prevent flickering
+  // After retry fails, continue using the preserved workoutInfo
+  const userTemplates = isAuthenticated && workoutInfo ? (workoutInfo?.workouts ?? []) : []
 
   const filteredTemplates = ((): Template[] => {
     if (filter === 'default') return defaultTemplates
@@ -103,7 +114,7 @@ function TemplatesScreen() {
       const session = isAuthenticated
         ? await trpc.sessions.create.mutate({ workoutId: template.id })
         : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
-      navigation.navigate('SessionDetail' as never, { id: session.id, initialSession: session } as never)
+      ;(navigation as any).navigate('SessionDetail', { id: session.id, initialSession: session })
     } catch (err) {
       Toast.show({
         type: 'error',
@@ -123,15 +134,18 @@ function TemplatesScreen() {
   const effectiveDefaultLoading = !defaultTemplatesFetched || defaultTemplatesLoading
   const hasNoTemplatesUnauth = defaultTemplatesFetched && !defaultTemplatesLoading && defaultTemplates.length === 0
 
-  if (serverDown && isAuthenticated && workoutInfo === null) {
+  // During retry, freeze the screen - don't react to any state changes
+  // Only show black screen conditions when NOT retrying
+  if (!isRetrying && serverDown && isAuthenticated && workoutInfo === null) {
     return <View style={[styles.container, { backgroundColor: colors.screen }]} />
   }
 
-  if (isLoading && isAuthenticated && !(serverDown && workoutInfo !== null)) {
+  if (!isRetrying && isLoading && isAuthenticated && !(serverDown && workoutInfo !== null)) {
     return <View style={styles.container} />
   }
 
-  if (effectiveDefaultLoading) {
+  // Don't show loading screen during retry - freeze the current state
+  if (!isRetrying && effectiveDefaultLoading) {
     return <View style={styles.container} />
   }
 
@@ -162,9 +176,12 @@ function TemplatesScreen() {
   )
 
   const renderTemplateCard = (template: Template) => {
-    const exerciseCount = template.workoutExercises?.length ?? 0
+    // Use exerciseCount and setCount from API if available, otherwise calculate from workoutExercises
+    const exerciseCount = template.exerciseCount ?? template.workoutExercises?.length ?? 0
     const setCount =
-      template.workoutExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ?? 0
+      template.setCount ??
+      template.workoutExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ??
+      0
     const meta =
       exerciseCount > 0 && setCount > 0
         ? `${exerciseCount} exercises • ${setCount} sets`
@@ -186,11 +203,15 @@ function TemplatesScreen() {
               <Text style={styles.templateName} numberOfLines={1}>
                 {template.name}
               </Text>
-              {isDefault && (
+              {isDefault ? (
                 <View style={styles.defaultTag}>
                   <Text style={styles.defaultTagText}>Default</Text>
                 </View>
-              )}
+              ) : isAuthenticated ? (
+                <View style={styles.customTag}>
+                  <Text style={styles.customTagText}>Custom</Text>
+                </View>
+              ) : null}
             </View>
             {meta ? <Text style={styles.templateMeta}>{meta}</Text> : null}
           </View>
@@ -202,10 +223,10 @@ function TemplatesScreen() {
           disabled={starting}
         >
           {starting ? (
-            <ActivityIndicator size="small" color={colors.primaryText} />
+            <ActivityIndicator size="small" color={colors.successText} />
           ) : (
             <>
-              <Ionicons name="play" size={20} color={colors.primaryText} />
+              <Ionicons name="play" size={20} color={colors.successText} />
               <Text style={styles.startWorkoutButtonText}>Start Workout</Text>
             </>
           )}
@@ -306,8 +327,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   filterPillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.successBgDark,
+    borderColor: colors.successBgDark,
   },
   filterPillText: {
     fontSize: 15,
@@ -315,7 +336,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   filterPillTextActive: {
-    color: colors.primaryText,
+    color: colors.successText,
   },
   filterPillTextDisabled: {
     color: colors.textMuted,
@@ -354,14 +375,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   createButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignSelf: 'flex-start',
   },
   createButtonText: {
-    color: colors.primaryText,
+    color: colors.successText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -396,7 +417,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   defaultTag: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -404,7 +425,19 @@ const styles = StyleSheet.create({
   defaultTagText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.primaryText,
+    color: colors.accentText,
+  },
+  customTag: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    opacity: 0.7,
+  },
+  customTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accentText,
   },
   templateMeta: {
     fontSize: 14,
@@ -414,13 +447,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
     borderRadius: 8,
     paddingVertical: 12,
     gap: 8,
   },
   startWorkoutButtonText: {
-    color: colors.primaryText,
+    color: colors.successText,
     fontSize: 16,
     fontWeight: '600',
   },

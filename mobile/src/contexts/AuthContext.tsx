@@ -52,39 +52,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isRetrying, setIsRetrying] = useState(false)
   const serverDownRef = useRef(false)
   serverDownRef.current = serverDown
+  const workoutInfoRef = useRef<WorkoutInfo | null>(null)
+  workoutInfoRef.current = workoutInfo
+  const isAuthenticatedRef = useRef<boolean | null>(null)
+  isAuthenticatedRef.current = isAuthenticated
   const lastHealthCheckAtRef = useRef(0)
   const retryingRef = useRef(false)
   const onRetrySuccessRef = useRef<(() => void) | null>(null)
+  // Refs to preserve state during retry - restore if retry fails
+  const preservedWorkoutInfoRef = useRef<WorkoutInfo | null>(null)
+  const preservedIsAuthenticatedRef = useRef<boolean | null>(null)
+  const preservedServerDownRef = useRef<boolean>(false)
 
   const checkAuth = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false
+    // Don't make API calls when server is down unless explicitly retrying
+    if (serverDownRef.current && !retryingRef.current) {
+      return
+    }
+    
+    // During retry, preserve current state - don't modify workoutInfo or isAuthenticated
+    const isRetryingNow = retryingRef.current
+    const preservedWorkoutInfo = isRetryingNow ? workoutInfoRef.current : null
+    const preservedIsAuthenticated = isRetryingNow ? isAuthenticatedRef.current : null
+    
     try {
       if (!silent) setIsLoading(true)
       setError(null)
+      console.log('users.getWorkoutInfo called (mobile - checkAuth)')
       const result = await trpc.users.getWorkoutInfo.mutate()
+      console.log('users.getWorkoutInfo result (mobile - checkAuth)', result)
 
       if (result) {
-        setWorkoutInfo(result as unknown as WorkoutInfo)
-        setIsAuthenticated(true)
-        setServerDown(false)
+        // During retry, only update state if retry succeeds (will be handled by retryServer)
+        if (!isRetryingNow) {
+          // Type assertion: API returns WorkoutInfo structure, but TypeScript infers optional properties
+          // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Template[]
+          setWorkoutInfo(result as unknown as WorkoutInfo)
+          setIsAuthenticated(true)
+          setServerDown(false)
+        }
       } else {
-        setIsAuthenticated(false)
-        setWorkoutInfo(null)
-        await clearStoredAuth()
-        showLoggedOutToast()
+        if (!isRetryingNow) {
+          setIsAuthenticated(false)
+          setWorkoutInfo(null)
+          await clearStoredAuth()
+          showLoggedOutToast()
+        }
       }
     } catch (err) {
       if (isUnauthorizedError(err)) {
-        setIsAuthenticated(false)
-        setWorkoutInfo(null)
-        await clearStoredAuth()
-        showLoggedOutToast()
-        setError(new Error('UNAUTHORIZED'))
+        if (!isRetryingNow) {
+          setIsAuthenticated(false)
+          setWorkoutInfo(null)
+          await clearStoredAuth()
+          showLoggedOutToast()
+          setError(new Error('UNAUTHORIZED'))
+        }
       } else {
-        setServerDown(true)
-        setIsAuthenticated(false)
-        setWorkoutInfo(null)
-        setError(err instanceof Error ? err : new Error('Connection failed'))
+        // Connection error: preserve existing state, only set serverDown
+        // During retry, don't modify state - let retryServer handle restoration
+        if (!isRetryingNow) {
+          setServerDown(true)
+          // Don't clear isAuthenticated or workoutInfo - preserve them so UI can show cached data
+          setError(err instanceof Error ? err : new Error('Connection failed'))
+        }
       }
     } finally {
       if (!silent) setIsLoading(false)
@@ -103,22 +135,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const retryServer = useCallback(async () => {
     retryingRef.current = true
     setIsRetrying(true)
-    setIsLoading(true)
+    // Don't set isLoading during retry - it causes screens to clear their state
+    // Use isRetrying flag instead for UI feedback
+    
+    // Preserve current state in refs before retry - restore if retry fails
+    preservedWorkoutInfoRef.current = workoutInfoRef.current
+    preservedIsAuthenticatedRef.current = isAuthenticatedRef.current
+    preservedServerDownRef.current = serverDownRef.current
+    
     setError(null)
     try {
       await runHealthCheck()
-      await checkAuth()
+      // Call checkAuth silently to avoid setting isLoading which clears screen state
+      // During retry, checkAuth won't modify state, so we need to fetch and update manually
       setServerDown(false)
-      setHasEnteredApp(true)
-      onRetrySuccessRef.current?.()
-      onRetrySuccessRef.current = null
-      Toast.show({
-        type: 'success',
-        text1: 'Connected',
-        text2: 'Connection to server restored.',
-      })
-    } catch {
-      setServerDown(true)
+
+      if (isAuthenticatedRef.current) {
+        console.log('users.getWorkoutInfo called (mobile - retryServer)')
+        const result = await trpc.users.getWorkoutInfo.mutate()
+        console.log('users.getWorkoutInfo result (mobile - retryServer)', result)
+        if (result) {
+          // Type assertion: API returns WorkoutInfo structure, but TypeScript infers optional properties
+          // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Template[]
+          setWorkoutInfo(result as unknown as WorkoutInfo)
+          setIsAuthenticated(true)
+          setServerDown(false)
+          setHasEnteredApp(true)
+          onRetrySuccessRef.current?.()
+          onRetrySuccessRef.current = null
+          Toast.show({
+            type: 'success',
+            text1: 'Connected',
+            text2: 'Connection to server restored.',
+          })
+        }
+      }
+    } catch (err) {
+      console.log('retryServer error', err)
+      // Retry failed - restore all preserved state exactly as it was before retry
+      setServerDown(preservedServerDownRef.current)
+      setWorkoutInfo(preservedWorkoutInfoRef.current)
+      setIsAuthenticated(preservedIsAuthenticatedRef.current)
       Toast.show({
         type: 'error',
         text1: 'Connection failed',
@@ -127,7 +184,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       retryingRef.current = false
       setIsRetrying(false)
-      setIsLoading(false)
     }
   }, [runHealthCheck, checkAuth])
 
@@ -152,6 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [runHealthCheck, checkAuth])
 
   const checkServerOnFocus = useCallback(() => {
+    // Don't run health checks during retry - freeze everything
+    if (retryingRef.current) return
     if (serverDownRef.current) return
     const now = Date.now()
     if (now - lastHealthCheckAtRef.current < HEALTH_CHECK_COOLDOWN_MS) return

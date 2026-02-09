@@ -38,6 +38,9 @@ export interface Template {
   createdAt: string
   workoutExercises: TemplateExercise[]
   isDefaultTemplate?: boolean
+  /** When provided by API, shown on template card as "X exercises • Y sets" */
+  exerciseCount?: number
+  setCount?: number
 }
 
 export interface Session {

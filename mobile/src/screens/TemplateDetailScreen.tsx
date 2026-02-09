@@ -48,7 +48,9 @@ function TemplateDetailScreen() {
     try {
       setLoading(true)
       setError(null)
+      console.log('workouts.getById called (mobile)', { id: templateId })
       const data = await trpc.workouts.getById.query({ id: templateId })
+      console.log('workouts.getById result (mobile)', data)
       setTemplate(data)
       setEditingSets(new Map())
     } catch (err) {
@@ -155,7 +157,7 @@ function TemplateDetailScreen() {
       const session = isAuthenticated
         ? await trpc.sessions.create.mutate({ workoutId: template.id })
         : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
-      navigation.navigate('SessionDetail' as never, { id: session.id, initialSession: session } as never)
+      ;(navigation as any).navigate('SessionDetail', { id: session.id, initialSession: session })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to create session'))
       Toast.show({
@@ -205,6 +207,10 @@ function TemplateDetailScreen() {
     return <View style={[styles.container, { backgroundColor: colors.screen }]} />
   }
 
+  if (!template) {
+    return null
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -249,7 +255,7 @@ function TemplateDetailScreen() {
             {template.workoutExercises.map((templateExercise) => (
               <View key={templateExercise.id} style={styles.exerciseCard}>
                 <Text style={styles.exerciseName}>
-                  {(templateExercise.order ?? 0) + 1}. {templateExercise.exercise.name}
+                  {templateExercise.order ?? 0}. {templateExercise.exercise.name}
                 </Text>
 
                 {templateExercise.sets.length === 0 ? (

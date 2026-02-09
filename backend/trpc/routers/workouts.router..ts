@@ -4,11 +4,15 @@ import { prisma } from "../../prisma/client";
 import { WorkoutCreateInput } from "../interfaces/workout.interface";
 import { protectedProcedure } from "../middleware/auth.middleware";
 import { publicProcedure, router } from "../trpc";
+import { TRPCError } from "@trpc/server";
 
 export const workoutsRouter = router({
   create: protectedProcedure
     .input(z.object({ workout: WorkoutCreateInput }))
     .mutation(async ({ input, ctx }) => {
+      if (!/^[a-zA-Z0-9\s-]+$/.test(input.workout.name)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Workout name can only contain letters, numbers, spaces, and hyphens" });
+      }
       return prisma.workout.create({
         data: {
           name: input.workout.name,
@@ -100,7 +104,10 @@ export const workoutsRouter = router({
     }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.number(), name: z.string() }))
+    .input(z.object({ 
+      id: z.number(), 
+      name: z.string().regex(/^[a-zA-Z0-9\s-]+$/, "Workout name can only contain letters, numbers, spaces, and hyphens")
+    }))
     .mutation(async ({ input }) => {
       return prisma.workout.update({
         where: { id: input.id },
@@ -189,9 +196,29 @@ export const workoutsRouter = router({
     }),
 
   createBySession: protectedProcedure
-    .input(z.object({ sessionId: z.number(), name: z.string() }))
-    .mutation(async ({ input }) => {
+    .input(z.object({ sessionId: z.number(), name: z.string().regex(/^[a-zA-Z0-9\s-]+$/, "Workout name can only contain letters, numbers, spaces, and hyphens") }))
+    .mutation(async ({ input, ctx }) => {
       await prisma.$transaction(async (tx) => {
+        console.log(input);
+        const existingWorkout = await tx.workout.findFirst({
+          where: {
+            userId: ctx.user.userId,
+            OR: [
+              { name: { startsWith: input.name + " (" } },
+              { name: input.name }
+            ]
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        console.log(existingWorkout);
+        if (existingWorkout) {
+          console.log(existingWorkout);
+          const match = existingWorkout.name.match(/\((\d+)\)/);
+          console.log(match, match?.[1]);
+          const runningNo = match?.[1] ?? "0";
+          input.name = `${input.name} (${parseInt(runningNo) + 1})`;
+        }
+        console.log("Starting session update");
         const session = await tx.session.findUnique({
           where: { id: input.sessionId },
           include: {
@@ -206,8 +233,10 @@ export const workoutsRouter = router({
             },
           },
         });
+        console.log(session);
         if (session === null) {
-          throw new Error("Session not found");
+          console.log("Session not found");
+          throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
         }
         const workout = await tx.workout.create({
           data: {
@@ -228,11 +257,22 @@ export const workoutsRouter = router({
             },
           },
         });
+        console.log(workout);
         await tx.session.update({
           where: { id: input.sessionId },
           data: { name: input.name, workoutId: workout.id, isSyncedOnce: true },
         });
+        console.log("Session updated successfully");
       });
       return "Workout created successfully";
+    }),
+
+    checkWorkoutName: protectedProcedure.input(z.object({ name: z.string() })).mutation(async ({ input, ctx }) => {
+      const existingWorkout = await prisma.workout.findFirst({
+        where: { name: input.name, userId: ctx.user.userId },
+      });
+      return {
+        exists: !!existingWorkout,
+      };
     }),
 });

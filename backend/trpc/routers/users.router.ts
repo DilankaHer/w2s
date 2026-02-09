@@ -104,6 +104,7 @@ export const usersRouter = router({
     }),
 
     getWorkoutInfo: protectedProcedure.mutation(async ({ ctx }) => {
+        console.log('users.getWorkoutInfo called', { userId: ctx.user.userId });
         const user = await prisma.user.findUnique({
             where: { id: ctx.user.userId },
             select: {
@@ -111,6 +112,22 @@ export const usersRouter = router({
                 workouts: {
                     orderBy: {
                         createdAt: 'desc',
+                    },
+                    include: {
+                        _count: {
+                            select: {
+                                workoutExercises: true,
+                            },
+                        },
+                        workoutExercises: {
+                            include: {
+                                _count: {
+                                    select: {
+                                        sets: true,
+                                    },
+                                },
+                            },
+                        }
                     },
                 },
                 sessions: {
@@ -139,6 +156,11 @@ export const usersRouter = router({
 
         return {
             ...user,
+            workouts: user?.workouts.map(({ _count, workoutExercises, ...workout }) => ({
+                ...workout,
+                exerciseCount: _count.workoutExercises,
+                setCount: workoutExercises.reduce((acc, exercise) => acc + exercise._count.sets, 0),
+            })),
             sessions: user?.sessions.map(({ _count, sessionExercises, ...session }) => ({
                 ...session,
                 exerciseCount: _count.sessionExercises,

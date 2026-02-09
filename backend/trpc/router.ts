@@ -5,6 +5,7 @@ import { serverRouter } from './routers/server.router';
 import { usersRouter } from './routers/users.router';
 import { workoutsRouter } from './routers/workouts.router.';
 import { router } from './trpc';
+import { statsRouter } from './routers/stats.router';
 
 export const appRouter = router({
   server: serverRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
   exercises: exercisesRouter,
   sets: setRouter,
   sessions: sessionsRouter,
+  stats: statsRouter,
 });
 
 export type AppRouter = typeof appRouter;

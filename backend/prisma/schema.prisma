@@ -48,6 +48,7 @@ model Workout {
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@unique([userId, name])
   @@map("workouts")
 }
 
