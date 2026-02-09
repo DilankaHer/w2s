@@ -8,14 +8,13 @@ import { triggerUnauthorized } from './onUnauthorized'
 
 const API_REQUEST_TIMEOUT_MS = 4_000
 
-// Get API base URL from Expo config or default
+// Get API base URL from Expo public env var or config
 // On Android emulator, use 10.0.2.2 instead of localhost
 const getApiBaseUrl = (): string => {
-  // Try to get from Expo config first, then env var, then default
+  // Priority: EXPO_PUBLIC_API_URL env var > Expo config extra > default
   const configUrl =
     Constants.expoConfig?.extra?.apiBaseUrl ??
-    process.env.EXPO_PUBLIC_API_BASE_URL ??
-    'http://119.76.183.15:3000'
+    'http://192.168.1.109:3000'
 
   // Replace localhost with 10.0.2.2 for Android emulator
   if (Platform.OS === 'android' && configUrl.includes('localhost')) {

@@ -1,0 +1,34 @@
+module.exports = {
+  expo: {
+    name: "w2s",
+    slug: "w2s-mobile",
+    version: "1.0.0",
+    sdkVersion: "54.0.0",
+    orientation: "portrait",
+    newArchEnabled: true,
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "dark",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#1A1A1A"
+    },
+    assetBundlePatterns: ["**/*"],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.w2s.mobile"
+    },
+    android: {
+      package: "com.w2s.mobile"
+    },
+    web: {
+      favicon: "./assets/favicon.png"
+    },
+    extra: {
+      // API URL from environment variable, fallback to production
+      apiUrl: process.env.APP_ENV === 'production'
+        ? "https://w2s-api.duvaher.com"
+        : "http://192.168.1.109:3000"
+    },
+  }
+}

@@ -299,7 +299,7 @@ function SplashScreen() {
   return (
     <View style={splashStyles.container}>
       <Text style={splashStyles.title}>W2S</Text>
-      <Text style={splashStyles.subtitle}>Workout to Session</Text>
+      <Text style={splashStyles.subtitle}>Weak To Strong</Text>
       <ActivityIndicator size="large" color={colors.primary} style={splashStyles.spinner} />
     </View>
   )
@@ -308,7 +308,7 @@ function SplashScreen() {
 const splashStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
