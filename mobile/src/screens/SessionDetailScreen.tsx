@@ -964,11 +964,11 @@ function SessionDetailScreen() {
                 ) : (
                   <View style={styles.setsContainer}>
                     <View style={styles.tableHeaderContainer}>
-                      <Text style={[styles.tableHeaderText, { width: 40 }]}>Set</Text>
-                      <Text style={[styles.tableHeaderText, { flex: 1, marginLeft: 8 }]}>kg</Text>
-                      <Text style={[styles.tableHeaderText, { flex: 1, marginLeft: 8 }]}>Reps</Text>
+                      <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Set</Text>
+                      <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>kg</Text>
+                      <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
                       {!session.completedAt && (
-                        <Text style={[styles.tableHeaderText, { flex: 1, marginLeft: 8 }]}>Done</Text>
+                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Done</Text>
                       )}
                       <View style={styles.tableHeaderActions} />
                     </View>
@@ -981,70 +981,66 @@ function SessionDetailScreen() {
 
                       const setRowContent = (
                         <View style={styles.setRowContainer}>
-                          <View
-                            style={styles.setRow}
-                          >
-                            <Text style={styles.setNumber}>{set.setNumber}</Text>
-                            {!session.completedAt ? (
-                              <TextInput
-                                style={styles.setInput}
-                                value={displayWeight === 0 ? '' : displayWeight.toString()}
-                                onFocus={() => initializeEditingSet(set)}
-                                onChangeText={(text) => {
-                                  const val = text === '' ? 0 : parseFloat(text) || 0
-                                  updateSetValue(set.id, 'weight', val)
-                                }}
-                                onBlur={() => {
-                                  const ed = editingSets.get(set.id)
-                                  if (ed) saveSetUpdate(set)
-                                }}
-                                keyboardType="numeric"
-                                placeholder="0"
-                                placeholderTextColor={colors.placeholder}
-                              />
-                            ) : (
-                              <Text style={styles.setValue}>{set.weight ?? 0}</Text>
-                            )}
-                            {!session.completedAt ? (
-                              <TextInput
-                                style={styles.setInput}
-                                value={displayReps === 0 ? '' : displayReps.toString()}
-                                onFocus={() => initializeEditingSet(set)}
-                                onChangeText={(text) => {
-                                  const val = text === '' ? 0 : parseInt(text) || 0
-                                  updateSetValue(set.id, 'reps', val)
-                                }}
-                                onBlur={() => {
-                                  const ed = editingSets.get(set.id)
-                                  if (ed) saveSetUpdate(set)
-                                }}
-                                keyboardType="numeric"
-                                placeholder="0"
-                                placeholderTextColor={colors.placeholder}
-                              />
-                            ) : (
-                              <Text style={styles.setValue}>{set.reps ?? 0}</Text>
-                            )}
-                            {!session.completedAt && (
-                              <TouchableOpacity
-                                style={styles.checkboxContainer}
-                                onPress={() => toggleSetComplete(set)}
-                                disabled={!canComplete && !isCompleted}
+                          <Text style={styles.setNumber}>{set.setNumber}</Text>
+                          {!session.completedAt ? (
+                            <TextInput
+                              style={styles.setInput}
+                              value={displayWeight === 0 ? '' : displayWeight.toString()}
+                              onFocus={() => initializeEditingSet(set)}
+                              onChangeText={(text) => {
+                                const val = text === '' ? 0 : parseFloat(text) || 0
+                                updateSetValue(set.id, 'weight', val)
+                              }}
+                              onBlur={() => {
+                                const ed = editingSets.get(set.id)
+                                if (ed) saveSetUpdate(set)
+                              }}
+                              keyboardType="numeric"
+                              placeholder="0"
+                              placeholderTextColor={colors.placeholder}
+                            />
+                          ) : (
+                            <Text style={styles.setValue}>{set.weight ?? 0}</Text>
+                          )}
+                          {!session.completedAt ? (
+                            <TextInput
+                              style={styles.setInput}
+                              value={displayReps === 0 ? '' : displayReps.toString()}
+                              onFocus={() => initializeEditingSet(set)}
+                              onChangeText={(text) => {
+                                const val = text === '' ? 0 : parseInt(text) || 0
+                                updateSetValue(set.id, 'reps', val)
+                              }}
+                              onBlur={() => {
+                                const ed = editingSets.get(set.id)
+                                if (ed) saveSetUpdate(set)
+                              }}
+                              keyboardType="numeric"
+                              placeholder="0"
+                              placeholderTextColor={colors.placeholder}
+                            />
+                          ) : (
+                            <Text style={styles.setValue}>{set.reps ?? 0}</Text>
+                          )}
+                          {!session.completedAt && (
+                            <TouchableOpacity
+                              style={styles.checkboxContainer}
+                              onPress={() => toggleSetComplete(set)}
+                              disabled={!canComplete && !isCompleted}
+                            >
+                              <View
+                                style={[
+                                  styles.checkbox,
+                                  isCompleted && styles.checkboxChecked,
+                                  !canComplete && !isCompleted && styles.checkboxDisabled,
+                                ]}
                               >
-                                <View
-                                  style={[
-                                    styles.checkbox,
-                                    isCompleted && styles.checkboxChecked,
-                                    !canComplete && !isCompleted && styles.checkboxDisabled,
-                                  ]}
-                                >
-                                  {isCompleted && (
-                                    <Text style={styles.checkboxCheckmark}>✓</Text>
-                                  )}
-                                </View>
-                              </TouchableOpacity>
-                            )}
-                          </View>
+                                {isCompleted && (
+                                  <Text style={styles.checkboxCheckmark}>✓</Text>
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          )}
                           {!session.completedAt && sessionExercise.sets.length > 1 && (
                             <View style={styles.setRowActions}>
                               <Ionicons 
@@ -1575,6 +1571,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 8,
+    gap: 8,
   },
   tableHeader: {
     flex: 1,
@@ -1591,18 +1588,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
   },
+  tableHeaderColumn: {
+    flex: 1,
+  },
   setRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: 8,
-  },
-  setRow: {
-    flex: 1,
-    flexDirection: 'row',
     paddingVertical: 12,
-    alignItems: 'center',
+    gap: 8,
   },
   setRowActions: {
     width: 24,
@@ -1617,7 +1613,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successBgDark,
   },
   setNumber: {
-    width: 40,
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
@@ -1627,7 +1623,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
   },
   checkbox: {
     width: 24,
@@ -1659,19 +1654,17 @@ const styles = StyleSheet.create({
     borderColor: colors.inputBorder,
     borderRadius: 8,
     paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     fontSize: 16,
     textAlign: 'center',
     backgroundColor: colors.inputBg,
     color: colors.text,
-    marginLeft: 8,
   },
   setValue: {
     flex: 1,
     fontSize: 16,
     color: colors.text,
     textAlign: 'center',
-    marginLeft: 8,
   },
   actionButtons: {
     flexDirection: 'column',

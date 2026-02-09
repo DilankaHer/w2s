@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native'
+import { Swipeable } from 'react-native-gesture-handler'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
@@ -430,9 +431,9 @@ function CreateTemplateScreen() {
                         <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
                         <View style={styles.tableHeaderActions} />
                       </View>
-                      {workoutExercise.sets.map((set) => (
-                        <View key={set.setNumber} style={styles.setRowContainer}>
-                          <View style={styles.setRow}>
+                      {workoutExercise.sets.map((set) => {
+                        const setRowContent = (
+                          <View style={styles.setRowContainer}>
                             <Text style={styles.setNumber}>{set.setNumber}</Text>
                             <TextInput
                               style={styles.setInput}
@@ -464,19 +465,41 @@ function CreateTemplateScreen() {
                               placeholder="0"
                               placeholderTextColor={colors.placeholder}
                             />
+                            <View style={styles.setRowActions}>
+                              {workoutExercise.sets.length > 1 && (
+                                <Ionicons 
+                                  name="chevron-back-outline" 
+                                  size={16} 
+                                  color={colors.error} 
+                                  style={styles.swipeIconHint}
+                                />
+                              )}
+                            </View>
                           </View>
-                          <View style={styles.setRowActions}>
-                            {workoutExercise.sets.length > 1 && (
-                              <Ionicons 
-                                name="chevron-back-outline" 
-                                size={16} 
-                                color={colors.error} 
-                                style={styles.swipeIconHint}
-                              />
-                            )}
-                          </View>
-                        </View>
-                      ))}
+                        )
+
+                        if (workoutExercise.sets.length > 1) {
+                          return (
+                            <Swipeable
+                              key={set.setNumber}
+                              renderRightActions={() => (
+                                <TouchableOpacity
+                                  style={styles.swipeSetDelete}
+                                  onPress={() => removeSet(workoutExercise.id, set.setNumber)}
+                                >
+                                  <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
+                                  <Text style={styles.swipeSetDeleteText}>Delete</Text>
+                                </TouchableOpacity>
+                              )}
+                              friction={2}
+                              rightThreshold={40}
+                            >
+                              {setRowContent}
+                            </Swipeable>
+                          )
+                        }
+                        return <View key={set.setNumber}>{setRowContent}</View>
+                      })}
                     </View>
                     <TouchableOpacity
                       style={styles.addSetButton}
@@ -711,12 +734,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: 8,
-  },
-  setRow: {
-    flex: 1,
-    flexDirection: 'row',
     paddingVertical: 12,
-    alignItems: 'center',
     gap: 8,
   },
   setNumber: {
@@ -746,6 +764,20 @@ const styles = StyleSheet.create({
   },
   swipeIconHint: {
     opacity: 0.4,
+  },
+  swipeSetDelete: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 72,
+    marginVertical: 0,
+    marginRight: 0,
+  },
+  swipeSetDeleteText: {
+    color: colors.primaryText,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
   },
   removeSetButton: {
     padding: 8,
