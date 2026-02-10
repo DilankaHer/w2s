@@ -4,7 +4,7 @@ module.exports = {
     name: "w2s",
     slug: "w2s-mobile",
     version: "1.0.0",
-    sdkVersion: "54.0.0",
+    sdkVersion: "51.0.39",
     orientation: "portrait",
     newArchEnabled: true,
     icon: "./assets/icon.png",
