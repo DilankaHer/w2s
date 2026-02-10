@@ -21,7 +21,7 @@
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/stack": "^6.4.1",
     "@trpc/client": "^11.9.0",
-    "@trpc/server": "11.9.0",
+    "@trpc/server": "11.10.0",
     "expo": "~54.0.33",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
