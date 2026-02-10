@@ -7,21 +7,15 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "android": {
-        "workflow": "generic"
-      }
+      "nodeModulesInstall": "pnpm"
     },
     "preview": {
       "distribution": "internal",
-      "android": {
-        "workflow": "generic"
-      }
+      "nodeModulesInstall": "pnpm"
     },
     "production": {
       "autoIncrement": true,
-      "android": {
-        "workflow": "generic"
-      }
+      "nodeModulesInstall": "pnpm"
     }
   },
   "submit": {
