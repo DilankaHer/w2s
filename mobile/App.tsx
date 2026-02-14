@@ -11,6 +11,7 @@ import Toast from 'react-native-toast-message'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { AuthProvider, useAuth } from './src/contexts/AuthContext'
 import CreateTemplateScreen from './src/screens/CreateTemplateScreen'
+import ExercisesScreen from './src/screens/ExercisesScreen'
 import HistoryScreen from './src/screens/HistoryScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
@@ -31,6 +32,7 @@ export type TabParamList = {
   Templates: undefined
   Create: undefined
   History: undefined
+  Exercises: undefined
   Profile: undefined
 }
 
@@ -241,6 +243,17 @@ function MainTabs() {
           tabBarLabel: 'Sessions',
           tabBarIcon: ({ focused, color, size }) => (
             <Ionicons name={focused ? 'time' : 'time-outline'} size={size ?? 24} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Exercises"
+        component={ExercisesScreen}
+        options={{
+          title: 'Exercises',
+          tabBarLabel: 'Exercises',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? 'barbell' : 'barbell-outline'} size={size ?? 24} color={color} />
           ),
         }}
       />
@@ -472,7 +485,7 @@ function RootNavigator() {
       <Stack.Screen
         name="Login"
         component={LoginScreen}
-        options={{ headerShown: false }}
+        options={{ headerShown: false, cardStyle: { backgroundColor: colors.screen } }}
       />
       <Stack.Screen
         name="MainTabs"

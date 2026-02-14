@@ -21,6 +21,39 @@ export const exercisesRouter = router({
     }),
 
     list: publicProcedure.query(async () => {
-        return prisma.exercise.findMany();
+        return prisma.exercise.findMany({
+            include: {
+                bodyPart: true,
+                equipment: true,
+            },
+        })
+    }),
+
+    filterBodyParts: publicProcedure
+    .query(async () => {
+        return prisma.bodyPart.findMany({
+          where: {
+            exercises: {
+              some: {}
+            },
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        })
+    }),
+
+    filterEquipment: publicProcedure
+    .query(async () => {
+        return prisma.equipment.findMany({
+          where: {
+            exercises: {
+              some: {},
+            },
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        })
     }),
 });

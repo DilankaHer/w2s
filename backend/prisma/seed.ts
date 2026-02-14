@@ -19,6 +19,8 @@ async function main() {
   await prisma.workout.deleteMany()
   await prisma.session.deleteMany()
   await prisma.user.deleteMany()
+  await prisma.equipment.deleteMany()
+  await prisma.bodyPart.deleteMany()
 
   const bodyParts = await prisma.bodyPart.createMany({
     data: [
@@ -65,7 +67,7 @@ async function main() {
       { name: 'Bench Press', bodyPartId: 2, equipmentId: 1 },
       { name: 'Deadlift', bodyPartId: 3, equipmentId: 1 },
       { name: 'Overhead Press', bodyPartId: 4, equipmentId: 1 },
-      { name: 'Barbell Row', bodyPartId: 5, equipmentId: 1 },
+      { name: 'Barbell Row', bodyPartId: 3, equipmentId: 1 },
       { name: 'Pull-ups', bodyPartId: 3, equipmentId: 8 },
       { name: 'Dips', bodyPartId: 2, equipmentId: 9 },
       { name: 'Push-ups', bodyPartId: 2, equipmentId: 14 },

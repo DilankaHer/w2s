@@ -3,6 +3,12 @@ export interface Exercise {
   name: string
 }
 
+/** Exercise with relations as returned by exercises.list */
+export interface ExerciseWithMeta extends Exercise {
+  bodyPart?: { id: number; name: string } | null
+  equipment?: { id: number; name: string } | null
+}
+
 export interface Set {
   id: number
   setNumber: number

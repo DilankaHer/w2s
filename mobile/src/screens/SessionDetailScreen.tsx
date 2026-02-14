@@ -751,6 +751,7 @@ function SessionDetailScreen() {
                 style={styles.addExerciseButton}
                 onPress={() => setShowAddExerciseModal(true)}
               >
+                <Ionicons name="add" size={20} color={colors.success} />
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
               </TouchableOpacity>
             )}
@@ -894,7 +895,7 @@ function SessionDetailScreen() {
                     style={styles.addSetButton}
                     onPress={() => addSetToExercise(sessionExercise)}
                   >
-                    <Ionicons name="add" size={20} color={colors.primaryText} />
+                    <Ionicons name="add" size={18} color={colors.success} />
                     <Text style={styles.addSetButtonText}>Add Set</Text>
                   </TouchableOpacity>
                 )}
@@ -902,10 +903,10 @@ function SessionDetailScreen() {
             ))}
             {!session.completedAt && (
               <TouchableOpacity
-                style={styles.addExerciseButtonSecondary}
+                style={styles.addExerciseButton}
                 onPress={() => setShowAddExerciseModal(true)}
               >
-                <Ionicons name="add" size={22} color={colors.primaryText} />
+                <Ionicons name="add" size={20} color={colors.success} />
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
               </TouchableOpacity>
             )}
@@ -1305,16 +1306,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.cardElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
+    gap: 6,
     padding: 12,
-    marginTop: 12,
+    marginTop: 8,
   },
   addSetButtonText: {
-    color: colors.text,
+    color: colors.success,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1333,15 +1330,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addExerciseButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    marginBottom: 16,
   },
   addExerciseButtonText: {
-    color: colors.text,
+    color: colors.success,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1349,18 +1346,6 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 12,
     alignItems: 'center',
-  },
-  addExerciseButtonSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.cardElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 8,
   },
   noSetsText: {
     fontSize: 14,
