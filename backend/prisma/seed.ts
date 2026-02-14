@@ -12,21 +12,65 @@ async function main() {
 
   // Clean existing data (order matters because of FKs)
   await prisma.set.deleteMany()
+  await prisma.sessionSet.deleteMany()
   await prisma.workoutExercise.deleteMany()
+  await prisma.sessionExercise.deleteMany()
   await prisma.exercise.deleteMany()
   await prisma.workout.deleteMany()
+  await prisma.session.deleteMany()
+  await prisma.user.deleteMany()
+
+  const bodyParts = await prisma.bodyPart.createMany({
+    data: [
+      { name: 'Legs' },
+      { name: 'Chest' },
+      { name: 'Back' },
+      { name: 'Shoulders' },
+      { name: 'Arms' },
+      { name: 'Core' },
+      { name: 'Glutes' },
+      { name: 'Neck' }
+    ],
+  })
+
+  console.log(`✅ Created ${bodyParts.count} body parts`)
+
+  const equipment = await prisma.equipment.createMany({
+    data: [
+      { name: 'Barbell-Standard' },
+      { name: 'Barbell-Olympic' },
+      { name: 'Barbell-Powerlifting' },
+      { name: 'Safety squat bar' },
+      { name: 'EZ curl bar' },
+      { name: 'Cambered bar' },
+      { name: 'Trap bar' },
+      { name: 'Pull-up bar' },
+      { name: 'Dip bar' },
+      { name: 'Dumbbell' },
+      { name: 'Kettlebell' },
+      { name: 'Cable' },
+      { name: 'Machine' },
+      { name: 'Bodyweight' },
+      { name: 'Resistance band' },
+      { name: 'Plate' },
+      { name: 'Other' },
+    ],
+  })
+  console.log(`✅ Created ${equipment.count} equipment`)
 
   // Create exercises
   const exercises = await prisma.exercise.createMany({
     data: [
-      { name: 'Squat' },
-      { name: 'Bench Press' },
-      { name: 'Deadlift' },
-      { name: 'Overhead Press' },
-      { name: 'Barbell Row' },
-      { name: 'Pull-ups' },
-      { name: 'Dips' },
-      { name: 'Leg Press' },
+      { name: 'Squat', bodyPartId: 1, equipmentId: 1 },
+      { name: 'Bench Press', bodyPartId: 2, equipmentId: 1 },
+      { name: 'Deadlift', bodyPartId: 3, equipmentId: 1 },
+      { name: 'Overhead Press', bodyPartId: 4, equipmentId: 1 },
+      { name: 'Barbell Row', bodyPartId: 5, equipmentId: 1 },
+      { name: 'Pull-ups', bodyPartId: 3, equipmentId: 8 },
+      { name: 'Dips', bodyPartId: 2, equipmentId: 9 },
+      { name: 'Push-ups', bodyPartId: 2, equipmentId: 14 },
+      { name: 'Bicep Curls', bodyPartId: 5, equipmentId: 10 },
+      { name: 'Leg Press', bodyPartId: 1, equipmentId: 13 },
     ],
   })
 

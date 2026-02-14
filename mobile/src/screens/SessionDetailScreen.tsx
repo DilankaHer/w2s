@@ -1,5 +1,5 @@
-import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
+import React, { useEffect, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
@@ -14,6 +14,8 @@ import {
     View,
 } from 'react-native'
 import { Swipeable } from 'react-native-gesture-handler'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- Expo vector-icons types
+// @ts-ignore - module resolved at runtime
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
@@ -27,50 +29,11 @@ import { buildSessionUpdatePayload } from '../utils/buildSessionUpdatePayload'
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
 
-// Timer component that only re-renders itself
-const Timer = React.memo(({ startTimeMs, completedAt }: { startTimeMs: number | null, completedAt?: string }) => {
-  const [elapsedTime, setElapsedTime] = useState(() => {
-    if (completedAt && startTimeMs) {
-      const endTime = new Date(completedAt).getTime()
-      return Math.max(0, Math.floor((endTime - startTimeMs) / 1000))
-    }
-    if (startTimeMs) {
-      return Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000))
-    }
-    return 0
-  })
-
-  useEffect(() => {
-    if (completedAt || !startTimeMs) return
-    
-    const updateElapsed = () => {
-      setElapsedTime(Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000)))
-    }
-    updateElapsed()
-    const interval = setInterval(updateElapsed, 1000)
-    return () => clearInterval(interval)
-  }, [startTimeMs, completedAt])
-
-  const formatTime = (seconds: number) => {
-    const s = Math.max(0, Math.floor(seconds))
-    const hrs = Math.floor(s / 3600)
-    const mins = Math.floor((s % 3600) / 60)
-    const secs = s % 60
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  return <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
-})
-Timer.displayName = 'Timer'
-
 // Helper function to map session data
 const mapSessionData = (sessionData: any): Session | null => {
   if (!sessionData) return null
   try {
-    const mapped = {
+    return {
       id: sessionData.id,
       name: sessionData.name,
       createdAt: sessionData.createdAt,
@@ -79,22 +42,19 @@ const mapSessionData = (sessionData: any): Session | null => {
       sessionTime: sessionData.sessionTime ?? undefined,
       isSyncedOnce: sessionData.isSyncedOnce ?? false,
       isFromDefaultTemplate: sessionData.isFromDefaultTemplate ?? false,
-      sessionExercises: (sessionData.sessionExercises || []).map((se: any) => {
-        return {
-          id: se.id,
-          order: se.order,
-          exercise: se.exercise,
-          sets: (se.sessionSets || se.sets || []).map((set: any) => ({
-            id: set.id,
-            setNumber: set.setNumber,
-            reps: set.reps ?? set.targetReps ?? 0,
-            weight: set.weight ?? set.targetWeight ?? 0,
-            isCompleted: set.isCompleted ?? false,
-          })),
-        }
-      }),
+      sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
+        id: se.id,
+        order: se.order,
+        exercise: se.exercise,
+        sets: (se.sessionSets || se.sets || []).map((set: any) => ({
+          id: set.id,
+          setNumber: set.setNumber,
+          reps: set.reps ?? set.targetReps ?? 0,
+          weight: set.weight ?? set.targetWeight ?? 0,
+          isCompleted: set.isCompleted ?? false,
+        })),
+      })),
     }
-    return mapped
   } catch (err) {
     return null
   }
@@ -112,6 +72,16 @@ function SessionDetailScreen() {
   const [loading, setLoading] = useState(() => !initialSessionParam)
   const [error, setError] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
+  const [elapsedTime, setElapsedTime] = useState(() => {
+    const s = initialSessionParam ? mapSessionData(initialSessionParam) : null
+    if (s && !s.completedAt) {
+      return Math.max(0, Math.floor((Date.now() - new Date(s.createdAt).getTime()) / 1000))
+    }
+    if (initialCreatedAtParam) {
+      return Math.max(0, Math.floor((Date.now() - new Date(initialCreatedAtParam).getTime()) / 1000))
+    }
+    return 0
+  })
   const [deleting, setDeleting] = useState(false)
   const [startingNew, setStartingNew] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
@@ -126,17 +96,13 @@ function SessionDetailScreen() {
   const [templateSuccess, setTemplateSuccess] = useState(false)
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
-  const [workoutNameExists, setWorkoutNameExists] = useState<boolean | null>(null)
-  const workoutNameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showAddExerciseModal, setShowAddExerciseModal] = useState(false)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [exercisesLoading, setExercisesLoading] = useState(false)
-  const [replacingExerciseId, setReplacingExerciseId] = useState<number | null>(null)
   const [removedSessionExerciseIds, setRemovedSessionExerciseIds] = useState<number[]>([])
   const [removedSessionSetIds, setRemovedSessionSetIds] = useState<number[]>([])
   const nextTempIdRef = useRef(-1)
   const exercisesFetchedRef = useRef(false)
-  const isNavigatingToSaveRef = useRef(false)
 
   useEffect(() => {
     if (!id) return
@@ -150,29 +116,6 @@ function SessionDetailScreen() {
       setShowCompletionSummary(true)
     }
   }, [session?.completedAt, showCompletionSummary])
-
-  // Cleanup: Delete guest sessions when navigating away if they're completed but not saved
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        // Cleanup function runs when screen loses focus
-        if (
-          !isNavigatingToSaveRef.current &&
-          !isAuthenticated &&
-          session &&
-          session.completedAt &&
-          !session.isSyncedOnce
-        ) {
-          // Guest session that was completed locally but not saved - delete it
-          trpc.sessions.delete.mutate({ id: session.id }).catch(() => {
-            // Silently fail - session might already be deleted or not exist
-          })
-        }
-        // Reset the flag
-        isNavigatingToSaveRef.current = false
-      }
-    }, [isAuthenticated, session])
-  )
 
   const fetchExercises = async () => {
     try {
@@ -219,6 +162,30 @@ function SessionDetailScreen() {
     }
   }
 
+  // Timer effect: run when we have session (and not completed) or when loading with initialCreatedAt (e.g. from History)
+  useEffect(() => {
+    if (session?.completedAt) {
+      const startTime = new Date(session.createdAt).getTime()
+      const endTime = new Date(session.completedAt).getTime()
+      setElapsedTime(Math.max(0, Math.floor((endTime - startTime) / 1000)))
+      return
+    }
+
+    const startTimeMs = session
+      ? new Date(session.createdAt).getTime()
+      : initialCreatedAtParam
+        ? new Date(initialCreatedAtParam).getTime()
+        : null
+
+    if (startTimeMs === null) return
+
+    const updateElapsed = () => {
+      setElapsedTime(Math.max(0, Math.floor((Date.now() - startTimeMs) / 1000)))
+    }
+    updateElapsed()
+    const interval = setInterval(updateElapsed, 1000)
+    return () => clearInterval(interval)
+  }, [session, initialCreatedAtParam])
 
   const initializeEditingSet = (set: SessionSet) => {
     setEditingSets((prev) => {
@@ -256,61 +223,34 @@ function SessionDetailScreen() {
 
   const addExerciseToSession = (exercise: Exercise) => {
     if (!session) return
-    
-    if (replacingExerciseId !== null) {
-      // Replace existing exercise
-      setSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              sessionExercises: prev.sessionExercises.map((se) =>
-                se.id === replacingExerciseId
-                  ? {
-                      ...se,
-                      exercise,
-                    }
-                  : se
-              ),
-            }
-          : null
-      )
-      setReplacingExerciseId(null)
-    } else {
-      // Add new exercise
-      const newOrder = session.sessionExercises.length > 0
-        ? Math.max(...session.sessionExercises.map(se => se.order)) + 1
-        : 1
-      const exerciseTempId = nextTempIdRef.current--
-      const firstSetId = nextTempIdRef.current--
-      const newSessionExercise: SessionExercise = {
-        id: exerciseTempId,
-        order: newOrder,
-        exercise,
-        sets: [
-          {
-            id: firstSetId,
-            setNumber: 1,
-            reps: 0,
-            weight: 0,
-            isCompleted: false,
-          },
-        ],
-      }
-      setSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              sessionExercises: [...prev.sessionExercises, newSessionExercise],
-            }
-          : null
-      )
+    const newOrder = session.sessionExercises.length > 0
+      ? Math.max(...session.sessionExercises.map(se => se.order)) + 1
+      : 1
+    const exerciseTempId = nextTempIdRef.current--
+    const firstSetId = nextTempIdRef.current--
+    const newSessionExercise: SessionExercise = {
+      id: exerciseTempId,
+      order: newOrder,
+      exercise,
+      sets: [
+        {
+          id: firstSetId,
+          setNumber: 1,
+          reps: 0,
+          weight: 0,
+          isCompleted: false,
+        },
+      ],
     }
+    setSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            sessionExercises: [...prev.sessionExercises, newSessionExercise],
+          }
+        : null
+    )
     setShowAddExerciseModal(false)
-  }
-
-  const replaceExerciseInSession = (sessionExerciseId: number) => {
-    setReplacingExerciseId(sessionExerciseId)
-    setShowAddExerciseModal(true)
   }
 
   const addSetToExercise = (sessionExercise: SessionExercise) => {
@@ -523,7 +463,7 @@ function SessionDetailScreen() {
               await trpc.sessions.delete.mutate({ id: session.id })
               // Refresh workout info to update sessions list
               await checkAuth()
-              ;(navigation as any).navigate('MainTabs')
+              navigation.navigate('MainTabs' as never)
             } catch (err) {
               setError(getApiErrorMessage(err, 'Failed to cancel workout'))
             } finally {
@@ -601,7 +541,6 @@ function SessionDetailScreen() {
         {
           text: 'Log in / Sign up',
           onPress: () => {
-            isNavigatingToSaveRef.current = true
             const nav = navigation as any
             nav.navigate('Login', {
               completeSessionId: session.id,
@@ -616,56 +555,12 @@ function SessionDetailScreen() {
     )
   }
 
-  const checkWorkoutName = useCallback(async (value: string) => {
-    if (!isAuthenticated) {
-      setWorkoutNameExists(null)
-      return
-    }
-    const trimmed = value.trim()
-    if (!trimmed) {
-      setWorkoutNameExists(null)
-      return
-    }
-    try {
-      const result = await trpc.workouts.checkWorkoutName.mutate({ name: trimmed })
-      setWorkoutNameExists(result.exists)
-    } catch {
-      setWorkoutNameExists(null)
-    }
-  }, [isAuthenticated])
-
-  useEffect(() => {
-    if (isAuthenticated && showCreateTemplateModal) {
-      if (workoutNameCheckTimeoutRef.current) {
-        clearTimeout(workoutNameCheckTimeoutRef.current)
-        workoutNameCheckTimeoutRef.current = null
-      }
-      const trimmed = newTemplateName.trim()
-      if (!trimmed) {
-        setWorkoutNameExists(null)
-        return
-      }
-      workoutNameCheckTimeoutRef.current = setTimeout(() => {
-        checkWorkoutName(trimmed)
-        workoutNameCheckTimeoutRef.current = null
-      }, 500) // 500ms debounce
-      return () => {
-        if (workoutNameCheckTimeoutRef.current) {
-          clearTimeout(workoutNameCheckTimeoutRef.current)
-        }
-      }
-    } else {
-      setWorkoutNameExists(null)
-    }
-  }, [newTemplateName, isAuthenticated, showCreateTemplateModal, checkWorkoutName])
-
   const handleCreateTemplatePress = () => {
     if (!session) return
 
     // Show template name modal first (for both guests and authenticated users)
     setNewTemplateName(session?.name ?? '')
     setTemplateError(null)
-    setWorkoutNameExists(null)
     setShowCreateTemplateModal(true)
   }
 
@@ -683,7 +578,6 @@ function SessionDetailScreen() {
           {
             text: 'Log in / Sign up',
             onPress: () => {
-              isNavigatingToSaveRef.current = true
               const nav = navigation as any
               nav.navigate('Login', {
                 completeSessionId: session.id,
@@ -701,23 +595,11 @@ function SessionDetailScreen() {
     }
 
     // Authenticated users can create template directly
-    // Check if workout name already exists first
-    try {
-      const nameCheck = await trpc.workouts.checkWorkoutName.mutate({ name: newTemplateName.trim() })
-      if (nameCheck.exists) {
-        setTemplateError('A workout with this name already exists')
-        setTemplateErrorSource('create')
-        return
-      }
-    } catch (err) {
-      // If check fails, continue anyway (might be network issue)
-    }
-
     try {
       setTemplateCreateLoading(true)
       setTemplateError(null)
       setTemplateErrorSource(null)
-      const createResponse = await trpc.workouts.createBySession.mutate({
+      await trpc.workouts.createBySession.mutate({
         sessionId: session.id,
         name: newTemplateName.trim(),
       })
@@ -745,20 +627,7 @@ function SessionDetailScreen() {
     }
   }
 
-  const handleGoToTemplates = async () => {
-    // If guest with completed unsaved session, delete it before navigating
-    if (
-      !isAuthenticated &&
-      session &&
-      session.completedAt &&
-      !session.isSyncedOnce
-    ) {
-      try {
-        await trpc.sessions.delete.mutate({ id: session.id })
-      } catch (err) {
-        // Silently fail - session might already be deleted
-      }
-    }
+  const handleGoToTemplates = () => {
     ;(navigation as any).navigate('MainTabs', { screen: 'Templates' })
   }
 
@@ -782,21 +651,6 @@ function SessionDetailScreen() {
     )
   }
 
-  // Memoize exercises list structure to prevent re-rendering when only elapsedTime changes
-  // Note: editingSets is used inside the render, so we still re-render when it changes,
-  // but this prevents the map from running unnecessarily when only the timer updates
-  // Must be called before any early returns to maintain hook order
-  const exercisesList = useMemo(() => {
-    if (!session?.sessionExercises) return []
-    return session.sessionExercises.map((sessionExercise, index) => {
-      // Show all sets - isCompleted is only for client-side tracking during active sessions
-      // For completed sessions from DB, all sets should be shown
-      const displaySets = sessionExercise.sets
-      
-      return { sessionExercise, index, displaySets }
-    })
-  }, [session?.sessionExercises])
-
   // Only show "Session not found" if we're not loading and there's no session
   if (!loading && !session) {
     return (
@@ -814,9 +668,7 @@ function SessionDetailScreen() {
         <View style={styles.container}>
           <View style={[styles.headerCard, styles.loadingHeader]}>
             <Text style={styles.loadingText}>Loading session…</Text>
-            {initialCreatedAtParam && (
-              <Timer startTimeMs={new Date(initialCreatedAtParam).getTime()} />
-            )}
+            <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
           </View>
         </View>
       )
@@ -824,9 +676,7 @@ function SessionDetailScreen() {
     return null
   }
 
-  if (!session) {
-    return null
-  }
+  if (!session) return null
 
   const allSets = session.sessionExercises.flatMap((ex) => ex.sets)
   const totalSets = allSets.length
@@ -862,7 +712,7 @@ function SessionDetailScreen() {
                   <Text style={styles.headerMetaText}>
                     {session.sessionTime ?? (session.completedAt && session.createdAt
                       ? formatTime(Math.floor((new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()) / 1000))
-                      : '')}
+                      : formatTime(elapsedTime))}
                   </Text>
                 </View>
                 <Text style={styles.setsCompletedLine}>
@@ -873,7 +723,7 @@ function SessionDetailScreen() {
           </View>
           <View style={styles.headerRight}>
             {!session.completedAt && (
-              <Timer startTimeMs={new Date(session.createdAt).getTime()} />
+              <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>
             )}
             {session.completedAt && !showCompletionSummary && (
               <TouchableOpacity
@@ -899,12 +749,8 @@ function SessionDetailScreen() {
             {!session.completedAt && (
               <TouchableOpacity
                 style={styles.addExerciseButton}
-                onPress={() => {
-                  setReplacingExerciseId(null)
-                  setShowAddExerciseModal(true)
-                }}
+                onPress={() => setShowAddExerciseModal(true)}
               >
-                <Ionicons name="add" size={20} color={colors.success} />
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
               </TouchableOpacity>
             )}
@@ -914,45 +760,35 @@ function SessionDetailScreen() {
             {session.completedAt && (
               <Text style={styles.exercisesSectionTitle}>Exercises</Text>
             )}
-            {exercisesList.map(({ sessionExercise, index, displaySets }) => {
-              return (
+            {session.sessionExercises.map((sessionExercise, index) => (
               <View key={sessionExercise.id} style={styles.exerciseCard}>
                 <View style={styles.exerciseCardHeader}>
                   <Text style={styles.exerciseName}>
-                    {index + 1}. {sessionExercise.exercise?.name ?? 'Unknown Exercise'}
+                    {index + 1}. {sessionExercise.exercise.name}
                   </Text>
                   {!session.completedAt && (
-                    <View style={styles.exerciseActionButtons}>
-                      <TouchableOpacity
-                        style={styles.exerciseActionButton}
-                        onPress={() => replaceExerciseInSession(sessionExercise.id)}
-                      >
-                        <Ionicons name="swap-horizontal-outline" size={20} color={colors.success} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.exerciseActionButton}
-                        onPress={() => removeExerciseFromSession(sessionExercise)}
-                      >
-                        <Ionicons name="trash-outline" size={20} color={colors.error} />
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.removeExerciseButton}
+                      onPress={() => removeExerciseFromSession(sessionExercise)}
+                    >
+                      <Text style={styles.removeExerciseButtonText}>Remove</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
 
-                {displaySets.length === 0 ? (
+                {sessionExercise.sets.length === 0 ? (
                   <Text style={styles.noSetsText}>No sets configured</Text>
                 ) : (
                   <View style={styles.setsContainer}>
-                    <View style={styles.tableHeaderContainer}>
-                      <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Set</Text>
-                      <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>kg</Text>
-                      <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
+                    <View style={styles.tableHeader}>
+                      <Text style={styles.tableHeaderText}>Set</Text>
+                      <Text style={styles.tableHeaderText}>kg</Text>
+                      <Text style={styles.tableHeaderText}>Reps</Text>
                       {!session.completedAt && (
-                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Done</Text>
+                        <Text style={styles.tableHeaderText}>Done</Text>
                       )}
-                      <View style={styles.tableHeaderActions} />
                     </View>
-                    {displaySets.map((set) => {
+                    {sessionExercise.sets.map((set) => {
                       const edited = editingSets.get(set.id)
                       const displayWeight = edited?.weight ?? set.weight ?? 0
                       const displayReps = edited?.reps ?? set.reps ?? 0
@@ -960,7 +796,12 @@ function SessionDetailScreen() {
                       const canComplete = canSetBeCompleted(set)
 
                       const setRowContent = (
-                        <View style={styles.setRowContainer}>
+                        <View
+                          style={[
+                            styles.setRow,
+                            isCompleted && styles.completedSetRow,
+                          ]}
+                        >
                           <Text style={styles.setNumber}>{set.setNumber}</Text>
                           {!session.completedAt ? (
                             <TextInput
@@ -1021,16 +862,6 @@ function SessionDetailScreen() {
                               </View>
                             </TouchableOpacity>
                           )}
-                          {!session.completedAt && sessionExercise.sets.length > 1 && (
-                            <View style={styles.setRowActions}>
-                              <Ionicons 
-                                name="chevron-back-outline" 
-                                size={16} 
-                                color={colors.error} 
-                                style={styles.swipeIconHint}
-                              />
-                            </View>
-                          )}
                         </View>
                       )
 
@@ -1063,22 +894,18 @@ function SessionDetailScreen() {
                     style={styles.addSetButton}
                     onPress={() => addSetToExercise(sessionExercise)}
                   >
-                    <Ionicons name="add" size={20} color={colors.success} />
+                    <Ionicons name="add" size={20} color={colors.primaryText} />
                     <Text style={styles.addSetButtonText}>Add Set</Text>
                   </TouchableOpacity>
                 )}
               </View>
-            )
-            })}
+            ))}
             {!session.completedAt && (
               <TouchableOpacity
                 style={styles.addExerciseButtonSecondary}
-                onPress={() => {
-                  setReplacingExerciseId(null)
-                  setShowAddExerciseModal(true)
-                }}
+                onPress={() => setShowAddExerciseModal(true)}
               >
-                <Ionicons name="add" size={22} color={colors.success} />
+                <Ionicons name="add" size={22} color={colors.primaryText} />
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
               </TouchableOpacity>
             )}
@@ -1213,39 +1040,27 @@ function SessionDetailScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>New workout name</Text>
             <TextInput
-              style={[
-                styles.modalInput,
-                (workoutNameExists === true && isAuthenticated) || (templateError && templateErrorSource === 'create')
-                  ? styles.modalInputError
-                  : null,
-              ]}
+              style={styles.modalInput}
               value={newTemplateName}
               onChangeText={setNewTemplateName}
               placeholder="Workout name"
               placeholderTextColor={colors.placeholder}
               autoFocus
             />
-            {workoutNameExists === true && isAuthenticated && (
-              <Text style={styles.modalErrorText}>A workout with this name already exists</Text>
-            )}
-            {templateError && templateErrorSource === 'create' && (
-              <Text style={styles.modalErrorText}>{templateError}</Text>
-            )}
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => {
                   setShowCreateTemplateModal(false)
                   setTemplateError(null)
-                  setWorkoutNameExists(null)
                 }}
               >
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalConfirmButton, (!newTemplateName.trim() || templateCreateLoading || workoutNameExists === true) && styles.buttonDisabled]}
+                style={[styles.modalConfirmButton, (!newTemplateName.trim() || templateCreateLoading) && styles.buttonDisabled]}
                 onPress={handleCreateTemplateConfirm}
-                disabled={!newTemplateName.trim() || templateCreateLoading || workoutNameExists === true}
+                disabled={!newTemplateName.trim() || templateCreateLoading}
               >
                 {templateCreateLoading ? (
                   <ActivityIndicator color={colors.primaryText} size="small" />
@@ -1413,13 +1228,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   performAgainButton: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   performAgainButtonText: {
-    color: colors.successText,
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1475,23 +1290,31 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginRight: 8,
   },
-  exerciseActionButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  removeExerciseButton: {
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  exerciseActionButton: {
-    padding: 6,
+  removeExerciseButtonText: {
+    color: colors.primaryText,
+    fontSize: 14,
+    fontWeight: '600',
   },
   addSetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
     padding: 12,
     marginTop: 12,
   },
   addSetButtonText: {
-    color: colors.success,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1510,16 +1333,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addExerciseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     marginTop: 16,
+    alignItems: 'center',
   },
   addExerciseButtonText: {
-    color: colors.success,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1533,6 +1355,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
     padding: 16,
     marginTop: 8,
   },
@@ -1543,51 +1369,29 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginTop: 8,
   },
-  tableHeaderContainer: {
+  tableHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
     backgroundColor: colors.cardElevated,
-    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    gap: 8,
-  },
-  tableHeader: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tableHeaderActions: {
-    width: 24,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   tableHeaderText: {
+    flex: 1,
     fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  tableHeaderColumn: {
-    flex: 1,
-  },
-  setRowContainer: {
+  setRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  setRowActions: {
-    width: 24,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  swipeIconHint: {
-    opacity: 0.4,
   },
   completedSetRow: {
     backgroundColor: colors.successBgDark,
@@ -1633,10 +1437,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    padding: 8,
     fontSize: 16,
     textAlign: 'center',
+    marginHorizontal: 4,
     backgroundColor: colors.inputBg,
     color: colors.text,
   },
@@ -1764,14 +1568,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   templateActionButton: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignItems: 'center',
   },
   templateActionButtonText: {
-    color: colors.successText,
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1858,17 +1662,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: colors.inputBg,
     color: colors.text,
-    marginBottom: 0,
-  },
-  modalInputError: {
-    borderColor: colors.error,
-  },
-  modalErrorText: {
-    fontSize: 14,
-    color: colors.error,
-    marginTop: 0,
-    marginBottom: 12,
   },
   modalButtons: {
     flexDirection: 'row',

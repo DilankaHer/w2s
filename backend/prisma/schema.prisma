@@ -14,41 +14,47 @@ datasource db {
 }
 
 model User {
-  id Int        @id @default(autoincrement())
-  username      String
-  email         String?
-  passwordHash  String
-  createdAt     DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  username     String
+  email        String?
+  passwordHash String
+  createdAt    DateTime @default(now())
 
-  workouts      Workout[]
-  sessions      Session[]
+  workouts Workout[]
+  sessions Session[]
 
   @@map("users")
 }
 
 model Exercise {
-  id   Int    @id @default(autoincrement())
-  name String @unique
+  id         Int    @id @default(autoincrement())
+  name       String @unique
+  bodyPartId Int?
+  equipmentId Int?
 
   workoutExercises WorkoutExercise[]
   sessionExercises SessionExercise[]
 
+  bodyPart BodyPart? @relation(fields: [bodyPartId], references: [id])
+  equipment Equipment? @relation(fields: [equipmentId], references: [id])
+
+  @@unique([id, bodyPartId, equipmentId])
   @@map("exercises")
 }
 
 model Workout {
-  id                  Int      @id @default(autoincrement())
-  name                String
-  userId              Int?
-  isDefaultTemplate   Boolean @default(false)
-  createdAt  DateTime @default(now())
+  id                Int      @id @default(autoincrement())
+  name              String
+  userId            Int?
+  isDefaultTemplate Boolean  @default(false)
+  createdAt         DateTime @default(now())
 
   workoutExercises WorkoutExercise[]
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, createdAt])
   @@unique([userId, name])
+  @@index([userId, createdAt])
   @@map("workouts")
 }
 
@@ -62,8 +68,8 @@ model WorkoutExercise {
   exercise Exercise @relation(fields: [exerciseId], references: [id])
   sets     Set[]
 
-  @@index([workoutId, order])
   @@unique([workoutId, exerciseId])
+  @@index([workoutId, order])
   @@map("workoutexercises")
 }
 
@@ -76,21 +82,21 @@ model Set {
 
   workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
 
-  @@index([workoutExerciseId])
   @@unique([setNumber, workoutExerciseId])
+  @@index([workoutExerciseId])
   @@map("sets")
 }
 
 model Session {
-  id            Int       @id @default(autoincrement())
-  name          String
-  userId        Int?
-  workoutId     Int?
-  createdAt     DateTime  @default(now())
-  completedAt   DateTime?
-  sessionTime   String?
-  isSyncedOnce  Boolean @default(false)
-  isFromDefaultTemplate Boolean @default(false)
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  userId                Int?
+  workoutId             Int?
+  createdAt             DateTime  @default(now())
+  completedAt           DateTime?
+  sessionTime           String?
+  isSyncedOnce          Boolean   @default(false)
+  isFromDefaultTemplate Boolean   @default(false)
 
   sessionExercises SessionExercise[]
 
@@ -111,13 +117,13 @@ model SessionExercise {
 
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@index([sessionId, order])
   @@unique([sessionId, exerciseId])
+  @@index([sessionId, order])
   @@map("sessionexercises")
 }
 
 model SessionSet {
-  id                Int @id @default(autoincrement())
+  id                Int    @id @default(autoincrement())
   sessionExerciseId Int
   setNumber         Int
   reps              Int?
@@ -125,7 +131,23 @@ model SessionSet {
 
   sessionExercise SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
 
-  @@index([sessionExerciseId])
   @@unique([setNumber, sessionExerciseId])
+  @@index([sessionExerciseId])
   @@map("sessionsets")
+}
+
+model BodyPart {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  exercises Exercise[]
+
+  @@map("bodyparts")
+}
+
+model Equipment {
+  id    Int        @id @default(autoincrement())
+  name  String     @unique
+  exercises Exercise[]
+
+  @@map("equipment")
 }

@@ -12,8 +12,11 @@ const API_REQUEST_TIMEOUT_MS = 4_000
 // On Android emulator, use 10.0.2.2 instead of localhost
 const getApiBaseUrl = (): string => {
   // Priority: EXPO_PUBLIC_API_URL env var > Expo config extra > default
+
+  console.log("process.env.APP_ENV", process.env.APP_ENV)
+  console.log("Constants.expoConfig?.extra", Constants.expoConfig?.extra)
   const configUrl =
-    Constants.expoConfig?.extra?.apiBaseUrl ??
+    Constants.expoConfig?.extra?.apiUrl ??
     'http://192.168.1.109:3000'
 
   // Replace localhost with 10.0.2.2 for Android emulator
@@ -25,6 +28,8 @@ const getApiBaseUrl = (): string => {
 }
 
 const API_BASE_URL = getApiBaseUrl()
+
+console.log("API_BASE_URL", API_BASE_URL)
 
 // Cookie storage key
 const COOKIE_STORAGE_KEY = '@w2s:cookies'

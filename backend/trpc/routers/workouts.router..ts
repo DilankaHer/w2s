@@ -1,7 +1,7 @@
 // backend/trpc/routers/workouts.router.ts
 import { z } from "zod";
 import { prisma } from "../../prisma/client";
-import { WorkoutCreateInput } from "../interfaces/workout.interface";
+import { WorkoutCreateInput } from "../interfaces/workouts.interface";
 import { protectedProcedure } from "../middleware/auth.middleware";
 import { publicProcedure, router } from "../trpc";
 import { TRPCError } from "@trpc/server";

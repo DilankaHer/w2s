@@ -29,18 +29,10 @@ function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [usernameTaken, setUsernameTaken] = useState<boolean | null>(null)
-  const [connectionError, setConnectionError] = useState(false)
   const usernameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigation = useNavigation()
   const route = useRoute<LoginRouteProp>()
-  const { checkAuth, serverDown, isRetrying } = useAuth()
-  
-  // Clear connection error when server comes back up or when retry starts
-  useEffect(() => {
-    if (!serverDown || isRetrying) {
-      setConnectionError(false)
-    }
-  }, [serverDown, isRetrying])
+  const { checkAuth } = useAuth()
 
   const checkUsername = useCallback(async (value: string) => {
     const trimmed = value.trim()
@@ -82,11 +74,6 @@ function LoginScreen() {
   }, [username, isLogin, checkUsername])
 
   const handleSubmit = async () => {
-    // Don't allow login attempts during retry
-    if (isRetrying) {
-      return
-    }
-    
     if (!username.trim() || !password.trim()) {
       Toast.show({
         type: 'error',
@@ -106,8 +93,6 @@ function LoginScreen() {
 
     try {
       setLoading(true)
-      // Clear any previous connection errors when attempting login
-      setConnectionError(false)
       const result = isLogin
         ? await trpc.users.login.mutate({
             username: username.trim(),
@@ -146,11 +131,10 @@ function LoginScreen() {
             // If user wanted to create template, do it now
             if (shouldCreateTemplate && templateName.trim()) {
               try {
-                const createPayload = {
+                await trpc.workouts.createBySession.mutate({
                   sessionId: updatedSession.id,
                   name: templateName.trim(),
-                }
-                const createResponse = await trpc.workouts.createBySession.mutate(createPayload)
+                })
                 await checkAuth()
                 
                 // Navigate to Templates screen
@@ -213,56 +197,9 @@ function LoginScreen() {
         })
       }
     } catch (err) {
-      // Don't show any errors during retry - wait for retry to complete
-      if (isRetrying) {
-        return
-      }
-      
-      // Don't show connection errors if server is up
-      if (!serverDown) {
-        // Server is up, so this is likely a real error, not a connection issue
-        const errorMessage = getApiErrorMessage(err, '')
-        if (errorMessage.includes('not found') || errorMessage.includes('User not found')) {
-          Toast.show({
-            type: 'error',
-            text1: 'Login Failed',
-            text2: 'Username or password is incorrect.',
-          })
-        } else if (errorMessage.includes('Invalid password')) {
-          Toast.show({
-            type: 'error',
-            text1: 'Login Failed',
-            text2: 'Username or password is incorrect.',
-          })
-        } else if (errorMessage.includes('already exists') || errorMessage.includes('Username already exists')) {
-          Toast.show({
-            type: 'error',
-            text1: 'Signup Failed',
-            text2: 'Username already exists. Please choose another.',
-          })
-        } else {
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: isLogin ? 'Failed to log in. Please try again.' : 'Failed to create account. Please try again.',
-          })
-        }
-        return
-      }
-      
-      // Server is down - check if it's a connection error
       const errorMessage = getApiErrorMessage(err, '')
-      const isConnectionError = errorMessage === '' || errorMessage.includes('Aborted') || errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('fetch')
-      
-      // Only show connection error if server is actually down
-      if (isConnectionError) {
-        setConnectionError(true)
-        Toast.show({
-          type: 'error',
-          text1: 'Connection Error',
-          text2: 'Connection down. Please try again.',
-        })
-      } else if (errorMessage.includes('not found') || errorMessage.includes('User not found')) {
+      // Show user-friendly error messages
+      if (errorMessage.includes('not found') || errorMessage.includes('User not found')) {
         Toast.show({
           type: 'error',
           text1: 'Login Failed',

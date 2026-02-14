@@ -1,6 +1,6 @@
 import z from "zod"
 import { prisma } from "../../prisma/client"
-import { SessionUpdateInput } from "../interfaces/session.interface"
+import { SessionUpdateInput } from "../interfaces/sessions.interface"
 import { protectedProcedure } from "../middleware/auth.middleware"
 import { publicProcedure, router } from "../trpc"
 import { TRPCError } from "@trpc/server"

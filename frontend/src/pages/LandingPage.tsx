@@ -28,12 +28,6 @@ function LandingPage() {
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const navigate = useNavigate()
 
-  // One-off: call stats router and log result (for inspection only)
-  useEffect(() => {
-    const t = trpc as { stats: { getStats: { query: () => Promise<unknown> } } }
-    t.stats.getStats.query().catch(() => {})
-  }, [])
-
   useEffect(() => {
     // Only use workoutInfo from getWorkoutInfo - no fallback to other endpoints
     if (!isLoading) {
@@ -101,6 +95,7 @@ function LandingPage() {
         timerProgressBar: true,
       })
     } catch (err) {
+      console.error('Error deleting session:', err)
       await Swal.fire({
         title: 'Error!',
         text: err instanceof Error ? err.message : 'Failed to delete session',
