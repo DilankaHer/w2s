@@ -1,6 +1,9 @@
 export interface Exercise {
   id: number
   name: string
+  link?: string | null
+  info?: unknown
+  imageName?: string | null
 }
 
 /** Exercise with relations as returned by exercises.list */

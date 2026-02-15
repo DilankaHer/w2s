@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native'
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
@@ -65,7 +66,7 @@ function SessionDetailScreen() {
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
   const { checkAuth, isAuthenticated } = useAuth()
-  const { id, initialSession: initialSessionParam, initialCreatedAt: initialCreatedAtParam, initialCompletedAt: initialCompletedAtParam } = route.params
+  const { id, initialSession: initialSessionParam, initialCreatedAt: initialCreatedAtParam, initialCompletedAt: initialCompletedAtParam, selectedExercise: selectedExerciseParam } = route.params
   const [session, setSession] = useState<Session | null>(() =>
     initialSessionParam ? mapSessionData(initialSessionParam) : null
   )
@@ -139,6 +140,16 @@ function SessionDetailScreen() {
     exercisesFetchedRef.current = true
     fetchExercises()
   }, [session])
+
+  // Handle return from Exercises picker with selected exercise (add locally, no API)
+  useFocusEffect(
+    useCallback(() => {
+      const selected = selectedExerciseParam
+      if (!selected || !session) return
+      addExerciseToSession(selected)
+      ;(navigation as any).setParams({ selectedExercise: undefined })
+    }, [selectedExerciseParam, session, navigation])
+  )
 
   const fetchSession = async (sessionId: number) => {
     try {
@@ -252,6 +263,14 @@ function SessionDetailScreen() {
     )
     setShowAddExerciseModal(false)
   }
+
+  const openExercisePicker = useCallback(() => {
+    if (!session?.id) return
+    ;(navigation as any).navigate('ExercisePicker', {
+      pickerFor: 'session',
+      sessionId: session.id,
+    })
+  }, [navigation, session?.id])
 
   const addSetToExercise = (sessionExercise: SessionExercise) => {
     if (!session) return
@@ -749,7 +768,7 @@ function SessionDetailScreen() {
             {!session.completedAt && (
               <TouchableOpacity
                 style={styles.addExerciseButton}
-                onPress={() => setShowAddExerciseModal(true)}
+                onPress={openExercisePicker}
               >
                 <Ionicons name="add" size={20} color={colors.success} />
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
@@ -904,7 +923,7 @@ function SessionDetailScreen() {
             {!session.completedAt && (
               <TouchableOpacity
                 style={styles.addExerciseButton}
-                onPress={() => setShowAddExerciseModal(true)}
+                onPress={openExercisePicker}
               >
                 <Ionicons name="add" size={20} color={colors.success} />
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>

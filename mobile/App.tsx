@@ -11,6 +11,7 @@ import Toast from 'react-native-toast-message'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { AuthProvider, useAuth } from './src/contexts/AuthContext'
 import CreateTemplateScreen from './src/screens/CreateTemplateScreen'
+import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
 import ExercisesScreen from './src/screens/ExercisesScreen'
 import HistoryScreen from './src/screens/HistoryScreen'
 import LoginScreen from './src/screens/LoginScreen'
@@ -20,12 +21,15 @@ import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
 import TemplatesScreen from './src/screens/TemplatesScreen'
 import { colors } from './src/theme/colors'
 
+export type ExercisePickerResult = { id: number; name: string }
+
 export type RootStackParamList = {
   Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createTemplate?: boolean; templateName?: string } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
   TemplateDetail: { id: number }
-  SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string }
-  CreateTemplate: undefined
+  SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult }
+  CreateTemplate: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: number } | undefined
+  ExercisePicker: { pickerFor: 'createTemplate' | 'session'; sessionId?: number; replacingExerciseId?: number }
 }
 
 export type TabParamList = {
@@ -515,6 +519,11 @@ function RootNavigator() {
           </ProtectedRoute>
         )}
       </Stack.Screen>
+      <Stack.Screen
+        name="ExercisePicker"
+        component={ExercisePickerScreen}
+        options={{ title: 'Select Exercise' }}
+      />
     </Stack.Navigator>
     {serverDown && hasEnteredApp && <ServerDownOverlay />}
     </View>

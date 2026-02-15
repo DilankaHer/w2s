@@ -1,4 +1,5 @@
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import type { RouteProp } from '@react-navigation/native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     KeyboardAvoidingView,
@@ -17,8 +18,11 @@ import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { useAuth } from '../hooks/useAuth'
+import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
 import type { Exercise } from '../types'
+
+type CreateTemplateRouteProp = RouteProp<RootStackParamList, 'CreateTemplate'>
 
 interface Set {
   setNumber: number
@@ -36,6 +40,8 @@ type CreateTemplatePhase = 'checking' | 'retry' | 'ready'
 
 function CreateTemplateScreen() {
   const navigation = useNavigation()
+  const route = useRoute<CreateTemplateRouteProp>()
+  const params = route.params
   const {
     checkAuth,
     serverDown,
@@ -104,6 +110,38 @@ function CreateTemplateScreen() {
     useCallback(() => {
       checkServerOnFocus()
     }, [checkServerOnFocus])
+  )
+
+  // Handle return from Exercises picker with selected exercise (only once: clear params first then update state)
+  useFocusEffect(
+    useCallback(() => {
+      const selected = params?.selectedExercise
+      const replacingId = params?.replacingExerciseId
+      if (!selected) return
+      // Clear params immediately so a re-run of this effect (e.g. when callback identity changes) won't process again
+      ;(navigation as any).setParams({ selectedExercise: undefined, replacingExerciseId: undefined })
+      const isReplace = typeof replacingId === 'number'
+      if (isReplace) {
+        setWorkoutExercises((prev) =>
+          prev.map((ex) =>
+            ex.id === replacingId ? { ...ex, id: selected.id } : ex
+          )
+        )
+      } else {
+        setWorkoutExercises((prev) => {
+          const newOrder =
+            prev.length > 0 ? Math.max(...prev.map((ex) => ex.order)) + 1 : 1
+          return [
+            ...prev,
+            {
+              id: selected.id,
+              order: newOrder,
+              sets: [{ setNumber: 1, targetReps: 0, targetWeight: 0 }],
+            },
+          ]
+        })
+      }
+    }, [params?.selectedExercise, params?.replacingExerciseId, navigation])
   )
 
   const fetchExercisesInternal = async (silent: boolean) => {
@@ -197,9 +235,19 @@ function CreateTemplateScreen() {
     setShowExerciseList(false)
   }
 
+  const openExercisePicker = useCallback(
+    (replacingId: number | null) => {
+      navigation.navigate('ExercisePicker', {
+        pickerFor: 'createTemplate',
+        ...(typeof replacingId === 'number' ? { replacingExerciseId: replacingId } : {}),
+      })
+    },
+    [navigation]
+  )
+
   const replaceExercise = (exerciseId: number) => {
     setReplacingExerciseId(exerciseId)
-    setShowExerciseList(true)
+    openExercisePicker(exerciseId)
   }
 
   const removeExercise = (exerciseId: number) => {
@@ -214,14 +262,17 @@ function CreateTemplateScreen() {
       workoutExercises.map((ex) => {
         if (ex.id === exerciseId) {
           const newSetNumber = ex.sets.length + 1
+          const lastSet = ex.sets[ex.sets.length - 1]
+          const targetReps = lastSet?.targetReps ?? 0
+          const targetWeight = lastSet?.targetWeight ?? 0
           return {
             ...ex,
             sets: [
               ...ex.sets,
               {
                 setNumber: newSetNumber,
-                targetReps: 0,
-                targetWeight: 0,
+                targetReps,
+                targetWeight,
               },
             ],
           }
@@ -385,10 +436,7 @@ function CreateTemplateScreen() {
             </Text>
             <TouchableOpacity
               style={styles.addExerciseButton}
-              onPress={() => {
-                setReplacingExerciseId(null)
-                setShowExerciseList(true)
-              }}
+              onPress={() => openExercisePicker(null)}
             >
               <Ionicons name="add" size={20} color={colors.success} />
               <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
@@ -515,10 +563,7 @@ function CreateTemplateScreen() {
 
             <TouchableOpacity
               style={styles.addExerciseButton}
-              onPress={() => {
-                setReplacingExerciseId(null)
-                setShowExerciseList(true)
-              }}
+              onPress={() => openExercisePicker(null)}
             >
               <Ionicons name="add" size={20} color={colors.success} />
               <Text style={styles.addExerciseButtonText}>Add Exercise</Text>

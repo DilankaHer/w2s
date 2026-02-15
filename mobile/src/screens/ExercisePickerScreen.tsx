@@ -1,5 +1,6 @@
-import { useFocusEffect } from '@react-navigation/native'
-import React, { useCallback, useMemo, useState } from 'react'
+import { useNavigation, useRoute } from '@react-navigation/native'
+import type { RouteProp } from '@react-navigation/native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -16,12 +17,16 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
-import { useAuth } from '../hooks/useAuth'
+import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
-import type { ExerciseWithMeta } from '../types'
+import type { Exercise, ExerciseWithMeta } from '../types'
 
-function ExercisesScreen() {
-  const { serverDown, checkServerOnFocus } = useAuth()
+type ExercisePickerRouteProp = RouteProp<RootStackParamList, 'ExercisePicker'>
+
+function ExercisePickerScreen() {
+  const route = useRoute<ExercisePickerRouteProp>()
+  const navigation = useNavigation<any>()
+  const { pickerFor, sessionId, replacingExerciseId } = route.params ?? {}
   const [exercises, setExercises] = useState<ExerciseWithMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -53,13 +58,9 @@ function ExercisesScreen() {
     }
   }, [])
 
-  useFocusEffect(
-    useCallback(() => {
-      if (serverDown) return
-      checkServerOnFocus()
-      fetchExercises(true)
-    }, [serverDown, checkServerOnFocus, fetchExercises])
-  )
+  useEffect(() => {
+    fetchExercises(false)
+  }, [fetchExercises])
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
@@ -140,9 +141,23 @@ function ExercisesScreen() {
 
   const hasActiveFilters = selectedBodyPartId != null || selectedEquipmentId != null || searchQuery.trim().length > 0
 
-  const handleExercisePress = useCallback((item: ExerciseWithMeta) => {
-    setInfoExercise(item)
-  }, [])
+  const handleSelectExercise = useCallback(
+    (item: ExerciseWithMeta) => {
+      const exercise: Exercise = { id: item.id, name: item.name }
+      if (pickerFor === 'createTemplate') {
+        navigation.navigate('CreateTemplate', {
+          selectedExercise: exercise,
+          ...(typeof replacingExerciseId === 'number' ? { replacingExerciseId } : {}),
+        })
+      } else if (pickerFor === 'session' && sessionId != null) {
+        navigation.navigate('SessionDetail', {
+          id: sessionId,
+          selectedExercise: exercise,
+        })
+      }
+    },
+    [pickerFor, sessionId, replacingExerciseId, navigation]
+  )
 
   const renderFilterChips = (
     label: string,
@@ -207,7 +222,7 @@ function ExercisesScreen() {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => handleExercisePress(item)}
+        onPress={() => handleSelectExercise(item)}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={item.name}
@@ -611,4 +626,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default ExercisesScreen
+export default ExercisePickerScreen
