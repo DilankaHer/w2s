@@ -65,7 +65,7 @@ export const workoutsRouter = router({
     });
   }),
 
-  getTemplatesByUser: protectedProcedure.input(z.object({ userId: z.number() })).query(async ({ input }) => {
+  getWorkoutsByUser: protectedProcedure.input(z.object({ userId: z.number() })).query(async ({ input }) => {
     return prisma.workout.findMany({
       where: { userId: input.userId },
       include: {

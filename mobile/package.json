@@ -23,7 +23,11 @@
     "@react-navigation/stack": "^6.4.1",
     "@trpc/client": "^11.9.0",
     "@trpc/server": "11.10.0",
+    "babel-plugin-inline-import": "^3.0.0",
+    "drizzle-orm": "^0.45.1",
     "expo": "~54.0.33",
+    "expo-crypto": "^15.0.8",
+    "expo-sqlite": "^16.0.10",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
     "react-native": "0.81.5",
@@ -38,6 +42,7 @@
     "@babel/core": "^7.29.0",
     "@types/react": "~19.1.17",
     "babel-preset-expo": "^54.0.10",
+    "drizzle-kit": "^0.31.9",
     "typescript": "~5.9.3"
   },
   "resolutions": {

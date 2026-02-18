@@ -3,7 +3,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native'
 import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { StatusBar } from 'expo-status-bar'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -20,6 +20,10 @@ import SessionDetailScreen from './src/screens/SessionDetailScreen'
 import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
 import TemplatesScreen from './src/screens/TemplatesScreen'
 import { colors } from './src/theme/colors'
+import { db, initDatabase } from '@/database/database'
+import migrations from 'drizzle/migrations'
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator'
+import { seed } from '@/database/seed'
 
 export type ExercisePickerResult = { id: number; name: string }
 
@@ -123,17 +127,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           }
           if (route.name === 'Create' && options.tabBarButton) {
             const TabButton = options.tabBarButton
-            return <TabButton key={route.key} to={undefined} href={undefined} onPress={onPress} onLongPress={() => {}} accessibilityRole="button" accessibilityState={{ selected: isFocused }} accessibilityLabel={typeof label === 'string' ? label : undefined} testID={undefined} style={customTabBarStyles.fabSlot} />
+            return <TabButton key={route.key} to={undefined} href={undefined} onPress={onPress} onLongPress={() => { }} accessibilityRole="button" accessibilityState={{ selected: isFocused }} accessibilityLabel={typeof label === 'string' ? label : undefined} testID={undefined} style={customTabBarStyles.fabSlot} />
           }
           const iconName = options.tabBarIcon
             ? (() => {
-                const result = options.tabBarIcon({
-                  focused: isFocused,
-                  color: isFocused ? colors.tabActive : colors.tabInactive,
-                  size: 24,
-                })
-                return result
-              })()
+              const result = options.tabBarIcon({
+                focused: isFocused,
+                color: isFocused ? colors.tabActive : colors.tabInactive,
+                size: 24,
+              })
+              return result
+            })()
             : null
           const tint = isFocused ? colors.tabActive : colors.tabInactive
           return (
@@ -197,7 +201,7 @@ const customTabBarStyles = StyleSheet.create({
 
 function MainTabs() {
   const insets = useSafeAreaInsets()
-  
+
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -469,63 +473,83 @@ const overlayStyles = StyleSheet.create({
 })
 
 function RootNavigator() {
-  const { isLoading, isAuthenticated, serverDown, hasEnteredApp } = useAuth()
+  console.log('RootNavigator');
+  const { success, error } = useMigrations(db, migrations);
+  console.log('success', success);
+  console.log('error', error);
+  const [isDbReady, setIsDbReady] = useState(false);
+  useEffect(() => {
+    if (success) {
+      async function afterMigration() {
+        await db.run("PRAGMA foreign_keys = ON");
+        const existing = await db.query.exercises.findFirst();
+        console.log('existing', existing);
+        if (!existing) {
+          await seed();
+        }
+        console.log('setIsDbReady true');
+        setIsDbReady(true);
+      }
+      afterMigration();
+    }
+  }, [success]);
+  // const { isLoading, isAuthenticated, serverDown, hasEnteredApp } = useAuth()
 
-  if (serverDown && !hasEnteredApp) {
-    return <ServerDownScreen />
-  }
+  // if (serverDown && !hasEnteredApp) {
+  //   return <ServerDownScreen />
+  // }
 
   // Always show splash screen during initial auth check (before we know auth state).
-  if (isLoading && isAuthenticated === null) {
+  if (!success || !isDbReady) {
     return <SplashScreen />
   }
 
   return (
     <View style={{ flex: 1 }}>
-    <Stack.Navigator
-      initialRouteName="MainTabs"
-      screenOptions={stackScreenOptions}
-    >
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: false, cardStyle: { backgroundColor: colors.screen } }}
-      />
-      <Stack.Screen
-        name="MainTabs"
-        options={{ headerShown: false }}
+      <Stack.Navigator
+        initialRouteName="MainTabs"
+        screenOptions={stackScreenOptions}
       >
-        {() => <MainTabs />}
-      </Stack.Screen>
-      <Stack.Screen
-        name="TemplateDetail"
-        options={{ title: 'Workout Details' }}
-      >
-        {() => <TemplateDetailScreen />}
-      </Stack.Screen>
-      <Stack.Screen
-        name="SessionDetail"
-        options={{ title: 'Workout Session' }}
-      >
-        {() => <SessionDetailScreen />}
-      </Stack.Screen>
-      <Stack.Screen
-        name="CreateTemplate"
-        options={{ title: 'Create Workout' }}
-      >
-        {() => (
-          <ProtectedRoute>
-            <CreateTemplateScreen />
-          </ProtectedRoute>
-        )}
-      </Stack.Screen>
-      <Stack.Screen
-        name="ExercisePicker"
-        component={ExercisePickerScreen}
-        options={{ title: 'Select Exercise' }}
-      />
-    </Stack.Navigator>
-    {serverDown && hasEnteredApp && <ServerDownOverlay />}
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false, cardStyle: { backgroundColor: colors.screen } }}
+        />
+        <Stack.Screen
+          name="MainTabs"
+          options={{ headerShown: false }}
+        >
+          {() => <MainTabs />}
+        </Stack.Screen>
+        <Stack.Screen
+          name="TemplateDetail"
+          options={{ title: 'Workout Details' }}
+        >
+          {() => <TemplateDetailScreen />}
+        </Stack.Screen>
+        <Stack.Screen
+          name="SessionDetail"
+          options={{ title: 'Workout Session' }}
+        >
+          {() => <SessionDetailScreen />}
+        </Stack.Screen>
+        <Stack.Screen
+          name="CreateTemplate"
+          options={{ title: 'Create Workout' }}
+        >
+          {() => (
+            <ProtectedRoute>
+              <CreateTemplateScreen />
+            </ProtectedRoute>
+          )}
+        </Stack.Screen>
+        <Stack.Screen
+          name="ExercisePicker"
+          component={ExercisePickerScreen}
+          options={{ title: 'Select Exercise' }}
+        />
+      </Stack.Navigator>
+      {/* {serverDown && hasEnteredApp && <ServerDownOverlay />} */}
     </View>
   )
 }
