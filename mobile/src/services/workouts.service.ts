@@ -1,5 +1,11 @@
-import { getWorkouts } from "@/database/repositories/workouts.repository";
+import { getWorkoutById, getWorkouts } from '../database/repositories/workouts.repository'
 
 export const getWorkoutsService = async () => {
-    return await getWorkouts();
+    const workouts = await getWorkouts();
+    return workouts;
+}
+
+export const getWorkoutByIdService = async (id: string) => {
+    const workout = await getWorkoutById(id);
+    return workout;
 }

@@ -1,79 +1,70 @@
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { RootStackParamList } from '../../App'
-import { trpc } from '../api/client'
-import { getApiErrorMessage } from '../api/errorMessage'
-import { useAuth } from '../hooks/useAuth'
+import { getWorkoutByIdService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
-import type { Set, Template } from '../types'
 
 type TemplateDetailRouteProp = RouteProp<RootStackParamList, 'TemplateDetail'>
+
+type WorkoutDetail = NonNullable<Awaited<ReturnType<typeof getWorkoutByIdService>>>
+type SetItem = WorkoutDetail['workoutExercises'][number]['sets'][number]
 
 function TemplateDetailScreen() {
   const route = useRoute<TemplateDetailRouteProp>()
   const navigation = useNavigation()
-  const { isAuthenticated, serverDown, isLoading: authLoading, checkServerOnFocus } = useAuth()
+  const insets = useSafeAreaInsets()
   const { id } = route.params
-  const [template, setTemplate] = useState<Template | null>(null)
+  const [template, setTemplate] = useState<WorkoutDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
-  const [editingSets, setEditingSets] = useState<Map<number, { targetReps: number; targetWeight: number }>>(new Map())
-  const prevServerDownRef = useRef(serverDown)
+  const [editingSets, setEditingSets] = useState<Map<string, { targetReps: number; targetWeight: number }>>(new Map())
+
+  const fetchTemplate = useCallback(async (templateId: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await getWorkoutByIdService(templateId)
+      setTemplate(data ?? null)
+      setEditingSets(new Map())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (id) {
       fetchTemplate(id)
     }
-  }, [id])
+  }, [id, fetchTemplate])
 
   useFocusEffect(
     useCallback(() => {
-      checkServerOnFocus()
-    }, [checkServerOnFocus])
+      if (id) fetchTemplate(id)
+    }, [id, fetchTemplate])
   )
 
-  const fetchTemplate = async (templateId: number) => {
-    try {
-      setLoading(true)
-      setError(null)
-      const data = await trpc.workouts.getById.query({ id: templateId })
-      setTemplate(data)
-      setEditingSets(new Map())
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'An error occurred'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (serverDown) prevServerDownRef.current = true
-    else if (prevServerDownRef.current && !authLoading && !template && id) {
-      fetchTemplate(id)
-      prevServerDownRef.current = false
-    } else if ((template || !id) && !authLoading) prevServerDownRef.current = false
-    else if (!serverDown && !authLoading) prevServerDownRef.current = false
-  }, [serverDown, authLoading, template, id])
-
-  const updateSetValue = (setId: number, field: 'targetReps' | 'targetWeight', value: number) => {
+  const updateSetValue = (setId: string, field: 'targetReps' | 'targetWeight', value: number) => {
     setEditingSets((prev) => {
       const newMap = new Map(prev)
       const current = newMap.get(setId)
       if (!current) {
-        let targetSet: Set | null = null
-        for (const templateExercise of template?.workoutExercises || []) {
+        let targetSet: SetItem | null = null
+        for (const templateExercise of template?.workoutExercises ?? []) {
           const foundSet = templateExercise.sets.find((s) => s.id === setId)
           if (foundSet) {
             targetSet = foundSet
@@ -94,115 +85,50 @@ function TemplateDetailScreen() {
     })
   }
 
-  const saveSetUpdate = async (set: Set) => {
+  const saveSetUpdate = async (set: SetItem) => {
     const edited = editingSets.get(set.id)
     if (!edited) return
-
     if (!template || template.isDefaultTemplate) return
-
-    const updateData = {
-      setId: set.id,
-      targetWeight: edited.targetWeight,
-      targetReps: edited.targetReps,
-    }
-
-    try {
-      const updatedSet = await trpc.sets.update.mutate(updateData)
-
-      setTemplate((prev) => {
-        if (!prev) return null
-        return {
-          ...prev,
-          workoutExercises: prev.workoutExercises.map((templateExercise) => ({
-            ...templateExercise,
-            sets: templateExercise.sets.map((s) =>
-              s.id === updatedSet.id
-                ? {
-                    ...s,
-                    targetReps: updatedSet.targetReps,
-                    targetWeight: updatedSet.targetWeight,
-                  }
-                : s
-            ),
-          })),
-        }
-      })
-
-      setEditingSets((prev) => {
-        const newMap = new Map(prev)
-        newMap.delete(set.id)
-        return newMap
-      })
-    } catch (err) {
-      setEditingSets((prev) => {
-        const newMap = new Map(prev)
-        newMap.delete(set.id)
-        return newMap
-      })
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to update set',
-      })
-    }
+    // TODO: local set update when offline persistence is wired
+    setEditingSets((prev) => {
+      const newMap = new Map(prev)
+      newMap.delete(set.id)
+      return newMap
+    })
   }
 
   const handleCreateSession = async () => {
     if (!template) return
-
-    try {
-      setCreatingSession(true)
-      setError(null)
-      const session = isAuthenticated
-        ? await trpc.sessions.create.mutate({ workoutId: template.id })
-        : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
-      ;(navigation as any).navigate('SessionDetail', { id: session.id, initialSession: session })
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to create session'))
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to start workout. Please try again.',
-      })
-    } finally {
-      setCreatingSession(false)
-    }
+    setCreatingSession(true)
+    Toast.show({
+      type: 'info',
+      text1: 'Offline mode',
+      text2: 'Starting session from template will be available when session flow is wired to local.',
+    })
+    setCreatingSession(false)
   }
 
-  // Only show white when server is up and we have no template yet. When server is down always show content we have so overlay is the only change.
-  if (!serverDown && !template && loading) {
-    return <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.screen }]} />
-  }
-  if (serverDown && !template) {
+  if (!template && loading) {
     return <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.screen }]} />
   }
 
-  // Only show error if we're not loading
   if (!loading && error && !template) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error: {error}</Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => id && fetchTemplate(id)}
-        >
+        <TouchableOpacity style={styles.button} onPress={() => id && fetchTemplate(id)}>
           <Text style={styles.buttonText}>Retry</Text>
         </TouchableOpacity>
       </View>
     )
   }
 
-  // Only show "Template not found" if we're not loading and there's no template
   if (!loading && !template) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Workout not found</Text>
       </View>
     )
-  }
-
-  // Show gray container while loading and no template (dialog takes priority; no content update until resolved)
-  if (loading && !template) {
-    return <View style={[styles.container, { backgroundColor: colors.screen }]} />
   }
 
   if (!template) {
@@ -214,7 +140,10 @@ function TemplateDetailScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) }]}
+      >
 
         <View style={styles.headerCard}>
           <View style={styles.headerContent}>

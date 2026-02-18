@@ -20,7 +20,7 @@ import SessionDetailScreen from './src/screens/SessionDetailScreen'
 import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
 import TemplatesScreen from './src/screens/TemplatesScreen'
 import { colors } from './src/theme/colors'
-import { db, initDatabase } from '@/database/database'
+import { db } from '@/database/database'
 import migrations from 'drizzle/migrations'
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator'
 import { seed } from '@/database/seed'
@@ -30,7 +30,7 @@ export type ExercisePickerResult = { id: number; name: string }
 export type RootStackParamList = {
   Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createTemplate?: boolean; templateName?: string } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
-  TemplateDetail: { id: number }
+  TemplateDetail: { id: string }
   SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult }
   CreateTemplate: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: number } | undefined
   ExercisePicker: { pickerFor: 'createTemplate' | 'session'; sessionId?: number; replacingExerciseId?: number }
@@ -523,10 +523,14 @@ function RootNavigator() {
         </Stack.Screen>
         <Stack.Screen
           name="TemplateDetail"
-          options={{ title: 'Workout Details' }}
-        >
-          {() => <TemplateDetailScreen />}
-        </Stack.Screen>
+          component={TemplateDetailScreen}
+          options={{
+            title: 'Workout Details',
+            headerStyle: { backgroundColor: colors.header },
+            headerTintColor: colors.headerText,
+            headerBackTitleVisible: false,
+          }}
+        />
         <Stack.Screen
           name="SessionDetail"
           options={{ title: 'Workout Session' }}

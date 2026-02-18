@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   RefreshControl,
@@ -11,140 +11,69 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
-import { trpc } from '../api/client'
-import { getApiErrorMessage } from '../api/errorMessage'
-import { useAuth } from '../hooks/useAuth'
+import { getWorkoutsService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
-import type { Template } from '../types'
 
 type Filter = 'all' | 'default' | 'custom'
 
+type WorkoutItem = Awaited<ReturnType<typeof getWorkoutsService>>[number]
+
 function TemplatesScreen() {
-  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus, isRetrying } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
-  const [defaultTemplates, setDefaultTemplates] = useState<Template[]>([])
-  const [defaultTemplatesLoading, setDefaultTemplatesLoading] = useState(true)
-  const [defaultTemplatesFetched, setDefaultTemplatesFetched] = useState(false)
-  const [startingWorkoutId, setStartingWorkoutId] = useState<number | null>(null)
+  const [workouts, setWorkouts] = useState<WorkoutItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [startingWorkoutId, setStartingWorkoutId] = useState<string | null>(null)
   const navigation = useNavigation()
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () =>
-        !isAuthenticated ? (
-          <TouchableOpacity
-            onPress={() => {
-              const nav = navigation as any
-              nav.navigate('Login')
-            }}
-            style={styles.headerLoginButton}
-          >
-            <Text style={styles.headerLoginText}>Login</Text>
-          </TouchableOpacity>
-        ) : null,
-    })
-  }, [navigation, isAuthenticated])
+  const loadWorkouts = useCallback(async () => {
+    try {
+      const data = await getWorkoutsService()
+      setWorkouts(Array.isArray(data) ? data : [])
+    } catch {
+      setWorkouts([])
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
 
   useEffect(() => {
-    // Don't react to loading state changes during retry - preserve templates
-    if (isRetrying) return
-    
-    if (!isLoading && !serverDown) {
-      setDefaultTemplatesFetched(false)
-      setDefaultTemplatesLoading(true)
-      trpc.workouts.getTemplates
-        .query({ isDefaultTemplate: true })
-        .then((data) => {
-          setDefaultTemplates(Array.isArray(data) ? data : [])
-        })
-        .catch(() => setDefaultTemplates([]))
-        .finally(() => {
-          setDefaultTemplatesFetched(true)
-          setDefaultTemplatesLoading(false)
-        })
-    } else {
-      if (isAuthenticated && !serverDown) setDefaultTemplatesFetched(false)
-      setDefaultTemplatesLoading(false)
-    }
-  }, [isAuthenticated, isLoading, isRetrying])
+    setLoading(true)
+    loadWorkouts()
+  }, [loadWorkouts])
 
   useFocusEffect(
     useCallback(() => {
-      // Don't do anything during retry - freeze the screen completely
-      if (isRetrying) return
-      if (serverDown) return
-      checkServerOnFocus()
-      // Don't call checkAuth when server is down - preserve state until user retries
-      if (isAuthenticated && !serverDown) checkAuth({ silent: true })
-    }, [checkServerOnFocus, checkAuth, isAuthenticated, serverDown, isRetrying])
+      loadWorkouts()
+    }, [loadWorkouts])
   )
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true)
-    if (isAuthenticated) {
-      await checkAuth()
-    }
-    try {
-      const data = await trpc.workouts.getTemplates.query({ isDefaultTemplate: true })
-      setDefaultTemplates(Array.isArray(data) ? data : [])
-    } catch {
-      setDefaultTemplates([])
-    }
-    setRefreshing(false)
+    loadWorkouts()
   }
 
-  // During retry, use the last known workoutInfo to prevent flickering
-  // After retry fails, continue using the preserved workoutInfo
-  const userTemplates = isAuthenticated && workoutInfo ? (workoutInfo?.workouts ?? []) : []
-
-  const filteredTemplates = ((): Template[] => {
-    if (filter === 'default') return defaultTemplates
-    if (filter === 'custom') return userTemplates
-    const customIds = new Set(userTemplates.map((t) => t.id))
-    const defaultsOnly = defaultTemplates.filter((t) => !customIds.has(t.id))
-    return [...userTemplates, ...defaultsOnly]
+  const filteredTemplates = ((): WorkoutItem[] => {
+    if (filter === 'default') return workouts.filter((w) => w.isDefaultTemplate === true)
+    if (filter === 'custom') return workouts.filter((w) => w.isDefaultTemplate !== true)
+    return workouts
   })()
 
-  const handleStartWorkout = async (template: Template) => {
-    try {
-      setStartingWorkoutId(template.id)
-      const session = isAuthenticated
-        ? await trpc.sessions.create.mutate({ workoutId: template.id })
-        : await trpc.sessions.createUnprotected.mutate({ workoutId: template.id })
-      ;(navigation as any).navigate('SessionDetail', { id: session.id, initialSession: session })
-    } catch (err) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: getApiErrorMessage(err, 'Failed to start workout. Please try again.'),
-      })
-    } finally {
-      setStartingWorkoutId(null)
-    }
+  const handleStartWorkout = async (template: WorkoutItem) => {
+    setStartingWorkoutId(template.id)
+    // TODO: local session creation for offline
+    Toast.show({
+      type: 'info',
+      text1: 'Offline mode',
+      text2: 'Starting workout from template will be available when session flow is wired to local.',
+    })
+    setStartingWorkoutId(null)
   }
 
-  const handleTemplateClick = (id: number) => {
+  const handleTemplateClick = (id: string) => {
     const nav = navigation as any
     nav.navigate('TemplateDetail', { id })
-  }
-
-  const effectiveDefaultLoading = !defaultTemplatesFetched || defaultTemplatesLoading
-  const hasNoTemplatesUnauth = defaultTemplatesFetched && !defaultTemplatesLoading && defaultTemplates.length === 0
-
-  // During retry, freeze the screen - don't react to any state changes
-  // Only show black screen conditions when NOT retrying
-  if (!isRetrying && serverDown && isAuthenticated && workoutInfo === null) {
-    return <View style={[styles.container, { backgroundColor: colors.screen }]} />
-  }
-
-  if (!isRetrying && isLoading && isAuthenticated && !(serverDown && workoutInfo !== null)) {
-    return <View style={styles.container} />
-  }
-
-  // Don't show loading screen during retry - freeze the current state
-  if (!isRetrying && effectiveDefaultLoading) {
-    return <View style={styles.container} />
   }
 
   const renderFilterTabs = () => (
@@ -164,22 +93,16 @@ function TemplatesScreen() {
       <TouchableOpacity
         style={[styles.filterPill, filter === 'custom' && styles.filterPillActive]}
         onPress={() => setFilter('custom')}
-        disabled={!isAuthenticated}
       >
-        <Text style={[styles.filterPillText, filter === 'custom' && styles.filterPillTextActive, !isAuthenticated && styles.filterPillTextDisabled]}>
-          Custom
-        </Text>
+        <Text style={[styles.filterPillText, filter === 'custom' && styles.filterPillTextActive]}>Custom</Text>
       </TouchableOpacity>
     </View>
   )
 
-  const renderTemplateCard = (template: Template) => {
-    // Use exerciseCount and setCount from API if available, otherwise calculate from workoutExercises
-    const exerciseCount = template.exerciseCount ?? template.workoutExercises?.length ?? 0
+  const renderTemplateCard = (template: WorkoutItem) => {
+    const exerciseCount = template.workoutExercises?.length ?? 0
     const setCount =
-      template.setCount ??
-      template.workoutExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ??
-      0
+      template.workoutExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ?? 0
     const meta =
       exerciseCount > 0 && setCount > 0
         ? `${exerciseCount} exercises • ${setCount} sets`
@@ -205,11 +128,11 @@ function TemplatesScreen() {
                 <View style={styles.defaultTag}>
                   <Text style={styles.defaultTagText}>Default</Text>
                 </View>
-              ) : isAuthenticated ? (
+              ) : (
                 <View style={styles.customTag}>
                   <Text style={styles.customTagText}>Custom</Text>
                 </View>
-              ) : null}
+              )}
             </View>
             {meta ? <Text style={styles.templateMeta}>{meta}</Text> : null}
           </View>
@@ -233,33 +156,25 @@ function TemplatesScreen() {
     )
   }
 
-  if (!isAuthenticated) {
+  if (loading) {
+    return <View style={styles.container} />
+  }
+
+  const showEmpty = workouts.length === 0
+  const showEmptyCustom = filter === 'custom' && filteredTemplates.length === 0
+  const showEmptyDefault = filter === 'default' && filteredTemplates.length === 0
+  const showEmptyAll = filter === 'all' && filteredTemplates.length === 0
+
+  if (showEmpty) {
     return (
       <View style={styles.container}>
-        {hasNoTemplatesUnauth ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No Default Workouts</Text>
-            <Text style={styles.emptyText}>Default workouts will appear here.</Text>
-          </View>
-        ) : (
-          <>
-            {renderFilterTabs()}
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.content}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            >
-              {defaultTemplates.map(renderTemplateCard)}
-            </ScrollView>
-          </>
-        )}
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle}>No Workouts</Text>
+          <Text style={styles.emptyText}>Workouts will appear here once added or synced.</Text>
+        </View>
       </View>
     )
   }
-
-  const showEmptyCustom = filter === 'custom' && userTemplates.length === 0
-  const showEmptyDefault = filter === 'default' && defaultTemplates.length === 0
-  const showEmptyAll = filter === 'all' && filteredTemplates.length === 0
 
   return (
     <View style={styles.container}>
@@ -271,16 +186,7 @@ function TemplatesScreen() {
       >
         {showEmptyCustom ? (
           <View style={styles.sectionEmpty}>
-            <Text style={styles.sectionEmptyText}>Create your first workout to get started.</Text>
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={() => {
-                const nav = navigation as any
-                nav.navigate('CreateTemplate')
-              }}
-            >
-              <Text style={styles.createButtonText}>Create workout</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionEmptyText}>No custom workouts yet.</Text>
           </View>
         ) : showEmptyDefault ? (
           <Text style={styles.sectionEmptyText}>No default workouts available.</Text>
@@ -298,16 +204,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.screen,
-  },
-  headerLoginButton: {
-    marginRight: 16,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  headerLoginText: {
-    color: colors.headerText,
-    fontSize: 16,
-    fontWeight: '600',
   },
   filterRow: {
     flexDirection: 'row',
@@ -335,9 +231,6 @@ const styles = StyleSheet.create({
   },
   filterPillTextActive: {
     color: colors.successText,
-  },
-  filterPillTextDisabled: {
-    color: colors.textMuted,
   },
   scrollView: {
     flex: 1,
@@ -371,18 +264,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
-  },
-  createButton: {
-    backgroundColor: colors.success,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    alignSelf: 'flex-start',
-  },
-  createButtonText: {
-    color: colors.successText,
-    fontSize: 16,
-    fontWeight: '600',
   },
   templateCard: {
     backgroundColor: colors.card,
