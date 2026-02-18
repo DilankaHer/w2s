@@ -1,12 +1,21 @@
 FROM oven/bun:1.3.7
+
 WORKDIR /app
 
-# Install deps
-COPY package.json bun.lock ./
+# Copy backend package files
+COPY backend/package.json backend/bun.lock ./backend/
+
+# Copy shared code
+COPY shared ./shared
+
+# Move into backend folder
+WORKDIR /app/backend
+
+# Install backend dependencies
 RUN bun install --frozen-lockfile
 
 # Copy backend source
-COPY . .
+COPY backend ./
 
 ENV NODE_ENV=production
 
