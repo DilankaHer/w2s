@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
-import type { Workout } from '@shared/types'
+import type { Workout } from '@shared/types/workouts.types'
 import { getWorkoutsService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 

@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import type { Set as SetType, WorkoutWithExercises } from '@shared/types'
+import type { Set as SetType, WorkoutWithExercises } from '@shared/types/workouts.types'
 import type { RootStackParamList } from '../../App'
 import { getWorkoutByIdService } from '../services/workouts.service'
 import { colors } from '../theme/colors'

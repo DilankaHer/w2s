@@ -25,7 +25,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator'
 import { seed } from '@/database/seed'
 import migrations from './drizzle/migrations'
 
-export type ExercisePickerResult = { id: number; name: string }
+export type ExercisePickerResult = { id: string; name: string }
 
 export type RootStackParamList = {
   Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createWorkout?: boolean; workoutName?: string } | undefined

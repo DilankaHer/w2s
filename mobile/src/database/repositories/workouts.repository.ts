@@ -1,8 +1,8 @@
 import { db } from "../database";
 import { workouts, workoutExercises, sets } from "../schema/schemas";
 import * as Crypto from "expo-crypto";
-import * as SharedTypes from "@shared/types";
-import { eq, InferSelectModel } from "drizzle-orm";
+import * as SharedTypes from "@shared/types/workouts.types";
+import { eq } from "drizzle-orm";
 
 export async function createWorkout(input: {
     name: string;

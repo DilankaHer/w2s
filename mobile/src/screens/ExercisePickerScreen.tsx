@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -15,169 +15,69 @@ import {
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { trpc } from '../api/client'
 import { getApiErrorMessage } from '../api/errorMessage'
 import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
-import type { Exercise, ExerciseWithMeta } from '../types'
+import { getExercisesService } from '../services/exercises.service'
+import type { BodyPart, Equipment, Exercise } from '@shared/types/exercises.types'
 
-type ExercisePickerRouteProp = RouteProp<RootStackParamList, 'ExercisePicker'>
+type ChipOption = { id: string; name: string }
+type ChipRow = { id: string; name: string }
 
-function ExercisePickerScreen() {
-  const route = useRoute<ExercisePickerRouteProp>()
-  const navigation = useNavigation<any>()
-  const { pickerFor, sessionId, replacingExerciseId } = route.params ?? {}
-  const [exercises, setExercises] = useState<ExerciseWithMeta[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedBodyPartId, setSelectedBodyPartId] = useState<number | null>(null)
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null)
-  const [bodyParts, setBodyParts] = useState<{ id: number; name: string }[]>([])
-  const [equipmentList, setEquipmentList] = useState<{ id: number; name: string }[]>([])
-  const [infoExercise, setInfoExercise] = useState<ExerciseWithMeta | null>(null)
+function FilterChipsRow({
+  label,
+  options,
+  selectedId,
+  onSelect,
+}: {
+  label: string
+  options: ChipOption[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+}) {
+  const listRef = useRef<FlatList<ChipRow> | null>(null)
 
-  const fetchExercises = useCallback(async (silent: boolean) => {
-    if (!silent) setLoading(true)
-    setError(null)
-    try {
-      const exercisesPromise = trpc.exercises.list.query() as Promise<ExerciseWithMeta[]>
-      const bodyPartsPromise = trpc.exercises.filterBodyParts.query() as Promise<{ id: number; name: string }[]>
-      const equipmentPromise = trpc.exercises.filterEquipment.query() as Promise<{ id: number; name: string }[]>
-      const [exercisesData, bodyPartsData, equipmentData] = await Promise.all([
-        exercisesPromise,
-        bodyPartsPromise,
-        equipmentPromise,
-      ])
-      setExercises(Array.isArray(exercisesData) ? exercisesData : [])
-      setBodyParts(Array.isArray(bodyPartsData) ? bodyPartsData : [])
-      setEquipmentList(Array.isArray(equipmentData) ? equipmentData : [])
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to load exercises'))
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [])
+  const data = useMemo<ChipRow[]>(() => [{ id: '__all__', name: 'All' }, ...options], [options])
+  const selectedIndex = useMemo(() => {
+    if (selectedId == null) return 0
+    const idx = data.findIndex((x) => x.id === selectedId)
+    return idx >= 0 ? idx : 0
+  }, [data, selectedId])
 
   useEffect(() => {
-    fetchExercises(false)
-  }, [fetchExercises])
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    fetchExercises(true)
-  }, [fetchExercises])
-
-  const filteredExercises = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return exercises.filter((ex) => {
-      const matchBody = selectedBodyPartId == null || ex.bodyPart?.id === selectedBodyPartId
-      const matchEquipment = selectedEquipmentId == null || ex.equipment?.id === selectedEquipmentId
-      const matchSearch = !q || ex.name.toLowerCase().includes(q)
-      return matchBody && matchEquipment && matchSearch
-    })
-  }, [exercises, searchQuery, selectedBodyPartId, selectedEquipmentId])
-
-  const availableBodyParts = useMemo(() => {
-    if (selectedEquipmentId == null) return bodyParts
-    const map = new Map<number, { id: number; name: string }>()
-    exercises
-      .filter((ex) => ex.equipment?.id === selectedEquipmentId)
-      .forEach((ex) => {
-        if (ex.bodyPart?.id != null && ex.bodyPart?.name) {
-          map.set(ex.bodyPart.id, { id: ex.bodyPart.id, name: ex.bodyPart.name })
-        }
-      })
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [exercises, bodyParts, selectedEquipmentId])
-
-  const availableEquipment = useMemo(() => {
-    if (selectedBodyPartId == null) return equipmentList
-    const map = new Map<number, { id: number; name: string }>()
-    exercises
-      .filter((ex) => ex.bodyPart?.id === selectedBodyPartId)
-      .forEach((ex) => {
-        if (ex.equipment?.id != null && ex.equipment?.name) {
-          map.set(ex.equipment.id, { id: ex.equipment.id, name: ex.equipment.name })
-        }
-      })
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [exercises, equipmentList, selectedBodyPartId])
-
-  const onSelectBodyPart = useCallback(
-    (id: number | null) => {
-      setSelectedBodyPartId(id)
-      if (id !== null && selectedEquipmentId != null) {
-        const equipmentIdsForBodyPart = new Set(
-          exercises.filter((ex) => ex.bodyPart?.id === id).map((ex) => ex.equipment?.id).filter((eid): eid is number => eid != null)
-        )
-        if (!equipmentIdsForBodyPart.has(selectedEquipmentId)) {
-          setSelectedEquipmentId(null)
-        }
+    if (!listRef.current) return
+    const t = setTimeout(() => {
+      try {
+        listRef.current?.scrollToIndex({ index: selectedIndex, viewPosition: 0.5, animated: true })
+      } catch {
+        // ignore
       }
-    },
-    [selectedEquipmentId, exercises]
-  )
+    }, 0)
+    return () => clearTimeout(t)
+  }, [selectedIndex, data.length])
 
-  const onSelectEquipment = useCallback(
-    (id: number | null) => {
-      setSelectedEquipmentId(id)
-      if (id !== null && selectedBodyPartId != null) {
-        const bodyPartIdsForEquipment = new Set(
-          exercises.filter((ex) => ex.equipment?.id === id).map((ex) => ex.bodyPart?.id).filter((bid): bid is number => bid != null)
-        )
-        if (!bodyPartIdsForEquipment.has(selectedBodyPartId)) {
-          setSelectedBodyPartId(null)
-        }
-      }
-    },
-    [selectedBodyPartId, exercises]
-  )
-
-  const clearFilters = useCallback(() => {
-    setSelectedBodyPartId(null)
-    setSelectedEquipmentId(null)
-    setSearchQuery('')
-  }, [])
-
-  const hasActiveFilters = selectedBodyPartId != null || selectedEquipmentId != null || searchQuery.trim().length > 0
-
-  const handleSelectExercise = useCallback(
-    (item: ExerciseWithMeta) => {
-      const exercise: Exercise = { id: item.id, name: item.name }
-      if (pickerFor === 'createWorkout') {
-        navigation.navigate('CreateWorkout', {
-          selectedExercise: exercise,
-          ...(typeof replacingExerciseId === 'number' ? { replacingExerciseId } : {}),
-        })
-      } else if (pickerFor === 'session' && sessionId != null) {
-        navigation.navigate('SessionDetail', {
-          id: sessionId,
-          selectedExercise: exercise,
-        })
-      }
-    },
-    [pickerFor, sessionId, replacingExerciseId, navigation]
-  )
-
-  const renderFilterChips = (
-    label: string,
-    options: { id: number; name: string }[],
-    selectedId: number | null,
-    onSelect: (id: number | null) => void
-  ) => (
+  return (
     <View style={styles.filterSection}>
       <Text style={styles.filterSectionLabel}>{label}</Text>
       <FlatList
+        ref={(r) => {
+          listRef.current = r
+        }}
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={[{ id: -1, name: 'All' }, ...options]}
-        keyExtractor={(item) => (item.id === -1 ? 'all' : String(item.id))}
+        data={data}
+        keyExtractor={(item) => (item.id === '__all__' ? 'all' : item.id)}
         contentContainerStyle={styles.filterRow}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            listRef.current?.scrollToOffset({
+              offset: Math.max(0, info.averageItemLength * info.index - info.averageItemLength),
+              animated: true,
+            })
+          }, 50)
+        }}
         renderItem={({ item }) => {
-          const isAll = item.id === -1
+          const isAll = item.id === '__all__'
           const isActive = isAll ? selectedId == null : selectedId === item.id
           return (
             <TouchableOpacity
@@ -194,6 +94,207 @@ function ExercisePickerScreen() {
         }}
       />
     </View>
+  )
+}
+
+type ExercisePickerRouteProp = RouteProp<RootStackParamList, 'ExercisePicker'>
+
+function ExercisePickerScreen() {
+  const route = useRoute<ExercisePickerRouteProp>()
+  const navigation = useNavigation<any>()
+  const { pickerFor, sessionId, replacingExerciseId } = route.params ?? {}
+  const [optionsExercises, setOptionsExercises] = useState<Exercise[]>([])
+  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedBodyPartId, setSelectedBodyPartId] = useState<string | null>(null)
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
+  const [bodyParts, setBodyParts] = useState<BodyPart[]>([])
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([])
+  const [infoExercise, setInfoExercise] = useState<Exercise | null>(null)
+
+  const didMountSearchEffect = useRef(false)
+
+  const deriveBodyParts = useCallback((source: Exercise[]): BodyPart[] => {
+    const map = new Map<string, BodyPart>()
+    source.forEach((ex) => {
+      if (ex.bodyPart) map.set(ex.bodyPart.id, ex.bodyPart)
+    })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
+
+  const deriveEquipment = useCallback((source: Exercise[]): Equipment[] => {
+    const map = new Map<string, Equipment>()
+    source.forEach((ex) => {
+      if (ex.equipment) map.set(ex.equipment.id, ex.equipment)
+    })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [])
+
+  const fetchOptions = useCallback(async () => {
+    try {
+      const all = await getExercisesService(undefined, undefined, undefined)
+      setOptionsExercises(all)
+      setBodyParts(deriveBodyParts(all))
+      setEquipmentList(deriveEquipment(all))
+    } catch {
+      // Best effort; list fetch will surface errors.
+    }
+  }, [deriveBodyParts, deriveEquipment])
+
+  const fetchExercises = useCallback(
+    async (silent: boolean, bodyPartId?: string, equipmentId?: string, search?: string) => {
+      if (!silent) setLoading(true)
+      setError(null)
+      try {
+        const data = await getExercisesService(bodyPartId, equipmentId, search)
+        setExercises(Array.isArray(data) ? data : [])
+      } catch (err) {
+        setError(getApiErrorMessage(err, 'Failed to load exercises'))
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    fetchOptions()
+    fetchExercises(false, undefined, undefined, undefined)
+  }, [fetchExercises, fetchOptions])
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true)
+    fetchExercises(
+      true,
+      selectedBodyPartId ?? undefined,
+      selectedEquipmentId ?? undefined,
+      searchQuery.trim() || undefined
+    )
+  }, [fetchExercises, searchQuery, selectedBodyPartId, selectedEquipmentId])
+
+  useEffect(() => {
+    if (!didMountSearchEffect.current) {
+      didMountSearchEffect.current = true
+      return
+    }
+
+    const t = setTimeout(() => {
+      fetchExercises(
+        true,
+        selectedBodyPartId ?? undefined,
+        selectedEquipmentId ?? undefined,
+        searchQuery.trim() || undefined
+      )
+    }, 250)
+
+    return () => clearTimeout(t)
+  }, [fetchExercises, searchQuery, selectedBodyPartId, selectedEquipmentId])
+
+  const availableBodyParts = useMemo(() => {
+    if (selectedEquipmentId == null) return bodyParts
+    const map = new Map<string, BodyPart>()
+    optionsExercises
+      .filter((ex) => ex.equipment?.id === selectedEquipmentId)
+      .forEach((ex) => {
+        if (ex.bodyPart) map.set(ex.bodyPart.id, ex.bodyPart)
+      })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [optionsExercises, bodyParts, selectedEquipmentId])
+
+  const availableEquipment = useMemo(() => {
+    if (selectedBodyPartId == null) return equipmentList
+    const map = new Map<string, Equipment>()
+    optionsExercises
+      .filter((ex) => ex.bodyPart?.id === selectedBodyPartId)
+      .forEach((ex) => {
+        if (ex.equipment) map.set(ex.equipment.id, ex.equipment)
+      })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [optionsExercises, equipmentList, selectedBodyPartId])
+
+  const onSelectBodyPart = useCallback(
+    (id: string | null) => {
+      const nextBodyPartId = id
+      let nextEquipmentId = selectedEquipmentId
+
+      setSelectedBodyPartId(nextBodyPartId)
+
+      if (nextBodyPartId !== null && nextEquipmentId != null) {
+        const isValidPair = optionsExercises.some(
+          (ex) => ex.bodyPart?.id === nextBodyPartId && ex.equipment?.id === nextEquipmentId
+        )
+        if (!isValidPair) {
+          nextEquipmentId = null
+          setSelectedEquipmentId(null)
+        }
+      }
+
+      fetchExercises(
+        true,
+        nextBodyPartId ?? undefined,
+        nextEquipmentId ?? undefined,
+        searchQuery.trim() || undefined
+      )
+    },
+    [fetchExercises, optionsExercises, searchQuery, selectedEquipmentId]
+  )
+
+  const onSelectEquipment = useCallback(
+    (id: string | null) => {
+      const nextEquipmentId = id
+      let nextBodyPartId = selectedBodyPartId
+
+      setSelectedEquipmentId(nextEquipmentId)
+
+      if (nextEquipmentId !== null && nextBodyPartId != null) {
+        const isValidPair = optionsExercises.some(
+          (ex) => ex.bodyPart?.id === nextBodyPartId && ex.equipment?.id === nextEquipmentId
+        )
+        if (!isValidPair) {
+          nextBodyPartId = null
+          setSelectedBodyPartId(null)
+        }
+      }
+
+      fetchExercises(
+        true,
+        nextBodyPartId ?? undefined,
+        nextEquipmentId ?? undefined,
+        searchQuery.trim() || undefined
+      )
+    },
+    [fetchExercises, optionsExercises, searchQuery, selectedBodyPartId]
+  )
+
+  const clearFilters = useCallback(() => {
+    setSelectedBodyPartId(null)
+    setSelectedEquipmentId(null)
+    setSearchQuery('')
+    fetchExercises(true, undefined, undefined, undefined)
+  }, [fetchExercises])
+
+  const hasActiveFilters = selectedBodyPartId != null || selectedEquipmentId != null || searchQuery.trim().length > 0
+
+  const handleSelectExercise = useCallback(
+    (item: Exercise) => {
+      const exercise = { id: item.id, name: item.name }
+      if (pickerFor === 'createWorkout') {
+        navigation.navigate('CreateWorkout', {
+          selectedExercise: exercise,
+          ...(typeof replacingExerciseId === 'number' ? { replacingExerciseId } : {}),
+        })
+      } else if (pickerFor === 'session' && sessionId != null) {
+        navigation.navigate('SessionDetail', {
+          id: sessionId,
+          selectedExercise: exercise,
+        })
+      }
+    },
+    [pickerFor, sessionId, replacingExerciseId, navigation]
   )
 
   const filterSection = (
@@ -213,12 +314,22 @@ function ExercisePickerScreen() {
           </TouchableOpacity>
         ) : null}
       </View>
-      {renderFilterChips('Body part', availableBodyParts, selectedBodyPartId, onSelectBodyPart)}
-      {renderFilterChips('Equipment', availableEquipment, selectedEquipmentId, onSelectEquipment)}
+      <FilterChipsRow
+        label="Body part"
+        options={availableBodyParts}
+        selectedId={selectedBodyPartId}
+        onSelect={onSelectBodyPart}
+      />
+      <FilterChipsRow
+        label="Equipment"
+        options={availableEquipment}
+        selectedId={selectedEquipmentId}
+        onSelect={onSelectEquipment}
+      />
     </View>
   )
 
-  const renderItem = ({ item }: { item: ExerciseWithMeta }) => {
+  const renderItem = ({ item }: { item: Exercise }) => {
     const bodyName = item.bodyPart?.name ?? '—'
     const equipName = item.equipment?.name ?? '—'
     const subtitle = [bodyName, equipName].filter((s) => s !== '—').join(' · ') || '—'
@@ -257,8 +368,16 @@ function ExercisePickerScreen() {
     )
   }
 
-  const renderInfoContent = (exercise: ExerciseWithMeta) => {
-    const info = exercise.info
+  const renderInfoContent = (exercise: Exercise) => {
+    const rawInfo = exercise.info
+    let info: unknown = rawInfo
+    if (typeof rawInfo === 'string' && rawInfo.trim()) {
+      try {
+        info = JSON.parse(rawInfo)
+      } catch {
+        info = rawInfo
+      }
+    }
     let infoNode: React.ReactNode
     if (Array.isArray(info) && info.length > 0) {
       const strings = info.every((x): x is string => typeof x === 'string')
@@ -279,9 +398,9 @@ function ExercisePickerScreen() {
       infoNode = <Text style={styles.infoNone}>No info</Text>
     }
     return (
-      <>
+      <View style={styles.infoSection}>
         <Text style={styles.infoSectionLabel}>Info</Text>
-        {infoNode}
+        <View style={styles.infoCard}>{infoNode}</View>
         {exercise.link ? (
           <TouchableOpacity
             style={styles.watchVideoButton}
@@ -291,7 +410,7 @@ function ExercisePickerScreen() {
             <Text style={styles.watchVideoText}>Watch video</Text>
           </TouchableOpacity>
         ) : null}
-      </>
+      </View>
     )
   }
 
@@ -335,11 +454,11 @@ function ExercisePickerScreen() {
     <View style={styles.container}>
       {filterSection}
       <FlatList
-        data={filteredExercises}
+        data={exercises}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[styles.listContent, filteredExercises.length === 0 && styles.listContentEmpty]}
+        contentContainerStyle={[styles.listContent, exercises.length === 0 && styles.listContentEmpty]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         keyboardShouldPersistTaps="handled"
       />
@@ -358,12 +477,32 @@ function ExercisePickerScreen() {
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.infoModalBox}>
             {infoExercise ? (
               <View style={styles.infoModalInner}>
+                <View style={styles.sheetHandle} />
                 <View style={styles.infoModalHeader}>
-                  <Text style={styles.infoModalTitle} numberOfLines={2}>
-                    {infoExercise.name}
-                  </Text>
-                  <TouchableOpacity onPress={() => setInfoExercise(null)} hitSlop={8}>
-                    <Ionicons name="close" size={24} color={colors.textSecondary} />
+                  <View style={styles.infoHeaderLeft}>
+                    <View style={styles.infoHeaderIcon}>
+                      <Ionicons name="barbell-outline" size={18} color={colors.primary} />
+                    </View>
+                    <View style={styles.infoHeaderText}>
+                      <Text style={styles.infoModalTitle} numberOfLines={2}>
+                        {infoExercise.name}
+                      </Text>
+                      <View style={styles.infoMetaRow}>
+                        {infoExercise.bodyPart?.name ? (
+                          <View style={styles.metaPill}>
+                            <Text style={styles.metaPillText}>{infoExercise.bodyPart.name}</Text>
+                          </View>
+                        ) : null}
+                        {infoExercise.equipment?.name ? (
+                          <View style={styles.metaPill}>
+                            <Text style={styles.metaPillText}>{infoExercise.equipment.name}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.closeButton} onPress={() => setInfoExercise(null)} hitSlop={8}>
+                    <Ionicons name="close" size={20} color={colors.text} />
                   </TouchableOpacity>
                 </View>
                 <ScrollView
@@ -548,17 +687,33 @@ const styles = StyleSheet.create({
   infoOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
   },
   infoModalBox: {
     backgroundColor: colors.card,
-    borderRadius: 12,
-    maxWidth: '100%',
-    width: 340,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    width: '100%',
     height: '80%',
-    maxHeight: 560,
+    maxHeight: 620,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: colors.border,
+    marginTop: 10,
+    marginBottom: 4,
   },
   infoModalInner: {
     flex: 1,
@@ -568,16 +723,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  infoHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 12,
+  },
+  infoHeaderIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.successBgDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  infoHeaderText: {
+    flex: 1,
+  },
   infoModalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.text,
-    flex: 1,
+    lineHeight: 24,
+    marginBottom: 6,
+  },
+  infoMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 0,
+  },
+  metaPill: {
+    backgroundColor: colors.screen,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
     marginRight: 8,
+    marginBottom: 6,
+  },
+  metaPillText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    backgroundColor: colors.screen,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoModalScroll: {
     flex: 1,
@@ -587,6 +794,9 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 24,
   },
+  infoSection: {
+    gap: 10,
+  },
   infoSectionLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -594,24 +804,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
+  infoCard: {
+    backgroundColor: colors.screen,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+  },
   infoList: {
-    marginBottom: 16,
+    gap: 10,
   },
   infoBullet: {
     fontSize: 15,
     color: colors.text,
-    marginBottom: 4,
+    lineHeight: 22,
   },
   infoParagraph: {
     fontSize: 15,
     color: colors.text,
-    marginBottom: 16,
+    lineHeight: 22,
   },
   infoNone: {
     fontSize: 15,
     color: colors.textSecondary,
     fontStyle: 'italic',
-    marginBottom: 16,
+    lineHeight: 22,
   },
   watchVideoButton: {
     flexDirection: 'row',

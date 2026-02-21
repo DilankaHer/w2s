@@ -121,11 +121,23 @@ function CreateWorkoutScreen() {
       if (!selected) return
       // Clear params immediately so a re-run of this effect (e.g. when callback identity changes) won't process again
       ;(navigation as any).setParams({ selectedExercise: undefined, replacingExerciseId: undefined })
+
+      const matched = exercises.find((e) => e.name === selected.name)
+      if (!matched) {
+        Toast.show({
+          type: 'error',
+          text1: 'Exercise not found',
+          text2: 'Please try selecting the exercise again.',
+        })
+        return
+      }
+
+      const selectedId = matched.id
       const isReplace = typeof replacingId === 'number'
       if (isReplace) {
         setWorkoutExercises((prev) =>
           prev.map((ex) =>
-            ex.id === replacingId ? { ...ex, id: selected.id } : ex
+            ex.id === replacingId ? { ...ex, id: selectedId } : ex
           )
         )
       } else {
@@ -135,14 +147,14 @@ function CreateWorkoutScreen() {
           return [
             ...prev,
             {
-              id: selected.id,
+              id: selectedId,
               order: newOrder,
               sets: [{ setNumber: 1, targetReps: 0, targetWeight: 0 }],
             },
           ]
         })
       }
-    }, [params?.selectedExercise, params?.replacingExerciseId, navigation])
+    }, [params?.selectedExercise, params?.replacingExerciseId, navigation, exercises])
   )
 
   const fetchExercisesInternal = async (silent: boolean) => {

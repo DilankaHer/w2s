@@ -146,9 +146,18 @@ function SessionDetailScreen() {
     useCallback(() => {
       const selected = selectedExerciseParam
       if (!selected || !session) return
-      addExerciseToSession(selected)
+      const matched = exercises.find((e) => e.name === selected.name)
+      if (!matched) {
+        Toast.show({
+          type: 'error',
+          text1: 'Exercise not found',
+          text2: 'Please try selecting the exercise again.',
+        })
+        return
+      }
+      addExerciseToSession(matched)
       ;(navigation as any).setParams({ selectedExercise: undefined })
-    }, [selectedExerciseParam, session, navigation])
+    }, [selectedExerciseParam, session, navigation, exercises])
   )
 
   const fetchSession = async (sessionId: number) => {

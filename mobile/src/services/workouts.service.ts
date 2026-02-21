@@ -1,4 +1,4 @@
-import type { Workout, WorkoutWithExercises } from '@shared/types'
+import type { Workout, WorkoutWithExercises } from '@shared/types/workouts.types'
 import { getWorkoutById, getWorkouts } from '../database/repositories/workouts.repository'
 
 export const getWorkoutsService = async (): Promise<Workout[]> => {
