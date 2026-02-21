@@ -12,21 +12,19 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import type { Set as SetType, WorkoutWithExercises } from '@shared/types'
 import type { RootStackParamList } from '../../App'
 import { getWorkoutByIdService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type WorkoutDetailRouteProp = RouteProp<RootStackParamList, 'WorkoutDetail'>
 
-type WorkoutDetail = NonNullable<Awaited<ReturnType<typeof getWorkoutByIdService>>>
-type SetItem = WorkoutDetail['workoutExercises'][number]['sets'][number]
-
 function WorkoutDetailScreen() {
   const route = useRoute<WorkoutDetailRouteProp>()
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
   const { id } = route.params
-  const [workout, setWorkout] = useState<WorkoutDetail | null>(null)
+  const [workout, setWorkout] = useState<WorkoutWithExercises | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
@@ -63,7 +61,7 @@ function WorkoutDetailScreen() {
       const newMap = new Map(prev)
       const current = newMap.get(setId)
       if (!current) {
-        let targetSet: SetItem | null = null
+        let targetSet: SetType | null = null
         for (const workoutExercise of workout?.workoutExercises ?? []) {
           const foundSet = workoutExercise.sets.find((s) => s.id === setId)
           if (foundSet) {
@@ -85,7 +83,7 @@ function WorkoutDetailScreen() {
     })
   }
 
-  const saveSetUpdate = async (set: SetItem) => {
+  const saveSetUpdate = async (set: SetType) => {
     const edited = editingSets.get(set.id)
     if (!edited) return
     if (!workout || workout.isDefaultWorkout) return

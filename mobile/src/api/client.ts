@@ -15,9 +15,7 @@ const getApiBaseUrl = (): string => {
 
   console.log("process.env.APP_ENV", process.env.APP_ENV)
   console.log("Constants.expoConfig?.extra", Constants.expoConfig?.extra)
-  const configUrl =
-    Constants.expoConfig?.extra?.apiUrl ??
-    'http://192.168.1.109:3000'
+  const configUrl = Constants.expoConfig?.extra?.apiUrl
 
   // Replace localhost with 10.0.2.2 for Android emulator
   if (Platform.OS === 'android' && configUrl.includes('localhost')) {

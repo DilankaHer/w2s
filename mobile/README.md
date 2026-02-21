@@ -1,87 +1,50 @@
-# W2S Mobile App
+# Welcome to your Expo app 👋
 
-React Native mobile application for the W2S workout tracking system, built with Expo.
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## Features
+## Get started
 
-- User authentication (login/signup)
-- Workout template management
-- Session tracking with timer
-- Exercise and set management
-- Real-time workout progress tracking
+1. Install dependencies
 
-## Prerequisites
+   ```bash
+   npm install
+   ```
 
-- Node.js 18+
-- pnpm (`npm install -g pnpm`)
-- Expo CLI (`pnpm add -g expo-cli` or `npm install -g expo-cli`)
-- iOS Simulator (for Mac) or Android Emulator
+2. Start the app
 
-**Note:** This project uses Expo SDK 53 with React Native 0.79 and React 19. The New Architecture is enabled by default.
+   ```bash
+   npx expo start
+   ```
 
-## Setup
+In the output, you'll find options to open the app in a
 
-1. Install dependencies:
-```bash
-pnpm install
-```
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-2. Configure API URL (optional):
-   - Create a `.env` file in the `mobile/` directory
-   - Add: `EXPO_PUBLIC_API_BASE_URL=http://your-backend-url:3000`
-   - Default is `http://localhost:3000`
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-3. Start the development server:
-```bash
-pnpm start
-```
+## Get a fresh project
 
-4. Run on your device:
-   - Scan the QR code with Expo Go app (iOS/Android)
-   - Or press `i` for iOS simulator, `a` for Android emulator
-
-## Project Structure
-
-```
-mobile/
-├── App.tsx                 # Root component with navigation
-├── src/
-│   ├── api/
-│   │   └── client.ts       # tRPC client configuration
-│   ├── hooks/
-│   │   └── useAuth.ts      # Authentication hook
-│   ├── components/
-│   │   └── ProtectedRoute.tsx  # Route protection wrapper
-│   ├── screens/            # Screen components
-│   │   ├── LoginScreen.tsx
-│   │   ├── LandingScreen.tsx
-│   │   ├── TemplateDetailScreen.tsx
-│   │   ├── SessionDetailScreen.tsx
-│   │   └── CreateTemplateScreen.tsx
-│   └── types/
-│       └── index.ts         # TypeScript type definitions
-└── package.json
-```
-
-## Development
-
-The app follows the same business logic as the web frontend:
-- Uses tRPC for API communication
-- Cookie-based authentication
-- Same data structures and API endpoints
-
-## Building for Production
+When you're ready, run:
 
 ```bash
-# iOS
-expo build:ios
-
-# Android
-expo build:android
+npm run reset-project
 ```
 
-## Notes
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-- The app uses AsyncStorage for cookie persistence
-- Make sure your backend is running and accessible from your device/emulator
-- For local development, use your computer's IP address instead of localhost
+## Learn more
+
+To learn more about developing your project with Expo, look at the following resources:
+
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+
+## Join the community
+
+Join our community of developers creating universal apps.
+
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.

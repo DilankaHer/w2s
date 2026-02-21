@@ -1,6 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { NavigationContainer, useNavigation } from '@react-navigation/native'
-import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack'
+import { createStackNavigator } from '@react-navigation/stack'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { StatusBar } from 'expo-status-bar'
 import React, { useEffect, useState } from 'react'
@@ -21,9 +21,9 @@ import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen'
 import WorkoutsScreen from './src/screens/WorkoutsScreen'
 import { colors } from './src/theme/colors'
 import { db } from '@/database/database'
-import migrations from 'drizzle/migrations'
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator'
 import { seed } from '@/database/seed'
+import migrations from './drizzle/migrations'
 
 export type ExercisePickerResult = { id: number; name: string }
 
@@ -309,11 +309,7 @@ const stackScreenOptions = {
   headerTitleStyle: {
     fontWeight: 'bold' as const,
   },
-  cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-  transitionSpec: {
-    open: { animation: 'timing' as const, config: { duration: 300 } },
-    close: { animation: 'timing' as const, config: { duration: 300 } },
-  },
+  contentStyle: { backgroundColor: colors.screen },
 }
 
 function SplashScreen() {
@@ -473,21 +469,16 @@ const overlayStyles = StyleSheet.create({
 })
 
 function RootNavigator() {
-  console.log('RootNavigator');
   const { success, error } = useMigrations(db, migrations);
-  console.log('success', success);
-  console.log('error', error);
   const [isDbReady, setIsDbReady] = useState(false);
   useEffect(() => {
     if (success) {
       async function afterMigration() {
         await db.run("PRAGMA foreign_keys = ON");
         const existing = await db.query.exercises.findFirst();
-        console.log('existing', existing);
         if (!existing) {
           await seed();
         }
-        console.log('setIsDbReady true');
         setIsDbReady(true);
       }
       afterMigration();
@@ -505,7 +496,7 @@ function RootNavigator() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack.Navigator
         initialRouteName="MainTabs"
         screenOptions={stackScreenOptions}
@@ -528,7 +519,7 @@ function RootNavigator() {
             title: 'Workout Details',
             headerStyle: { backgroundColor: colors.header },
             headerTintColor: colors.headerText,
-            headerBackTitleVisible: false,
+            animation: 'slide_from_right'
           }}
         />
         <Stack.Screen

@@ -1,0 +1,14 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit",
+    "source.sortMembers": "explicit"
+  },
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.project.explorer.showNonJavaResources": false,
+  "java.import.exclusions": [
+      "**/node_modules/**",
+      "**/android/.gradle/**"
+  ]
+}

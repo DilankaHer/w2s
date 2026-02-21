@@ -11,17 +11,16 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
+import type { Workout } from '@shared/types'
 import { getWorkoutsService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type Filter = 'all' | 'default' | 'custom'
 
-type WorkoutItem = Awaited<ReturnType<typeof getWorkoutsService>>[number]
-
 function WorkoutsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
-  const [workouts, setWorkouts] = useState<WorkoutItem[]>([])
+  const [workouts, setWorkouts] = useState<Workout[]>([])
   const [loading, setLoading] = useState(true)
   const [startingWorkoutId, setStartingWorkoutId] = useState<string | null>(null)
   const navigation = useNavigation()
@@ -54,13 +53,13 @@ function WorkoutsScreen() {
     loadWorkouts()
   }
 
-  const filteredWorkouts = ((): WorkoutItem[] => {
+  const filteredWorkouts = ((): Workout[] => {
     if (filter === 'default') return workouts.filter((w) => w.isDefaultWorkout === true)
     if (filter === 'custom') return workouts.filter((w) => w.isDefaultWorkout !== true)
     return workouts
   })()
 
-  const handleStartWorkout = async (workout: WorkoutItem) => {
+  const handleStartWorkout = async (workout: Workout) => {
     setStartingWorkoutId(workout.id)
     // TODO: local session creation for offline
     Toast.show({
@@ -99,7 +98,7 @@ function WorkoutsScreen() {
     </View>
   )
 
-  const renderWorkoutCard = (workout: WorkoutItem) => {
+  const renderWorkoutCard = (workout: Workout) => {
     const exerciseCount = workout.exerciseCount ?? 0
     const setCount = workout.setCount ?? 0
     const meta =

@@ -37,10 +37,13 @@ function ExercisesScreen() {
     if (!silent) setLoading(true)
     setError(null)
     try {
+      const exercisesPromise = trpc.exercises.list.query() as Promise<unknown>
+      const bodyPartsPromise = trpc.exercises.filterBodyParts.query() as Promise<{ id: number; name: string }[]>
+      const equipmentPromise = trpc.exercises.filterEquipment.query() as Promise<{ id: number; name: string }[]>
       const [exercisesData, bodyPartsData, equipmentData] = await Promise.all([
-        trpc.exercises.list.query(),
-        trpc.exercises.filterBodyParts.query(),
-        trpc.exercises.filterEquipment.query(),
+        exercisesPromise,
+        bodyPartsPromise,
+        equipmentPromise,
       ])
       setExercises(Array.isArray(exercisesData) ? (exercisesData as ExerciseWithMeta[]) : [])
       setBodyParts(Array.isArray(bodyPartsData) ? bodyPartsData : [])

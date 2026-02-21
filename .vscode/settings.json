@@ -3,7 +3,7 @@
     "java.compile.nullAnalysis.mode": "automatic",
     "java.project.explorer.showNonJavaResources": false,
     "java.import.exclusions": [
-        "**/node_modules/**",
-        "**/android/.gradle/**"
+        "./mobile/**/node_modules/**",
+        "./mobile/**/android/.gradle/**"
     ]
 }

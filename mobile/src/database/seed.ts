@@ -147,6 +147,8 @@ export async function seed() {
       name: 'Full Body Beginner',
       userId: null,
       isDefaultWorkout: true,
+      exerciseCount: 5,
+      setCount: 15,
       createdAt: now(),
     },
     {
@@ -154,6 +156,8 @@ export async function seed() {
       name: 'Upper Body Focus',
       userId: null,
       isDefaultWorkout: true,
+      exerciseCount: 3,
+      setCount: 9,
       createdAt: now(),
     },
   ]);
