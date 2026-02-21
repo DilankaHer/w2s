@@ -42,7 +42,7 @@ const mapSessionData = (sessionData: any): Session | null => {
       workoutId: sessionData.workoutId ?? undefined,
       sessionTime: sessionData.sessionTime ?? undefined,
       isSyncedOnce: sessionData.isSyncedOnce ?? false,
-      isFromDefaultTemplate: sessionData.isFromDefaultTemplate ?? false,
+      isFromDefaultWorkout: sessionData.isFromDefaultWorkout ?? false,
       sessionExercises: (sessionData.sessionExercises || []).map((se: any) => ({
         id: se.id,
         order: se.order,
@@ -90,13 +90,13 @@ function SessionDetailScreen() {
     // If we're loading a completed session from history, show summary immediately
     return !!initialCompletedAtParam
   })
-  const [templateError, setTemplateError] = useState<string | null>(null)
-  const [templateErrorSource, setTemplateErrorSource] = useState<'update' | 'create' | null>(null)
-  const [templateUpdateLoading, setTemplateUpdateLoading] = useState(false)
-  const [templateCreateLoading, setTemplateCreateLoading] = useState(false)
-  const [templateSuccess, setTemplateSuccess] = useState(false)
-  const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
-  const [newTemplateName, setNewTemplateName] = useState('')
+  const [workoutError, setWorkoutError] = useState<string | null>(null)
+  const [workoutErrorSource, setWorkoutErrorSource] = useState<'update' | 'create' | null>(null)
+  const [workoutUpdateLoading, setWorkoutUpdateLoading] = useState(false)
+  const [workoutCreateLoading, setWorkoutCreateLoading] = useState(false)
+  const [workoutSuccess, setWorkoutSuccess] = useState(false)
+  const [showCreateWorkoutModal, setShowCreateWorkoutModal] = useState(false)
+  const [newWorkoutName, setNewWorkoutName] = useState('')
   const [showAddExerciseModal, setShowAddExerciseModal] = useState(false)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [exercisesLoading, setExercisesLoading] = useState(false)
@@ -516,35 +516,35 @@ function SessionDetailScreen() {
     }
   }
 
-  const handleUpdateTemplate = async () => {
+  const handleUpdateWorkout = async () => {
     if (!session?.workoutId) return
     try {
-      setTemplateUpdateLoading(true)
-      setTemplateError(null)
-      setTemplateErrorSource(null)
+      setWorkoutUpdateLoading(true)
+      setWorkoutError(null)
+      setWorkoutErrorSource(null)
       await trpc.workouts.updateBySession.mutate({
         sessionId: session.id,
         workoutId: session.workoutId,
       })
-      setTemplateSuccess(true)
+      setWorkoutSuccess(true)
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Workout updated.',
       })
       await checkAuth()
-      handleGoToTemplates()
+      handleGoToWorkouts()
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to update workout. Please try again.')
-      setTemplateError(msg)
-      setTemplateErrorSource('update')
+      setWorkoutError(msg)
+      setWorkoutErrorSource('update')
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: 'Failed to update workout. Please try again.',
       })
     } finally {
-      setTemplateUpdateLoading(false)
+      setWorkoutUpdateLoading(false)
     }
   }
 
@@ -566,7 +566,7 @@ function SessionDetailScreen() {
               sessionCreatedAt: session.createdAt,
               session,
               removedSessionExerciseIds,
-              createTemplate: false,
+              createWorkout: false,
             })
           },
         },
@@ -574,21 +574,21 @@ function SessionDetailScreen() {
     )
   }
 
-  const handleCreateTemplatePress = () => {
+  const handleCreateWorkoutPress = () => {
     if (!session) return
 
-    // Show template name modal first (for both guests and authenticated users)
-    setNewTemplateName(session?.name ?? '')
-    setTemplateError(null)
-    setShowCreateTemplateModal(true)
+    // Show workout name modal first (for both guests and authenticated users)
+    setNewWorkoutName(session?.name ?? '')
+    setWorkoutError(null)
+    setShowCreateWorkoutModal(true)
   }
 
-  const handleCreateTemplateConfirm = async () => {
-    if (!session || !newTemplateName.trim()) return
+  const handleCreateWorkoutConfirm = async () => {
+    if (!session || !newWorkoutName.trim()) return
 
-    // If not authenticated, redirect to login with template name
+    // If not authenticated, redirect to login with workout name
     if (!isAuthenticated) {
-      setShowCreateTemplateModal(false)
+      setShowCreateWorkoutModal(false)
       Alert.alert(
         'Login required',
         'To create a workout, please log in or create an account.',
@@ -603,8 +603,8 @@ function SessionDetailScreen() {
                 sessionCreatedAt: session.createdAt,
                 session,
                 removedSessionExerciseIds,
-                createTemplate: true,
-                templateName: newTemplateName.trim(),
+                createWorkout: true,
+                workoutName: newWorkoutName.trim(),
               })
             },
           },
@@ -613,41 +613,41 @@ function SessionDetailScreen() {
       return
     }
 
-    // Authenticated users can create template directly
+    // Authenticated users can create workout directly
     try {
-      setTemplateCreateLoading(true)
-      setTemplateError(null)
-      setTemplateErrorSource(null)
+      setWorkoutCreateLoading(true)
+      setWorkoutError(null)
+      setWorkoutErrorSource(null)
       await trpc.workouts.createBySession.mutate({
         sessionId: session.id,
-        name: newTemplateName.trim(),
+        name: newWorkoutName.trim(),
       })
-      setTemplateSuccess(true)
-      setShowCreateTemplateModal(false)
+      setWorkoutSuccess(true)
+      setShowCreateWorkoutModal(false)
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Workout created.',
       })
       await checkAuth()
-      handleGoToTemplates()
+      handleGoToWorkouts()
     } catch (err) {
       const msg = getApiErrorMessage(err, 'Failed to create workout. Please try again.')
-      setTemplateError(msg)
-      setTemplateErrorSource('create')
-      setShowCreateTemplateModal(false)
+      setWorkoutError(msg)
+      setWorkoutErrorSource('create')
+      setShowCreateWorkoutModal(false)
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: 'Failed to create workout. Please try again.',
       })
     } finally {
-      setTemplateCreateLoading(false)
+      setWorkoutCreateLoading(false)
     }
   }
 
-  const handleGoToTemplates = () => {
-    ;(navigation as any).navigate('MainTabs', { screen: 'Templates' })
+  const handleGoToWorkouts = () => {
+    ;(navigation as any).navigate('MainTabs', { screen: 'Workouts' })
   }
 
   const formatTime = (seconds: number) => {
@@ -956,17 +956,17 @@ function SessionDetailScreen() {
 
         {session.completedAt && showCompletionSummary && (
           <View style={[styles.summaryBlock, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            {templateError && (
-              <View style={styles.templateErrorBox}>
-                <Text style={styles.templateErrorText}>{templateError}</Text>
+            {workoutError && (
+              <View style={styles.workoutErrorBox}>
+                <Text style={styles.workoutErrorText}>{workoutError}</Text>
                 <TouchableOpacity
                   style={styles.retryButton}
                   onPress={
-                    templateErrorSource === 'create'
-                      ? () => setShowCreateTemplateModal(true)
-                      : handleUpdateTemplate
+                    workoutErrorSource === 'create'
+                      ? () => setShowCreateWorkoutModal(true)
+                      : handleUpdateWorkout
                   }
-                  disabled={templateUpdateLoading || templateCreateLoading}
+                  disabled={workoutUpdateLoading || workoutCreateLoading}
                 >
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
@@ -1000,43 +1000,43 @@ function SessionDetailScreen() {
                     <Text style={styles.saveSessionButtonText}>Save Session</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.goToTemplatesButton}
-                    onPress={handleGoToTemplates}
+                    style={styles.goToWorkoutsButton}
+                    onPress={handleGoToWorkouts}
                   >
-                    <Text style={styles.goToTemplatesButtonText}>Go to Workouts</Text>
+                    <Text style={styles.goToWorkoutsButtonText}>Go to Workouts</Text>
                   </TouchableOpacity>
                 </>
               )}
-              {session.workoutId != null && isAuthenticated && !session.isSyncedOnce && !session.isFromDefaultTemplate && (
+              {session.workoutId != null && isAuthenticated && !session.isSyncedOnce && !session.isFromDefaultWorkout && (
                 <TouchableOpacity
-                  style={[styles.templateActionButton, templateUpdateLoading && styles.buttonDisabled]}
-                  onPress={handleUpdateTemplate}
-                  disabled={templateUpdateLoading}
+                  style={[styles.workoutActionButton, workoutUpdateLoading && styles.buttonDisabled]}
+                  onPress={handleUpdateWorkout}
+                  disabled={workoutUpdateLoading}
                 >
-                  {templateUpdateLoading ? (
+                  {workoutUpdateLoading ? (
                     <ActivityIndicator color={colors.primaryText} size="small" />
                   ) : (
-                    <Text style={styles.templateActionButtonText}>Update Workout</Text>
+                    <Text style={styles.workoutActionButtonText}>Update Workout</Text>
                   )}
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={[styles.templateActionButton, templateCreateLoading && styles.buttonDisabled]}
-                onPress={handleCreateTemplatePress}
-                disabled={templateCreateLoading}
+                style={[styles.workoutActionButton, workoutCreateLoading && styles.buttonDisabled]}
+                onPress={handleCreateWorkoutPress}
+                disabled={workoutCreateLoading}
               >
-                {templateCreateLoading ? (
+                {workoutCreateLoading ? (
                   <ActivityIndicator color={colors.primaryText} size="small" />
                 ) : (
-                  <Text style={styles.templateActionButtonText}>Create Workout</Text>
+                  <Text style={styles.workoutActionButtonText}>Create Workout</Text>
                 )}
               </TouchableOpacity>
               {isAuthenticated && (
                 <TouchableOpacity
-                  style={styles.goToTemplatesButton}
-                  onPress={handleGoToTemplates}
+                  style={styles.goToWorkoutsButton}
+                  onPress={handleGoToWorkouts}
                 >
-                  <Text style={styles.goToTemplatesButtonText}>Go to Workouts</Text>
+                  <Text style={styles.goToWorkoutsButtonText}>Go to Workouts</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1051,18 +1051,18 @@ function SessionDetailScreen() {
       </ScrollView>
 
       <Modal
-        visible={showCreateTemplateModal}
+        visible={showCreateWorkoutModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowCreateTemplateModal(false)}
+        onRequestClose={() => setShowCreateWorkoutModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>New workout name</Text>
             <TextInput
               style={styles.modalInput}
-              value={newTemplateName}
-              onChangeText={setNewTemplateName}
+              value={newWorkoutName}
+              onChangeText={setNewWorkoutName}
               placeholder="Workout name"
               placeholderTextColor={colors.placeholder}
               autoFocus
@@ -1071,18 +1071,18 @@ function SessionDetailScreen() {
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => {
-                  setShowCreateTemplateModal(false)
-                  setTemplateError(null)
+                  setShowCreateWorkoutModal(false)
+                  setWorkoutError(null)
                 }}
               >
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalConfirmButton, (!newTemplateName.trim() || templateCreateLoading) && styles.buttonDisabled]}
-                onPress={handleCreateTemplateConfirm}
-                disabled={!newTemplateName.trim() || templateCreateLoading}
+                style={[styles.modalConfirmButton, (!newWorkoutName.trim() || workoutCreateLoading) && styles.buttonDisabled]}
+                onPress={handleCreateWorkoutConfirm}
+                disabled={!newWorkoutName.trim() || workoutCreateLoading}
               >
-                {templateCreateLoading ? (
+                {workoutCreateLoading ? (
                   <ActivityIndicator color={colors.primaryText} size="small" />
                 ) : (
                   <Text style={styles.modalConfirmButtonText}>Confirm</Text>
@@ -1521,7 +1521,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 4,
   },
-  templateErrorBox: {
+  workoutErrorBox: {
     backgroundColor: colors.errorBg,
     borderWidth: 1,
     borderColor: colors.errorBorder,
@@ -1530,7 +1530,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
   },
-  templateErrorText: {
+  workoutErrorText: {
     color: colors.errorText,
     fontSize: 14,
     marginBottom: 8,
@@ -1547,7 +1547,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  templateSuccessText: {
+  workoutSuccessText: {
     fontSize: 14,
     color: colors.success,
     fontWeight: '600',
@@ -1571,14 +1571,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 12,
   },
-  templateActionButton: {
+  workoutActionButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  templateActionButtonText: {
+  workoutActionButtonText: {
     color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
@@ -1595,14 +1595,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  goToTemplatesButton: {
+  goToWorkoutsButton: {
     backgroundColor: colors.success,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  goToTemplatesButtonText: {
+  goToWorkoutsButtonText: {
     color: colors.successText,
     fontSize: 16,
     fontWeight: '600',

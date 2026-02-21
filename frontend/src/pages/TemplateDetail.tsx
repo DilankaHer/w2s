@@ -14,24 +14,24 @@ interface Exercise {
   name: string
 }
 
-interface TemplateExercise {
+interface WorkoutExercise {
   id: number
   order: number
   exercise: Exercise
   sets: Set[]
 }
 
-interface Template {
+interface Workout {
   id: number
   name: string
   createdAt: string
-  workoutExercises: TemplateExercise[]
+  workoutExercises: WorkoutExercise[]
 }
 
-function TemplateDetail() {
+function WorkoutDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [template, setTemplate] = useState<Template | null>(null)
+  const [workout, setWorkout] = useState<Workout | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
@@ -39,16 +39,16 @@ function TemplateDetail() {
 
   useEffect(() => {
     if (id) {
-      fetchTemplate(parseInt(id))
+      fetchWorkout(parseInt(id))
     }
   }, [id])
 
-  const fetchTemplate = async (templateId: number) => {
+  const fetchWorkout = async (workoutId: number) => {
     try {
       setLoading(true)
       setError(null)
-      const data = await trpc.workouts.getById.query({ id: templateId })
-      setTemplate(data)
+      const data = await trpc.workouts.getById.query({ id: workoutId })
+      setWorkout(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -63,8 +63,8 @@ function TemplateDetail() {
       if (!current) {
         // Initialize with current set values
         let targetSet: Set | null = null
-        for (const templateExercise of template?.workoutExercises || []) {
-          const foundSet = templateExercise.sets.find((s) => s.id === setId)
+        for (const workoutExercise of workout?.workoutExercises || []) {
+          const foundSet = workoutExercise.sets.find((s) => s.id === setId)
           if (foundSet) {
             targetSet = foundSet
             break
@@ -88,7 +88,7 @@ function TemplateDetail() {
     const edited = editingSets.get(set.id)
     if (!edited) return
 
-    if (!template) return
+    if (!workout) return
 
     // Prepare update data
     const updateData = {
@@ -102,13 +102,13 @@ function TemplateDetail() {
       await trpc.sets.update.mutate(updateData)
 
       // Update local state
-      setTemplate((prev) => {
+      setWorkout((prev) => {
         if (!prev) return null
         return {
           ...prev,
-          workoutExercises: prev.workoutExercises.map((templateExercise) => ({
-            ...templateExercise,
-            sets: templateExercise.sets.map((s) =>
+          workoutExercises: prev.workoutExercises.map((workoutExercise) => ({
+            ...workoutExercise,
+            sets: workoutExercise.sets.map((s) =>
               s.id === set.id
                 ? {
                     ...s,
@@ -133,13 +133,13 @@ function TemplateDetail() {
   }
 
   const handleCreateSession = async () => {
-    if (!template) return
+    if (!workout) return
 
     try {
       setCreatingSession(true)
       setError(null)
       const session = await trpc.sessions.create.mutate({
-        workoutId: template.id,
+        workoutId: workout.id,
       })
       // Navigate to session page with session data
       navigate(`/session/${session.id}`, { state: { session } })
@@ -177,7 +177,7 @@ function TemplateDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading template...</div>
+        <div className="text-lg text-gray-600">Loading workout...</div>
       </div>
     )
   }
@@ -191,10 +191,10 @@ function TemplateDetail() {
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
           >
-            Back to Templates
+            Back to Workouts
           </button>
           <button
-            onClick={() => id && fetchTemplate(parseInt(id))}
+            onClick={() => id && fetchWorkout(parseInt(id))}
             className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
           >
             Retry
@@ -204,16 +204,16 @@ function TemplateDetail() {
     )
   }
 
-  if (!template) {
+  if (!workout) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-gray-600 mb-4">Template not found</div>
+          <div className="text-gray-600 mb-4">Workout not found</div>
           <button
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            Back to Templates
+            Back to Workouts
           </button>
         </div>
       </div>
@@ -237,15 +237,15 @@ function TemplateDetail() {
           onClick={() => navigate('/')}
           className="mb-6 text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← Back to Templates
+          ← Back to Workouts
         </button>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{template.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{workout.name}</h1>
               <p className="text-sm text-gray-500">
-                Created: {new Date(template.createdAt).toLocaleDateString()}
+                Created: {new Date(workout.createdAt).toLocaleDateString()}
               </p>
             </div>
             <button
@@ -259,21 +259,21 @@ function TemplateDetail() {
         </div>
 
         <div className="space-y-4">
-          {template.workoutExercises.length === 0 ? (
+          {workout.workoutExercises.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-6 text-center text-gray-600">
-              No exercises in this template
+              No exercises in this workout
             </div>
           ) : (
-            template.workoutExercises.map((templateExercise) => (
+            workout.workoutExercises.map((workoutExercise) => (
               <div
-                key={templateExercise.id}
+                key={workoutExercise.id}
                 className="bg-white rounded-lg shadow-md p-6"
               >
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  {templateExercise.order + 1}. {templateExercise.exercise.name}
+                  {workoutExercise.order + 1}. {workoutExercise.exercise.name}
                 </h2>
                 
-                {templateExercise.sets.length === 0 ? (
+                {workoutExercise.sets.length === 0 ? (
                   <p className="text-gray-500 text-sm">No sets configured</p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -292,7 +292,7 @@ function TemplateDetail() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {templateExercise.sets.map((set) => {
+                        {workoutExercise.sets.map((set) => {
                           const edited = editingSets.get(set.id)
                           const displayWeight = edited?.targetWeight ?? set.targetWeight
                           const displayReps = edited?.targetReps ?? set.targetReps
@@ -374,4 +374,4 @@ function TemplateDetail() {
   )
 }
 
-export default TemplateDetail
+export default WorkoutDetail

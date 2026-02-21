@@ -42,12 +42,15 @@ function ExercisePickerScreen() {
     if (!silent) setLoading(true)
     setError(null)
     try {
+      const exercisesPromise = trpc.exercises.list.query() as Promise<ExerciseWithMeta[]>
+      const bodyPartsPromise = trpc.exercises.filterBodyParts.query() as Promise<{ id: number; name: string }[]>
+      const equipmentPromise = trpc.exercises.filterEquipment.query() as Promise<{ id: number; name: string }[]>
       const [exercisesData, bodyPartsData, equipmentData] = await Promise.all([
-        trpc.exercises.list.query(),
-        trpc.exercises.filterBodyParts.query(),
-        trpc.exercises.filterEquipment.query(),
+        exercisesPromise,
+        bodyPartsPromise,
+        equipmentPromise,
       ])
-      setExercises(Array.isArray(exercisesData) ? (exercisesData as ExerciseWithMeta[]) : [])
+      setExercises(Array.isArray(exercisesData) ? exercisesData : [])
       setBodyParts(Array.isArray(bodyPartsData) ? bodyPartsData : [])
       setEquipmentList(Array.isArray(equipmentData) ? equipmentData : [])
     } catch (err) {
@@ -144,8 +147,8 @@ function ExercisePickerScreen() {
   const handleSelectExercise = useCallback(
     (item: ExerciseWithMeta) => {
       const exercise: Exercise = { id: item.id, name: item.name }
-      if (pickerFor === 'createTemplate') {
-        navigation.navigate('CreateTemplate', {
+      if (pickerFor === 'createWorkout') {
+        navigation.navigate('CreateWorkout', {
           selectedExercise: exercise,
           ...(typeof replacingExerciseId === 'number' ? { replacingExerciseId } : {}),
         })

@@ -27,7 +27,7 @@ export interface SessionSet {
   isCompleted?: boolean
 }
 
-export interface TemplateExercise {
+export interface WorkoutExercise {
   id: number
   order: number
   exercise: Exercise
@@ -41,13 +41,13 @@ export interface SessionExercise {
   sets: SessionSet[]
 }
 
-export interface Template {
+export interface Workout {
   id: number
   name: string
   createdAt: string
-  workoutExercises: TemplateExercise[]
-  isDefaultTemplate?: boolean
-  /** When provided by API, shown on template card as "X exercises • Y sets" */
+  workoutExercises: WorkoutExercise[]
+  isDefaultWorkout?: boolean
+  /** When provided by API, shown on workout card as "X exercises • Y sets" */
   exerciseCount?: number
   setCount?: number
 }
@@ -60,13 +60,13 @@ export interface Session {
   workoutId?: number | null
   sessionTime?: string | null
   isSyncedOnce?: boolean
-  isFromDefaultTemplate?: boolean
+  isFromDefaultWorkout?: boolean
   sessionExercises: SessionExercise[]
 }
 
 export interface WorkoutInfo {
   username: string
-  workouts: Template[]
+  workouts: Workout[]
   sessions: Array<{
     id: number
     workoutId: number | null

@@ -1,5 +1,6 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
+import type { StackNavigationProp } from '@react-navigation/stack'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     KeyboardAvoidingView,
@@ -22,7 +23,7 @@ import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
 import type { Exercise } from '../types'
 
-type CreateTemplateRouteProp = RouteProp<RootStackParamList, 'CreateTemplate'>
+type CreateWorkoutRouteProp = RouteProp<RootStackParamList, 'CreateWorkout'>
 
 interface Set {
   setNumber: number
@@ -36,11 +37,11 @@ interface WorkoutExercise {
   sets: Set[]
 }
 
-type CreateTemplatePhase = 'checking' | 'retry' | 'ready'
+type CreateWorkoutPhase = 'checking' | 'retry' | 'ready'
 
-function CreateTemplateScreen() {
-  const navigation = useNavigation()
-  const route = useRoute<CreateTemplateRouteProp>()
+function CreateWorkoutScreen() {
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>()
+  const route = useRoute<CreateWorkoutRouteProp>()
   const params = route.params
   const {
     checkAuth,
@@ -51,8 +52,8 @@ function CreateTemplateScreen() {
     unregisterOnRetrySuccess,
     isAuthenticated,
   } = useAuth()
-  const [phase, setPhase] = useState<CreateTemplatePhase>('checking')
-  const [templateName, setTemplateName] = useState('')
+  const [phase, setPhase] = useState<CreateWorkoutPhase>('checking')
+  const [workoutName, setWorkoutName] = useState('')
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([])
   const [showExerciseList, setShowExerciseList] = useState(false)
   const [replacingExerciseId, setReplacingExerciseId] = useState<number | null>(null)
@@ -181,7 +182,7 @@ function CreateTemplateScreen() {
         clearTimeout(workoutNameCheckTimeoutRef.current)
         workoutNameCheckTimeoutRef.current = null
       }
-      const trimmed = templateName.trim()
+      const trimmed = workoutName.trim()
       if (!trimmed) {
         setWorkoutNameExists(null)
         return
@@ -198,7 +199,7 @@ function CreateTemplateScreen() {
     } else {
       setWorkoutNameExists(null)
     }
-  }, [templateName, isAuthenticated, phase, checkWorkoutName])
+  }, [workoutName, isAuthenticated, phase, checkWorkoutName])
 
   const addExercise = (exercise: Exercise) => {
     if (replacingExerciseId !== null) {
@@ -238,7 +239,7 @@ function CreateTemplateScreen() {
   const openExercisePicker = useCallback(
     (replacingId: number | null) => {
       navigation.navigate('ExercisePicker', {
-        pickerFor: 'createTemplate',
+        pickerFor: 'createWorkout',
         ...(typeof replacingId === 'number' ? { replacingExerciseId: replacingId } : {}),
       })
     },
@@ -323,7 +324,7 @@ function CreateTemplateScreen() {
   }
 
   const handleSubmit = async () => {
-    if (!templateName.trim()) {
+    if (!workoutName.trim()) {
       setError('Workout name is required')
       return
     }
@@ -336,7 +337,7 @@ function CreateTemplateScreen() {
     // Check if workout name already exists (for authenticated users)
     if (isAuthenticated) {
       try {
-        const nameCheck = await trpc.workouts.checkWorkoutName.mutate({ name: templateName.trim() })
+        const nameCheck = await trpc.workouts.checkWorkoutName.mutate({ name: workoutName.trim() })
         if (nameCheck.exists) {
           setError('A workout with this name already exists')
           return
@@ -352,8 +353,8 @@ function CreateTemplateScreen() {
 
       const workoutPayload = {
         workout: {
-          name: templateName.trim(),
-          isTemplate: true,
+          name: workoutName.trim(),
+          isWorkout: true,
           workoutExercises: workoutExercises.map((ex) => ({
             id: ex.id,
             order: ex.order,
@@ -363,7 +364,7 @@ function CreateTemplateScreen() {
       }
       await trpc.workouts.create.mutate(workoutPayload)
 
-      // Refresh workout info to get the new template
+      // Refresh workout info to get the new workout
       await checkAuth()
       navigation.navigate('MainTabs' as never)
     } catch (err) {
@@ -415,8 +416,8 @@ function CreateTemplateScreen() {
                   ? styles.nameInputError
                   : null,
               ]}
-              value={templateName}
-              onChangeText={setTemplateName}
+              value={workoutName}
+              onChangeText={setWorkoutName}
               placeholder="Enter workout name"
               placeholderTextColor={colors.placeholder}
             />
@@ -933,4 +934,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default CreateTemplateScreen
+export default CreateWorkoutScreen

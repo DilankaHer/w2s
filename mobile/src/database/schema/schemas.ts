@@ -60,7 +60,9 @@ import {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     userId: text('user_id'),
-    isDefaultTemplate: integer('is_default_template', { mode: 'boolean' }).default(false),
+    isDefaultWorkout: integer('is_default_workout', { mode: 'boolean' }).notNull().default(false),
+    exerciseCount: integer('exercise_count').notNull().default(0),
+    setCount: integer('set_count').notNull().default(0),
     createdAt: text('created_at').notNull()
   }, (table) => ({
     userNameUnique: uniqueIndex('workouts_user_name_unique')
@@ -85,7 +87,7 @@ import {
   }));
   
   //
-  // SETS (Workout Template Sets)
+  // SETS (Workout Sets)
   //
   export const sets = sqliteTable('sets', {
     id: text('id').primaryKey(),
@@ -112,7 +114,7 @@ import {
     completedAt: text('completed_at'),
     sessionTime: text('session_time'),
     isSyncedOnce: integer('is_synced_once', { mode: 'boolean' }).default(false),
-    isFromDefaultTemplate: integer('is_from_default_template', { mode: 'boolean' }).default(false)
+    isFromDefaultWorkout: integer('is_from_default_workout', { mode: 'boolean' }).default(false)
   }, (table) => ({
     userCreatedIdx: index('sessions_user_created_idx')
       .on(table.userId, table.createdAt),

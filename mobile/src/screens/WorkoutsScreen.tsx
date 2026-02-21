@@ -18,7 +18,7 @@ type Filter = 'all' | 'default' | 'custom'
 
 type WorkoutItem = Awaited<ReturnType<typeof getWorkoutsService>>[number]
 
-function TemplatesScreen() {
+function WorkoutsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [workouts, setWorkouts] = useState<WorkoutItem[]>([])
@@ -54,26 +54,26 @@ function TemplatesScreen() {
     loadWorkouts()
   }
 
-  const filteredTemplates = ((): WorkoutItem[] => {
-    if (filter === 'default') return workouts.filter((w) => w.isDefaultTemplate === true)
-    if (filter === 'custom') return workouts.filter((w) => w.isDefaultTemplate !== true)
+  const filteredWorkouts = ((): WorkoutItem[] => {
+    if (filter === 'default') return workouts.filter((w) => w.isDefaultWorkout === true)
+    if (filter === 'custom') return workouts.filter((w) => w.isDefaultWorkout !== true)
     return workouts
   })()
 
-  const handleStartWorkout = async (template: WorkoutItem) => {
-    setStartingWorkoutId(template.id)
+  const handleStartWorkout = async (workout: WorkoutItem) => {
+    setStartingWorkoutId(workout.id)
     // TODO: local session creation for offline
     Toast.show({
       type: 'info',
       text1: 'Offline mode',
-      text2: 'Starting workout from template will be available when session flow is wired to local.',
+      text2: 'Starting session from workout will be available when session flow is wired to local.',
     })
     setStartingWorkoutId(null)
   }
 
-  const handleTemplateClick = (id: string) => {
+  const handleWorkoutClick = (id: string) => {
     const nav = navigation as any
-    nav.navigate('TemplateDetail', { id })
+    nav.navigate('WorkoutDetail', { id })
   }
 
   const renderFilterTabs = () => (
@@ -99,30 +99,29 @@ function TemplatesScreen() {
     </View>
   )
 
-  const renderTemplateCard = (template: WorkoutItem) => {
-    const exerciseCount = template.workoutExercises?.length ?? 0
-    const setCount =
-      template.workoutExercises?.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0) ?? 0
+  const renderWorkoutCard = (workout: WorkoutItem) => {
+    const exerciseCount = workout.exerciseCount ?? 0
+    const setCount = workout.setCount ?? 0
     const meta =
       exerciseCount > 0 && setCount > 0
         ? `${exerciseCount} exercises • ${setCount} sets`
         : exerciseCount > 0
           ? `${exerciseCount} exercise${exerciseCount !== 1 ? 's' : ''}`
           : null
-    const isDefault = template.isDefaultTemplate === true
-    const starting = startingWorkoutId === template.id
+    const isDefault = workout.isDefaultWorkout === true
+    const starting = startingWorkoutId === workout.id
 
     return (
-      <View key={template.id} style={styles.templateCard}>
+      <View key={workout.id} style={styles.workoutCard}>
         <TouchableOpacity
-          style={styles.templateCardTop}
-          onPress={() => handleTemplateClick(template.id)}
+          style={styles.workoutCardTop}
+          onPress={() => handleWorkoutClick(workout.id)}
           activeOpacity={0.7}
         >
-          <View style={styles.templateCardMain}>
-            <View style={styles.templateTitleRow}>
-              <Text style={styles.templateName} numberOfLines={1}>
-                {template.name}
+          <View style={styles.workoutCardMain}>
+            <View style={styles.workoutTitleRow}>
+              <Text style={styles.workoutName} numberOfLines={1}>
+                {workout.name}
               </Text>
               {isDefault ? (
                 <View style={styles.defaultTag}>
@@ -134,13 +133,13 @@ function TemplatesScreen() {
                 </View>
               )}
             </View>
-            {meta ? <Text style={styles.templateMeta}>{meta}</Text> : null}
+            {meta ? <Text style={styles.workoutMeta}>{meta}</Text> : null}
           </View>
           <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.startWorkoutButton, starting && styles.buttonDisabled]}
-          onPress={() => handleStartWorkout(template)}
+          onPress={() => handleStartWorkout(workout)}
           disabled={starting}
         >
           {starting ? (
@@ -161,9 +160,9 @@ function TemplatesScreen() {
   }
 
   const showEmpty = workouts.length === 0
-  const showEmptyCustom = filter === 'custom' && filteredTemplates.length === 0
-  const showEmptyDefault = filter === 'default' && filteredTemplates.length === 0
-  const showEmptyAll = filter === 'all' && filteredTemplates.length === 0
+  const showEmptyCustom = filter === 'custom' && filteredWorkouts.length === 0
+  const showEmptyDefault = filter === 'default' && filteredWorkouts.length === 0
+  const showEmptyAll = filter === 'all' && filteredWorkouts.length === 0
 
   if (showEmpty) {
     return (
@@ -193,7 +192,7 @@ function TemplatesScreen() {
         ) : showEmptyAll ? (
           <Text style={styles.sectionEmptyText}>No workouts.</Text>
         ) : (
-          filteredTemplates.map(renderTemplateCard)
+          filteredWorkouts.map(renderWorkoutCard)
         )}
       </ScrollView>
     </View>
@@ -265,7 +264,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  templateCard: {
+  workoutCard: {
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
@@ -273,23 +272,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  templateCardTop: {
+  workoutCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  templateCardMain: {
+  workoutCardMain: {
     flex: 1,
     marginRight: 8,
   },
-  templateTitleRow: {
+  workoutTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
   },
-  templateName: {
+  workoutName: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
@@ -318,7 +317,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.accentText,
   },
-  templateMeta: {
+  workoutMeta: {
     fontSize: 14,
     color: colors.textSecondary,
   },
@@ -341,4 +340,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default TemplatesScreen
+export default WorkoutsScreen

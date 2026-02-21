@@ -136,7 +136,7 @@ export async function seed() {
   );
 
   //
-  // WORKOUT TEMPLATES
+  // WORKOUTS
   //
   const fullBodyId = crypto.randomUUID();
   const upperBodyId = crypto.randomUUID();
@@ -146,14 +146,14 @@ export async function seed() {
       id: fullBodyId,
       name: 'Full Body Beginner',
       userId: null,
-      isDefaultTemplate: true,
+      isDefaultWorkout: true,
       createdAt: now(),
     },
     {
       id: upperBodyId,
       name: 'Upper Body Focus',
       userId: null,
-      isDefaultTemplate: true,
+      isDefaultWorkout: true,
       createdAt: now(),
     },
   ]);
@@ -161,7 +161,7 @@ export async function seed() {
   //
   // WORKOUT EXERCISES
   //
-  const templateExercises: InferInsertModel<typeof workoutExercises>[] = []; 
+  const workoutExercisesList: InferInsertModel<typeof workoutExercises>[] = []; 
 
   const fullBodyOrder = [
     'Squat',
@@ -172,7 +172,7 @@ export async function seed() {
   ];
 
   fullBodyOrder.forEach((name, index) => {
-    templateExercises.push({
+    workoutExercisesList.push({
       id: crypto.randomUUID(),
       workoutId: fullBodyId,
       exerciseId: exMap[name],
@@ -187,7 +187,7 @@ export async function seed() {
   ];
 
   upperBodyOrder.forEach((name, index) => {
-    templateExercises.push({
+    workoutExercisesList.push({
       id: crypto.randomUUID(),
       workoutId: upperBodyId,
       exerciseId: exMap[name],
@@ -195,7 +195,7 @@ export async function seed() {
     });
   });
 
-  await db.insert(workoutExercises).values(templateExercises);
+  await db.insert(workoutExercises).values(workoutExercisesList);
   console.log('Inserted workout exercises');
 
   //
@@ -203,7 +203,7 @@ export async function seed() {
   //
   const setsRows: InferInsertModel<typeof sets>[] = [];
 
-  templateExercises.forEach(te => {
+  workoutExercisesList.forEach(te => {
     const isFullBody = te.workoutId === fullBodyId;
 
     const repScheme = isFullBody ? 10 : 8;

@@ -149,18 +149,18 @@ async function main() {
   const fullBodyWorkout = await prisma.workout.create({
     data: {
       name: 'Full Body Beginner',
-      isDefaultTemplate: true,
+      isDefaultWorkout: true,
     },
   })
 
   const upperBodyWorkout = await prisma.workout.create({
     data: {
       name: 'Upper Body Focus',
-      isDefaultTemplate: true,
+      isDefaultWorkout: true,
     },
   })
 
-  console.log(`✅ Created 2 templates`)
+  console.log(`✅ Created 2 workouts`)
 
   // Add exercises to Full Body workout
   const fullBodyExercises = [
@@ -171,7 +171,7 @@ async function main() {
     { exercise: barbellRow, order: 5 },
   ]
 
-  const fullBodyTemplateExercises = []
+  const fullBodyWorkoutExercises = []
   for (const { exercise, order } of fullBodyExercises) {
     const te = await prisma.workoutExercise.create({
       data: {
@@ -180,7 +180,7 @@ async function main() {
         order,
       },
     })
-    fullBodyTemplateExercises.push(te)
+    fullBodyWorkoutExercises.push(te)
   }
 
   // Add exercises to Upper Body workout
@@ -190,7 +190,7 @@ async function main() {
     { exercise: barbellRow, order: 3 },
   ]
 
-  const upperBodyTemplateExercises = []
+  const upperBodyWorkoutExercises = []
   for (const { exercise, order } of upperBodyExercises) {
     const te = await prisma.workoutExercise.create({
       data: {
@@ -199,10 +199,10 @@ async function main() {
         order,
       },
     })
-    upperBodyTemplateExercises.push(te)
+    upperBodyWorkoutExercises.push(te)
   }
 
-  console.log(`✅ Created ${fullBodyTemplateExercises.length + upperBodyTemplateExercises.length} workout exercises`)
+  console.log(`✅ Created ${fullBodyWorkoutExercises.length + upperBodyWorkoutExercises.length} workout exercises`)
 
   // Create sets for Full Body workout exercises
   const setsData = []
@@ -210,7 +210,7 @@ async function main() {
   // Squat: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      workoutExerciseId: fullBodyTemplateExercises[0]?.id ?? 0,
+      workoutExerciseId: fullBodyWorkoutExercises[0]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 10,
       targetWeight: 135,
@@ -220,7 +220,7 @@ async function main() {
   // Bench Press: 4 sets
   for (let i = 0; i < 4; i++) {
     setsData.push({
-      workoutExerciseId: fullBodyTemplateExercises[1]?.id ?? 0,
+      workoutExerciseId: fullBodyWorkoutExercises[1]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 185,
@@ -230,7 +230,7 @@ async function main() {
   // Deadlift: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      workoutExerciseId: fullBodyTemplateExercises[2]?.id ?? 0,
+      workoutExerciseId: fullBodyWorkoutExercises[2]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 5,
       targetWeight: 225,
@@ -240,7 +240,7 @@ async function main() {
   // Overhead Press: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      workoutExerciseId: fullBodyTemplateExercises[3]?.id ?? 0,
+      workoutExerciseId: fullBodyWorkoutExercises[3]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 95,
@@ -250,7 +250,7 @@ async function main() {
   // Barbell Row: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      workoutExerciseId: fullBodyTemplateExercises[4]?.id ?? 0,
+      workoutExerciseId: fullBodyWorkoutExercises[4]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 10,
       targetWeight: 135,
@@ -261,7 +261,7 @@ async function main() {
   // Bench Press: 4 sets
   for (let i = 0; i < 4; i++) {
     setsData.push({
-      workoutExerciseId: upperBodyTemplateExercises[0]?.id ?? 0,
+      workoutExerciseId: upperBodyWorkoutExercises[0]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 185,
@@ -271,7 +271,7 @@ async function main() {
   // Overhead Press: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      workoutExerciseId: upperBodyTemplateExercises[1]?.id ?? 0,
+      workoutExerciseId: upperBodyWorkoutExercises[1]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 8,
       targetWeight: 95,
@@ -281,7 +281,7 @@ async function main() {
   // Barbell Row: 3 sets
   for (let i = 0; i < 3; i++) {
     setsData.push({
-      workoutExerciseId: upperBodyTemplateExercises[2]?.id ?? 0,
+      workoutExerciseId: upperBodyWorkoutExercises[2]?.id ?? 0,
       setNumber: i + 1,
       targetReps: 10,
       targetWeight: 135,

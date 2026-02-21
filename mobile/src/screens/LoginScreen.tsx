@@ -110,8 +110,8 @@ function LoginScreen() {
 
         const sessionToSave = route.params?.session as Session | undefined
         const removedIds = route.params?.removedSessionExerciseIds
-        const shouldCreateTemplate = route.params?.createTemplate === true
-        const templateName = route.params?.templateName || sessionToSave?.name || ''
+        const shouldCreateWorkout = route.params?.createWorkout === true
+        const workoutName = route.params?.workoutName || sessionToSave?.name || ''
 
         if (sessionToSave && route.params?.completeSessionId != null) {
           try {
@@ -128,19 +128,19 @@ function LoginScreen() {
             })
             await checkAuth()
             
-            // If user wanted to create template, do it now
-            if (shouldCreateTemplate && templateName.trim()) {
+            // If user wanted to create workout, do it now
+            if (shouldCreateWorkout && workoutName.trim()) {
               try {
                 await trpc.workouts.createBySession.mutate({
                   sessionId: updatedSession.id,
-                  name: templateName.trim(),
+                  name: workoutName.trim(),
                 })
                 await checkAuth()
                 
-                // Navigate to Templates screen
+                // Navigate to Workouts screen
                 const nav = navigation as any
                 nav.navigate('MainTabs', {
-                  screen: 'Templates',
+                  screen: 'Workouts',
                 })
 
                 Toast.show({
@@ -149,9 +149,9 @@ function LoginScreen() {
                   text2: 'Session saved and workout created!',
                 })
                 return
-              } catch (templateErr) {
-                // Template creation failed, but session is saved
-                // Navigate back and let user retry template creation
+              } catch (workoutErr) {
+                // Workout creation failed, but session is saved
+                // Navigate back and let user retry workout creation
                 const nav = navigation as any
                 nav.navigate('SessionDetail', {
                   id: updatedSession.id,
@@ -167,10 +167,10 @@ function LoginScreen() {
               }
             }
             
-            // Navigate to Templates screen
+            // Navigate to Workouts screen
             const nav = navigation as any
             nav.navigate('MainTabs', {
-              screen: 'Templates',
+              screen: 'Workouts',
             })
 
             Toast.show({

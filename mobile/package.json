@@ -1,14 +1,8 @@
 {
   "name": "w2s-mobile",
   "version": "1.0.0",
-  "packageManager": "pnpm@10.14.0",
+  "type": "commonjs",
   "main": "index.js",
-  "pnpm": {
-    "overrides": {
-      "glob": "^10.4.5",
-      "rimraf": "^5.0.10"
-    }
-  },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -16,7 +10,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@pnpm/exe": "^10.14.0",
+    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
@@ -26,6 +20,7 @@
     "babel-plugin-inline-import": "^3.0.0",
     "drizzle-orm": "^0.45.1",
     "expo": "~54.0.33",
+    "expo-constants": "~17.0.0",
     "expo-crypto": "^15.0.8",
     "expo-sqlite": "^16.0.10",
     "expo-status-bar": "~3.0.9",
@@ -45,7 +40,7 @@
     "drizzle-kit": "^0.31.9",
     "typescript": "~5.9.3"
   },
-  "resolutions": {
+  "overrides": {
     "metro": "^0.80.9",
     "metro-config": "^0.80.9",
     "metro-core": "^0.80.9",

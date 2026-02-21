@@ -1,4 +1,5 @@
 import { useNavigation } from '@react-navigation/native'
+import type { StackNavigationProp } from '@react-navigation/stack'
 import React, { useState } from 'react'
 import {
     Alert,
@@ -11,6 +12,7 @@ import {
 import Toast from 'react-native-toast-message'
 import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
+import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
 
 interface Session {
@@ -25,23 +27,23 @@ function LandingScreen() {
   const { workoutInfo, isLoading, checkAuth } = useAuth()
   const [showAllSessions, setShowAllSessions] = useState(false)
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
-  const navigation = useNavigation()
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>()
 
   // Only derive lists after API has finished (avoids flash of empty state)
-  const templates = !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : []
+  const workouts = !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : []
   const sessions = !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
   const displayedSessions = showAllSessions ? sessions : sessions.slice(0, 5)
 
-  const handleTemplateClick = (id: number) => {
-    navigation.navigate('TemplateDetail' as never, { id } as never)
+  const handleWorkoutClick = (id: number) => {
+    navigation.navigate('WorkoutDetail', { id: String(id) })
   }
 
   const handleSessionClick = (sessionItem: { id: number; createdAt: string; completedAt: string | null }) => {
-    navigation.navigate('SessionDetail' as never, {
+    navigation.navigate('SessionDetail', {
       id: sessionItem.id,
       initialCreatedAt: sessionItem.createdAt,
       initialCompletedAt: sessionItem.completedAt ?? undefined,
-    } as never)
+    })
   }
 
   const handleDeleteSession = (sessionId: number) => {
@@ -103,7 +105,7 @@ function LandingScreen() {
           </Text>
           <TouchableOpacity
             style={styles.infoButton}
-            onPress={() => navigation.navigate('CreateTemplate' as never)}
+            onPress={() => navigation.navigate('CreateWorkout' as never)}
           >
             <Text style={styles.infoButtonText}>Create Your First Workout</Text>
           </TouchableOpacity>
@@ -114,27 +116,27 @@ function LandingScreen() {
         <Text style={styles.headerTitle}>Workouts</Text>
         <TouchableOpacity
           style={styles.createButton}
-          onPress={() => navigation.navigate('CreateTemplate' as never)}
+          onPress={() => navigation.navigate('CreateWorkout' as never)}
         >
           <Text style={styles.createButtonText}>Create Workout</Text>
         </TouchableOpacity>
       </View>
 
-      {templates.length === 0 ? (
+      {workouts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No workouts found</Text>
         </View>
       ) : (
-        <View style={styles.templatesContainer}>
-          {templates.map((template) => (
+        <View style={styles.workoutsContainer}>
+          {workouts.map((workout) => (
             <TouchableOpacity
-              key={template.id}
-              style={styles.templateCard}
-              onPress={() => handleTemplateClick(template.id)}
+              key={workout.id}
+              style={styles.workoutCard}
+              onPress={() => handleWorkoutClick(workout.id)}
             >
-              <Text style={styles.templateName}>{template.name}</Text>
-              <Text style={styles.templateDate}>
-                Created: {new Date(template.createdAt).toLocaleDateString()}
+              <Text style={styles.workoutName}>{workout.name}</Text>
+              <Text style={styles.workoutDate}>
+                Created: {new Date(workout.createdAt).toLocaleDateString()}
               </Text>
             </TouchableOpacity>
           ))}
@@ -257,10 +259,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  templatesContainer: {
+  workoutsContainer: {
     marginBottom: 32,
   },
-  templateCard: {
+  workoutCard: {
     backgroundColor: colors.card,
     borderRadius: 8,
     padding: 16,
@@ -273,13 +275,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  templateName: {
+  workoutName: {
     fontSize: 20,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
   },
-  templateDate: {
+  workoutDate: {
     fontSize: 14,
     color: colors.textSecondary,
   },

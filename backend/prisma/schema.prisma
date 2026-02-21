@@ -49,7 +49,7 @@ model Workout {
   id                Int      @id @default(autoincrement())
   name              String
   userId            Int?
-  isDefaultTemplate Boolean  @default(false)
+  isDefaultWorkout Boolean  @default(false)
   createdAt         DateTime @default(now())
 
   workoutExercises WorkoutExercise[]
@@ -99,7 +99,7 @@ model Session {
   completedAt           DateTime?
   sessionTime           String?
   isSyncedOnce          Boolean   @default(false)
-  isFromDefaultTemplate Boolean   @default(false)
+  isFromDefaultWorkout Boolean   @default(false)
 
   sessionExercises SessionExercise[]
 

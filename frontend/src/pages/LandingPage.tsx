@@ -4,7 +4,7 @@ import { trpc } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
 import Swal from 'sweetalert2'
 
-interface Template {
+interface Workout {
   id: number
   name: string
   createdAt: string
@@ -20,7 +20,7 @@ interface Session {
 
 function LandingPage() {
   const { workoutInfo, isLoading } = useAuth()
-  const [templates, setTemplates] = useState<Template[]>([])
+  const [workouts, setWorkouts] = useState<Workout[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [showAllSessions, setShowAllSessions] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -33,13 +33,13 @@ function LandingPage() {
     if (!isLoading) {
       if (workoutInfo) {
         // Use workout and session info from the hook
-        setTemplates(workoutInfo.workouts || [])
+        setWorkouts(workoutInfo.workouts || [])
         setSessions(workoutInfo.sessions || [])
         setLoading(false)
         setSessionsLoading(false)
       } else {
         // If workoutInfo is null but user is authenticated, they have no workouts/sessions yet
-        setTemplates([])
+        setWorkouts([])
         setSessions([])
         setLoading(false)
         setSessionsLoading(false)
@@ -47,8 +47,8 @@ function LandingPage() {
     }
   }, [workoutInfo, isLoading])
 
-  const handleTemplateClick = (id: number) => {
-    navigate(`/template/${id}`)
+  const handleWorkoutClick = (id: number) => {
+    navigate(`/workout/${id}`)
   }
 
   const handleSessionClick = (id: number) => {
@@ -135,14 +135,14 @@ function LandingPage() {
                   Get Started
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
-                  <p>You don't have any workout templates or sessions yet. Create your first template to get started!</p>
+                  <p>You don't have any workout workouts or sessions yet. Create your first workout to get started!</p>
                 </div>
                 <div className="mt-4">
                   <button
-                    onClick={() => navigate('/template/create')}
+                    onClick={() => navigate('/workout/create')}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                   >
-                    Create Your First Template
+                    Create Your First Workout
                   </button>
                 </div>
               </div>
@@ -151,32 +151,32 @@ function LandingPage() {
         )}
 
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Workout Templates</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Workouts</h1>
           <button
-            onClick={() => navigate('/template/create')}
+            onClick={() => navigate('/workout/create')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
           >
-            Create Template
+            Create Workout
           </button>
         </div>
         
-        {templates.length === 0 ? (
+        {workouts.length === 0 ? (
           <div className="text-center text-gray-600 py-12">
-            No templates found
+            No workouts found
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-            {templates.map((template) => (
+            {workouts.map((workout) => (
               <button
-                key={template.id}
-                onClick={() => handleTemplateClick(template.id)}
+                key={workout.id}
+                onClick={() => handleWorkoutClick(workout.id)}
                 className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left w-full border border-gray-200 hover:border-blue-500"
               >
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  {template.name}
+                  {workout.name}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Created: {new Date(template.createdAt).toLocaleDateString()}
+                  Created: {new Date(workout.createdAt).toLocaleDateString()}
                 </p>
               </button>
             ))}

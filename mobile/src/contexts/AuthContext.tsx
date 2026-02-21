@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // During retry, only update state if retry succeeds (will be handled by retryServer)
         if (!isRetryingNow) {
           // Type assertion: API returns WorkoutInfo structure, but TypeScript infers optional properties
-          // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Template[]
+          // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Workout[]
           setWorkoutInfo(result as unknown as WorkoutInfo)
           setIsAuthenticated(true)
           setServerDown(false)
@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await trpc.users.getWorkoutInfo.mutate()
         if (result) {
           // Type assertion: API returns WorkoutInfo structure, but TypeScript infers optional properties
-          // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Template[]
+          // The API returns workouts without workoutExercises (simplified), but WorkoutInfo expects Workout[]
           setWorkoutInfo(result as unknown as WorkoutInfo)
           setIsAuthenticated(true)
           setServerDown(false)

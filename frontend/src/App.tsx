@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
-import TemplateDetail from './pages/TemplateDetail'
+import WorkoutDetail from './pages/WorkoutDetail'
 import SessionDetail from './pages/SessionDetail'
-import CreateTemplate from './pages/CreateTemplate'
+import CreateWorkout from './pages/CreateWorkout'
 import LoginPage from './pages/LoginPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
@@ -20,18 +20,18 @@ function App() {
           }
         />
         <Route
-          path="/template/:id"
+          path="/workout/:id"
           element={
             <ProtectedRoute>
-              <TemplateDetail />
+              <WorkoutDetail />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/template/create"
+          path="/workout/create"
           element={
             <ProtectedRoute>
-              <CreateTemplate />
+              <CreateWorkout />
             </ProtectedRoute>
           }
         />

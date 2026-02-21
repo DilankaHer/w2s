@@ -75,11 +75,11 @@ function SessionDetail() {
   const [startingNew, setStartingNew] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<number, { reps: number; weight: number }>>(new Map())
   const [showCompletionSummary, setShowCompletionSummary] = useState(false)
-  const [templateError, setTemplateError] = useState<string | null>(null)
-  const [templateLoading, setTemplateLoading] = useState(false)
-  const [templateSuccess, setTemplateSuccess] = useState(false)
-  const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
-  const [newTemplateName, setNewTemplateName] = useState('')
+  const [workoutError, setWorkoutError] = useState<string | null>(null)
+  const [workoutLoading, setWorkoutLoading] = useState(false)
+  const [workoutSuccess, setWorkoutSuccess] = useState(false)
+  const [showCreateWorkoutModal, setShowCreateWorkoutModal] = useState(false)
+  const [newWorkoutName, setNewWorkoutName] = useState('')
 
   useEffect(() => {
     const sessionId = id ? parseInt(id) : null
@@ -340,7 +340,7 @@ function SessionDetail() {
       // Create a new session from the current session
       const newSession = await trpc.sessions.create.mutate({ sessionId: session.id })
 
-      // Navigate to the new session with session data (similar to TemplateDetail)
+      // Navigate to the new session with session data (similar to WorkoutDetail)
       navigate(`/session/${newSession.id}`, { state: { session: newSession } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start new workout')
@@ -349,61 +349,61 @@ function SessionDetail() {
     }
   }
 
-  const handleUpdateTemplate = async () => {
+  const handleUpdateWorkout = async () => {
     if (!session || session.workoutId == null) return
     try {
-      setTemplateLoading(true)
-      setTemplateError(null)
+      setWorkoutLoading(true)
+      setWorkoutError(null)
       await trpc.workouts.updateBySession.mutate({
         sessionId: session.id,
         workoutId: session.workoutId,
       })
-      setTemplateSuccess(true)
-      showToast('success', 'Success', 'Template updated.')
+      setWorkoutSuccess(true)
+      showToast('success', 'Success', 'Workout updated.')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to update template'
-      setTemplateError(msg)
-      showToast('error', 'Error', 'Failed to update template. Please try again.')
+      const msg = err instanceof Error ? err.message : 'Failed to update workout'
+      setWorkoutError(msg)
+      showToast('error', 'Error', 'Failed to update workout. Please try again.')
     } finally {
-      setTemplateLoading(false)
+      setWorkoutLoading(false)
     }
   }
 
-  const handleCreateTemplate = async (name: string) => {
+  const handleCreateWorkout = async (name: string) => {
     if (!session || !name.trim()) return
     try {
-      setTemplateLoading(true)
-      setTemplateError(null)
+      setWorkoutLoading(true)
+      setWorkoutError(null)
       await trpc.workouts.createBySession.mutate({
         sessionId: session.id,
         name: name.trim(),
       })
-      setTemplateSuccess(true)
-      setShowCreateTemplateModal(false)
-      setNewTemplateName('')
-      showToast('success', 'Success', 'Template created.')
+      setWorkoutSuccess(true)
+      setShowCreateWorkoutModal(false)
+      setNewWorkoutName('')
+      showToast('success', 'Success', 'Workout created.')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create template'
-      setTemplateError(msg)
-      showToast('error', 'Error', 'Failed to create template. Please try again.')
+      const msg = err instanceof Error ? err.message : 'Failed to create workout'
+      setWorkoutError(msg)
+      showToast('error', 'Error', 'Failed to create workout. Please try again.')
     } finally {
-      setTemplateLoading(false)
+      setWorkoutLoading(false)
     }
   }
 
-  const openCreateTemplateModal = () => {
-    setTemplateError(null)
-    setTemplateSuccess(false)
-    setShowCreateTemplateModal(true)
+  const openCreateWorkoutModal = () => {
+    setWorkoutError(null)
+    setWorkoutSuccess(false)
+    setShowCreateWorkoutModal(true)
   }
 
-  const handleCreateTemplateConfirm = () => {
-    const name = newTemplateName.trim()
+  const handleCreateWorkoutConfirm = () => {
+    const name = newWorkoutName.trim()
     if (!name) return
-    handleCreateTemplate(name)
+    handleCreateWorkout(name)
   }
 
-  const handleGoToTemplates = () => {
+  const handleGoToWorkouts = () => {
     navigate('/')
   }
 
@@ -425,7 +425,7 @@ function SessionDetail() {
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            Back to Templates
+            Back to Workouts
           </button>
         </div>
       </div>
@@ -441,7 +441,7 @@ function SessionDetail() {
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            Back to Templates
+            Back to Workouts
           </button>
         </div>
       </div>
@@ -501,7 +501,7 @@ function SessionDetail() {
           onClick={() => navigate('/')}
           className="mb-6 text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← Back to Templates
+          ← Back to Workouts
         </button>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -711,18 +711,18 @@ function SessionDetail() {
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3 items-center">
-              {templateSuccess ? (
+              {workoutSuccess ? (
                 <p className="text-green-600 font-medium">
-                  {session.workoutId != null ? 'Template updated.' : 'Template created.'}
+                  {session.workoutId != null ? 'Workout updated.' : 'Workout created.'}
                 </p>
-              ) : templateError ? (
+              ) : workoutError ? (
                 <>
-                  <p className="text-red-600 text-sm">{templateError}</p>
+                  <p className="text-red-600 text-sm">{workoutError}</p>
                   <button
                     onClick={() =>
                       session.workoutId != null
-                        ? handleUpdateTemplate()
-                        : openCreateTemplateModal()
+                        ? handleUpdateWorkout()
+                        : openCreateWorkoutModal()
                     }
                     className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-medium text-sm"
                   >
@@ -733,28 +733,28 @@ function SessionDetail() {
                 <>
                   {session.workoutId != null ? (
                     <button
-                      onClick={handleUpdateTemplate}
-                      disabled={templateLoading}
+                      onClick={handleUpdateWorkout}
+                      disabled={workoutLoading}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
                     >
-                      {templateLoading ? 'Updating...' : 'Update Template'}
+                      {workoutLoading ? 'Updating...' : 'Update Workout'}
                     </button>
                   ) : (
                     <button
-                      onClick={openCreateTemplateModal}
-                      disabled={templateLoading}
+                      onClick={openCreateWorkoutModal}
+                      disabled={workoutLoading}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
                     >
-                      {templateLoading ? 'Creating...' : 'Create Template'}
+                      {workoutLoading ? 'Creating...' : 'Create Workout'}
                     </button>
                   )}
                 </>
               )}
               <button
-                onClick={handleGoToTemplates}
+                onClick={handleGoToWorkouts}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
               >
-                Go to Templates
+                Go to Workouts
               </button>
             </div>
           </div>
@@ -766,36 +766,36 @@ function SessionDetail() {
           </div>
         )}
 
-        {showCreateTemplateModal && (
+        {showCreateWorkoutModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Create Template</h3>
-              <p className="text-sm text-gray-500 mb-4">Enter a name for the new template.</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Create Workout</h3>
+              <p className="text-sm text-gray-500 mb-4">Enter a name for the new workout.</p>
               <input
                 type="text"
-                value={newTemplateName}
-                onChange={(e) => setNewTemplateName(e.target.value)}
-                placeholder="Template name"
+                value={newWorkoutName}
+                onChange={(e) => setNewWorkoutName(e.target.value)}
+                placeholder="Workout name"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 mb-4"
                 autoFocus
               />
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => {
-                    setShowCreateTemplateModal(false)
-                    setNewTemplateName('')
-                    setTemplateError(null)
+                    setShowCreateWorkoutModal(false)
+                    setNewWorkoutName('')
+                    setWorkoutError(null)
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 font-medium"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleCreateTemplateConfirm}
-                  disabled={templateLoading || !newTemplateName.trim()}
+                  onClick={handleCreateWorkoutConfirm}
+                  disabled={workoutLoading || !newWorkoutName.trim()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
                 >
-                  {templateLoading ? 'Creating...' : 'Confirm'}
+                  {workoutLoading ? 'Creating...' : 'Confirm'}
                 </button>
               </div>
             </div>

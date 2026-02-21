@@ -19,9 +19,9 @@ interface WorkoutExercise {
   sets: Set[]
 }
 
-function CreateTemplate() {
+function CreateWorkout() {
   const navigate = useNavigate()
-  const [templateName, setTemplateName] = useState('')
+  const [workoutName, setWorkoutName] = useState('')
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([])
   const [showExerciseList, setShowExerciseList] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -132,8 +132,8 @@ function CreateTemplate() {
   }
 
   const handleSubmit = async () => {
-    if (!templateName.trim()) {
-      setError('Template name is required')
+    if (!workoutName.trim()) {
+      setError('Workout name is required')
       return
     }
 
@@ -148,7 +148,7 @@ function CreateTemplate() {
 
       await trpc.workouts.create.mutate({
         workout: {
-          name: templateName.trim(),
+          name: workoutName.trim(),
           workoutExercises: workoutExercises.map((ex) => ({
             id: ex.id,
             order: ex.order,
@@ -159,7 +159,7 @@ function CreateTemplate() {
 
       navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create template')
+      setError(err instanceof Error ? err.message : 'Failed to create workout')
     } finally {
       setSubmitting(false)
     }
@@ -218,20 +218,20 @@ function CreateTemplate() {
           onClick={() => navigate('/')}
           className="mb-6 text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← Back to Templates
+          ← Back to Workouts
         </button>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="mb-4">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Create Template</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Create Workout</h1>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Template Name
+              Workout Name
             </label>
             <input
               type="text"
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="Enter template name"
+              value={workoutName}
+              onChange={(e) => setWorkoutName(e.target.value)}
+              placeholder="Enter workout name"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -460,4 +460,4 @@ function CreateTemplate() {
   )
 }
 
-export default CreateTemplate
+export default CreateWorkout

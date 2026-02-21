@@ -16,28 +16,28 @@ import type { RootStackParamList } from '../../App'
 import { getWorkoutByIdService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
-type TemplateDetailRouteProp = RouteProp<RootStackParamList, 'TemplateDetail'>
+type WorkoutDetailRouteProp = RouteProp<RootStackParamList, 'WorkoutDetail'>
 
 type WorkoutDetail = NonNullable<Awaited<ReturnType<typeof getWorkoutByIdService>>>
 type SetItem = WorkoutDetail['workoutExercises'][number]['sets'][number]
 
-function TemplateDetailScreen() {
-  const route = useRoute<TemplateDetailRouteProp>()
+function WorkoutDetailScreen() {
+  const route = useRoute<WorkoutDetailRouteProp>()
   const navigation = useNavigation()
   const insets = useSafeAreaInsets()
   const { id } = route.params
-  const [template, setTemplate] = useState<WorkoutDetail | null>(null)
+  const [workout, setWorkout] = useState<WorkoutDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
   const [editingSets, setEditingSets] = useState<Map<string, { targetReps: number; targetWeight: number }>>(new Map())
 
-  const fetchTemplate = useCallback(async (templateId: string) => {
+  const fetchWorkout = useCallback(async (workoutId: string) => {
     try {
       setLoading(true)
       setError(null)
-      const data = await getWorkoutByIdService(templateId)
-      setTemplate(data ?? null)
+      const data = await getWorkoutByIdService(workoutId)
+      setWorkout(data ?? null)
       setEditingSets(new Map())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -48,14 +48,14 @@ function TemplateDetailScreen() {
 
   useEffect(() => {
     if (id) {
-      fetchTemplate(id)
+      fetchWorkout(id)
     }
-  }, [id, fetchTemplate])
+  }, [id, fetchWorkout])
 
   useFocusEffect(
     useCallback(() => {
-      if (id) fetchTemplate(id)
-    }, [id, fetchTemplate])
+      if (id) fetchWorkout(id)
+    }, [id, fetchWorkout])
   )
 
   const updateSetValue = (setId: string, field: 'targetReps' | 'targetWeight', value: number) => {
@@ -64,8 +64,8 @@ function TemplateDetailScreen() {
       const current = newMap.get(setId)
       if (!current) {
         let targetSet: SetItem | null = null
-        for (const templateExercise of template?.workoutExercises ?? []) {
-          const foundSet = templateExercise.sets.find((s) => s.id === setId)
+        for (const workoutExercise of workout?.workoutExercises ?? []) {
+          const foundSet = workoutExercise.sets.find((s) => s.id === setId)
           if (foundSet) {
             targetSet = foundSet
             break
@@ -88,7 +88,7 @@ function TemplateDetailScreen() {
   const saveSetUpdate = async (set: SetItem) => {
     const edited = editingSets.get(set.id)
     if (!edited) return
-    if (!template || template.isDefaultTemplate) return
+    if (!workout || workout.isDefaultWorkout) return
     // TODO: local set update when offline persistence is wired
     setEditingSets((prev) => {
       const newMap = new Map(prev)
@@ -98,32 +98,32 @@ function TemplateDetailScreen() {
   }
 
   const handleCreateSession = async () => {
-    if (!template) return
+    if (!workout) return
     setCreatingSession(true)
     Toast.show({
       type: 'info',
       text1: 'Offline mode',
-      text2: 'Starting session from template will be available when session flow is wired to local.',
+      text2: 'Starting session from workout will be available when session flow is wired to local.',
     })
     setCreatingSession(false)
   }
 
-  if (!template && loading) {
+  if (!workout && loading) {
     return <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.screen }]} />
   }
 
-  if (!loading && error && !template) {
+  if (!loading && error && !workout) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error: {error}</Text>
-        <TouchableOpacity style={styles.button} onPress={() => id && fetchTemplate(id)}>
+        <TouchableOpacity style={styles.button} onPress={() => id && fetchWorkout(id)}>
           <Text style={styles.buttonText}>Retry</Text>
         </TouchableOpacity>
       </View>
     )
   }
 
-  if (!loading && !template) {
+  if (!loading && !workout) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Workout not found</Text>
@@ -131,7 +131,7 @@ function TemplateDetailScreen() {
     )
   }
 
-  if (!template) {
+  if (!workout) {
     return null
   }
 
@@ -147,15 +147,15 @@ function TemplateDetailScreen() {
 
         <View style={styles.headerCard}>
           <View style={styles.headerContent}>
-            <Text style={styles.templateName}>{template.name}</Text>
-            {template.workoutExercises.length > 0 && (
-              <Text style={styles.templateSummary}>
-                {template.workoutExercises.length} exercise{template.workoutExercises.length !== 1 ? 's' : ''},{' '}
-                {template.workoutExercises.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0)} sets
+            <Text style={styles.workoutName}>{workout.name}</Text>
+            {workout.workoutExercises.length > 0 && (
+              <Text style={styles.workoutSummary}>
+                {workout.workoutExercises.length} exercise{workout.workoutExercises.length !== 1 ? 's' : ''},{' '}
+                {workout.workoutExercises.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0)} sets
               </Text>
             )}
-            <Text style={styles.templateDate}>
-              Created: {new Date(template.createdAt).toLocaleDateString()}
+            <Text style={styles.workoutDate}>
+              Created: {new Date(workout.createdAt).toLocaleDateString()}
             </Text>
           </View>
           <TouchableOpacity
@@ -173,19 +173,19 @@ function TemplateDetailScreen() {
           </View>
         )}
 
-        {template.workoutExercises.length === 0 ? (
+        {workout.workoutExercises.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No exercises in this workout</Text>
           </View>
         ) : (
           <View style={styles.exercisesContainer}>
-            {template.workoutExercises.map((templateExercise) => (
-              <View key={templateExercise.id} style={styles.exerciseCard}>
+            {workout.workoutExercises.map((workoutExercise) => (
+              <View key={workoutExercise.id} style={styles.exerciseCard}>
                 <Text style={styles.exerciseName}>
-                  {templateExercise.order ?? 0}. {templateExercise.exercise.name}
+                  {workoutExercise.order ?? 0}. {workoutExercise.exercise.name}
                 </Text>
 
-                {templateExercise.sets.length === 0 ? (
+                {workoutExercise.sets.length === 0 ? (
                   <Text style={styles.noSetsText}>No sets configured</Text>
                 ) : (
                   <View style={styles.setsContainer}>
@@ -194,11 +194,11 @@ function TemplateDetailScreen() {
                       <Text style={styles.tableHeaderText}>Weight (kg)</Text>
                       <Text style={styles.tableHeaderText}>Reps</Text>
                     </View>
-                    {templateExercise.sets.map((set) => {
+                    {workoutExercise.sets.map((set) => {
                       const edited = editingSets.get(set.id)
                       const displayWeight = edited?.targetWeight ?? set.targetWeight
                       const displayReps = edited?.targetReps ?? set.targetReps
-                      const readOnly = template.isDefaultTemplate
+                      const readOnly = workout.isDefaultWorkout
 
                       return (
                         <View key={set.id} style={styles.setRow}>
@@ -324,18 +324,18 @@ const styles = StyleSheet.create({
   headerContent: {
     marginBottom: 16,
   },
-  templateName: {
+  workoutName: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
   },
-  templateSummary: {
+  workoutSummary: {
     fontSize: 15,
     color: colors.textSecondary,
     marginBottom: 8,
   },
-  templateDate: {
+  workoutDate: {
     fontSize: 14,
     color: colors.textMuted,
   },
@@ -447,4 +447,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default TemplateDetailScreen
+export default WorkoutDetailScreen

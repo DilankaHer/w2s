@@ -10,15 +10,15 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import Toast from 'react-native-toast-message'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { AuthProvider, useAuth } from './src/contexts/AuthContext'
-import CreateTemplateScreen from './src/screens/CreateTemplateScreen'
+import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
 import ExercisesScreen from './src/screens/ExercisesScreen'
 import HistoryScreen from './src/screens/HistoryScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
 import SessionDetailScreen from './src/screens/SessionDetailScreen'
-import TemplateDetailScreen from './src/screens/TemplateDetailScreen'
-import TemplatesScreen from './src/screens/TemplatesScreen'
+import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen'
+import WorkoutsScreen from './src/screens/WorkoutsScreen'
 import { colors } from './src/theme/colors'
 import { db } from '@/database/database'
 import migrations from 'drizzle/migrations'
@@ -28,16 +28,16 @@ import { seed } from '@/database/seed'
 export type ExercisePickerResult = { id: number; name: string }
 
 export type RootStackParamList = {
-  Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createTemplate?: boolean; templateName?: string } | undefined
+  Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createWorkout?: boolean; workoutName?: string } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
-  TemplateDetail: { id: string }
+  WorkoutDetail: { id: string }
   SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult }
-  CreateTemplate: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: number } | undefined
-  ExercisePicker: { pickerFor: 'createTemplate' | 'session'; sessionId?: number; replacingExerciseId?: number }
+  CreateWorkout: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: number } | undefined
+  ExercisePicker: { pickerFor: 'createWorkout' | 'session'; sessionId?: number; replacingExerciseId?: number }
 }
 
 export type TabParamList = {
-  Templates: undefined
+  Workouts: undefined
   Create: undefined
   History: undefined
   Exercises: undefined
@@ -75,7 +75,7 @@ function AddButtonTab(props: any) {
       )
       return
     }
-    rootNav.navigate('CreateTemplate' as never)
+    rootNav.navigate('CreateWorkout' as never)
   }
 
   return (
@@ -224,8 +224,8 @@ function MainTabs() {
       }}
     >
       <Tab.Screen
-        name="Templates"
-        component={TemplatesScreen}
+        name="Workouts"
+        component={WorkoutsScreen}
         options={{
           title: 'Workouts',
           tabBarLabel: 'Workouts',
@@ -522,8 +522,8 @@ function RootNavigator() {
           {() => <MainTabs />}
         </Stack.Screen>
         <Stack.Screen
-          name="TemplateDetail"
-          component={TemplateDetailScreen}
+          name="WorkoutDetail"
+          component={WorkoutDetailScreen}
           options={{
             title: 'Workout Details',
             headerStyle: { backgroundColor: colors.header },
@@ -538,12 +538,12 @@ function RootNavigator() {
           {() => <SessionDetailScreen />}
         </Stack.Screen>
         <Stack.Screen
-          name="CreateTemplate"
+          name="CreateWorkout"
           options={{ title: 'Create Workout' }}
         >
           {() => (
             <ProtectedRoute>
-              <CreateTemplateScreen />
+              <CreateWorkoutScreen />
             </ProtectedRoute>
           )}
         </Stack.Screen>

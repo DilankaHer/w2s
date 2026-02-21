@@ -47,9 +47,9 @@ export const workoutsRouter = router({
     });
   }),
 
-  getTemplates: publicProcedure.input(z.object({ isDefaultTemplate: z.boolean().optional().default(false) })).query(async ({ input }) => {
+  getWorkouts: publicProcedure.input(z.object({ isDefaultWorkout: z.boolean().optional().default(false) })).query(async ({ input }) => {
     return prisma.workout.findMany({
-      where: { isDefaultTemplate: input.isDefaultTemplate },
+      where: { isDefaultWorkout: input.isDefaultWorkout },
       include: {
         workoutExercises: {
           include: {

@@ -51,7 +51,7 @@ export const sessionsRouter = router({
                         userId: ctx.user.userId,
                         workoutId: input.workoutId,
                         createdAt: new Date(),
-                        isFromDefaultTemplate: workout!.isDefaultTemplate,
+                        isFromDefaultWorkout: workout!.isDefaultWorkout,
                         sessionExercises: {
                             create: workout!.workoutExercises.map(ex => ({
                                 exerciseId: ex.exercise.id,
@@ -94,7 +94,7 @@ export const sessionsRouter = router({
                         userId: ctx.user.userId,
                         workoutId: session!.workoutId ?? undefined,
                         createdAt: new Date(),
-                        isFromDefaultTemplate: session!.isFromDefaultTemplate,
+                        isFromDefaultWorkout: session!.isFromDefaultWorkout,
                         sessionExercises: {
                             create: session!.sessionExercises.map(ex => ({
                                 exerciseId: ex.exercise.id,
@@ -146,7 +146,7 @@ export const sessionsRouter = router({
                     userId: null,
                     workoutId: input.workoutId,
                     createdAt: new Date(),
-                    isFromDefaultTemplate: workout!.isDefaultTemplate,
+                    isFromDefaultWorkout: workout!.isDefaultWorkout,
                     sessionExercises: {
                         create: workout!.workoutExercises.map(ex => ({
                             exerciseId: ex.exercise.id,
