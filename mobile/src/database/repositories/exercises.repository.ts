@@ -1,9 +1,9 @@
 import { db } from "../database";
 import { and, eq, like } from "drizzle-orm";
 import { exercises } from "../schema/schemas";
-import { Exercise } from "@shared/types/exercises.types";
+import * as SharedTypes from "@shared/types/exercises.types";
 
-export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string): Promise<Exercise[]> {
+export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string): Promise<SharedTypes.Exercise[]> {
     const conditions = []
 
     if (bodyPartId) {

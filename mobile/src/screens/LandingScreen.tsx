@@ -40,7 +40,7 @@ function LandingScreen() {
 
   const handleSessionClick = (sessionItem: { id: number; createdAt: string; completedAt: string | null }) => {
     navigation.navigate('SessionDetail', {
-      id: sessionItem.id,
+      id: String(sessionItem.id),
       initialCreatedAt: sessionItem.createdAt,
       initialCompletedAt: sessionItem.completedAt ?? undefined,
     })
@@ -101,7 +101,7 @@ function LandingScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Get Started</Text>
           <Text style={styles.infoText}>
-            You don't have any workouts or sessions yet. Create your first workout to get started!
+            You do not have any workouts or sessions yet. Create your first workout to get started!
           </Text>
           <TouchableOpacity
             style={styles.infoButton}

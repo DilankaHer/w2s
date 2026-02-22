@@ -1,3 +1,5 @@
+import type { Exercise } from "./exercises.types";
+
 interface Workout {
     id: string;
     isDefaultWorkout: boolean | null;
@@ -11,25 +13,34 @@ interface WorkoutWithExercises extends Workout {
     workoutExercises: WorkoutExercise[];
 }
 
+interface CreateWorkoutInput {
+    name: string;
+    exercises: {
+        exerciseId: string;
+        order: number;
+        sets: {
+            setNumber: number;
+            targetReps: number;
+            targetWeight: number;
+        }[];
+    }[];
+}
+
 interface WorkoutExercise {
     id: string;
     workoutId: string;
-    exercise: Exercise;
     order: number;
+    exercise: Exercise;
+    exerciseId?: string;
     sets: Set[];
-}
-
-interface Exercise {
-    id: string;
-    name: string;
 }
 
 interface Set {
     id: string;
-    workoutExerciseId: string;
     setNumber: number;
     targetReps: number;
     targetWeight: number;
+    workoutExerciseId?: string;
 }
 
-export type { Workout, WorkoutWithExercises, WorkoutExercise, Set, Exercise };
+export type { Workout, WorkoutWithExercises, WorkoutExercise, Exercise, CreateWorkoutInput, Set };

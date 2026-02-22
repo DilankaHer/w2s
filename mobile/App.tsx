@@ -4,11 +4,10 @@ import { createStackNavigator } from '@react-navigation/stack'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { StatusBar } from 'expo-status-bar'
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
-import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { AuthProvider, useAuth } from './src/contexts/AuthContext'
 import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
@@ -16,7 +15,7 @@ import ExercisesScreen from './src/screens/ExercisesScreen'
 import HistoryScreen from './src/screens/HistoryScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
-import SessionDetailScreen from './src/screens/SessionDetailScreen'
+import SessionDetailScreen from '@/screens/SessionDetailScreen'
 import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen'
 import WorkoutsScreen from './src/screens/WorkoutsScreen'
 import { colors } from './src/theme/colors'
@@ -28,12 +27,12 @@ import migrations from './drizzle/migrations'
 export type ExercisePickerResult = { id: string; name: string }
 
 export type RootStackParamList = {
-  Login: { completeSessionId?: number; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: number[]; createWorkout?: boolean; workoutName?: string } | undefined
+  Login: { completeSessionId?: string; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: string[]; createWorkout?: boolean; workoutName?: string } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
-  WorkoutDetail: { id: string }
-  SessionDetail: { id: number; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult }
-  CreateWorkout: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: number } | undefined
-  ExercisePicker: { pickerFor: 'createWorkout' | 'session'; sessionId?: number; replacingExerciseId?: number }
+  WorkoutDetail: { id: string; selectedExercise?: ExercisePickerResult; replacingWorkoutExerciseId?: string }
+  SessionDetail: { id: string; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult; replacingSessionExerciseId?: string }
+  CreateWorkout: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: string } | undefined
+  ExercisePicker: { pickerFor: 'createWorkout' | 'session' | 'workoutDetail'; sessionId?: string; replacingExerciseId?: string; replacingWorkoutExerciseId?: string; replacingSessionExerciseId?: string; returnToRouteKey?: string }
 }
 
 export type TabParamList = {
@@ -55,7 +54,6 @@ function CreatePlaceholder() {
 // Create tab button: inline with other tabs (no floating circle) so it fits the bar
 function AddButtonTab(props: any) {
   const navigation = useNavigation()
-  const { isAuthenticated } = useAuth()
 
   const handlePress = () => {
     // Resolve root navigator (stack); custom tab bar can run in a context where getParent() is null
@@ -64,17 +62,6 @@ function AddButtonTab(props: any) {
       rootNav = rootNav.getParent()
     }
     if (!rootNav) return
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Login required',
-        'You need to log in to create a workout.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Login', onPress: () => rootNav.navigate('Login' as never) },
-        ]
-      )
-      return
-    }
     rootNav.navigate('CreateWorkout' as never)
   }
 
@@ -532,11 +519,7 @@ function RootNavigator() {
           name="CreateWorkout"
           options={{ title: 'Create Workout' }}
         >
-          {() => (
-            <ProtectedRoute>
-              <CreateWorkoutScreen />
-            </ProtectedRoute>
-          )}
+          {() => <CreateWorkoutScreen />}
         </Stack.Screen>
         <Stack.Screen
           name="ExercisePicker"

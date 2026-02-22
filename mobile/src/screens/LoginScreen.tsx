@@ -109,7 +109,12 @@ function LoginScreen() {
         await checkAuth()
 
         const sessionToSave = route.params?.session as Session | undefined
-        const removedIds = route.params?.removedSessionExerciseIds
+        const removedIdsRaw = route.params?.removedSessionExerciseIds
+        const removedIds: number[] | undefined = Array.isArray(removedIdsRaw)
+          ? removedIdsRaw
+              .map((x) => (typeof x === 'number' ? x : parseInt(String(x), 10)))
+              .filter((n) => Number.isFinite(n))
+          : undefined
         const shouldCreateWorkout = route.params?.createWorkout === true
         const workoutName = route.params?.workoutName || sessionToSave?.name || ''
 

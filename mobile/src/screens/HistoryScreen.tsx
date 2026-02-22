@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   RefreshControl,
@@ -12,19 +12,16 @@ import {
 import { Swipeable } from 'react-native-gesture-handler'
 import Toast from 'react-native-toast-message'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { trpc } from '../api/client'
-import { useAuth } from '../hooks/useAuth'
+import type { Session } from '@shared/types/sessions.types'
+import { deleteSessionService, getSessionsService } from '../services/sessions.service'
 import { colors } from '../theme/colors'
 
-interface SessionListItem {
-  id: number
-  workoutId: number | null
-  createdAt: string
-  completedAt: string | null
-  sessionTime: string | null
-  name?: string
+type SessionListItem = Session & {
+  completedAt?: string | null
+  sessionTime?: string | null
   exerciseCount?: number
   setCount?: number
+  isFromDefaultWorkout?: boolean
 }
 
 function formatSessionDate(dateStr: string): string {
@@ -47,25 +44,43 @@ function formatDuration(session: SessionListItem): string {
 }
 
 function HistoryScreen() {
-  const { workoutInfo, isLoading, checkAuth, isAuthenticated, serverDown, checkServerOnFocus, isRetrying } = useAuth()
-  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
+  const [sessions, setSessions] = useState<SessionListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const navigation = useNavigation()
 
+  const loadSessions = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await getSessionsService()
+      setSessions((Array.isArray(data) ? data : []) as SessionListItem[])
+    } catch (err) {
+      setSessions([])
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: err instanceof Error ? err.message : 'Failed to load sessions',
+      })
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSessions()
+  }, [loadSessions])
+
   useFocusEffect(
     useCallback(() => {
-      // Don't do anything during retry - freeze the screen completely
-      if (isRetrying) return
-      checkServerOnFocus()
-      // Don't call checkAuth when server is down - preserve state until user retries
-      if (isAuthenticated && !serverDown) checkAuth({ silent: true })
-    }, [checkServerOnFocus, checkAuth, isAuthenticated, serverDown, isRetrying])
+      loadSessions()
+    }, [loadSessions])
   )
 
   const onRefresh = async () => {
     setRefreshing(true)
-    if (isAuthenticated) await checkAuth()
-    setRefreshing(false)
+    loadSessions()
   }
 
   const handleSessionClick = (session: SessionListItem) => {
@@ -76,7 +91,7 @@ function HistoryScreen() {
     })
   }
 
-  const handleDeleteSession = (sessionId: number) => {
+  const handleDeleteSession = (sessionId: string) => {
     Alert.alert(
       'Are you sure?',
       'This action cannot be undone!',
@@ -88,14 +103,14 @@ function HistoryScreen() {
           onPress: async () => {
             try {
               setDeletingSessionId(sessionId)
-              await trpc.sessions.delete.mutate({ id: sessionId })
-              await checkAuth({ silent: true })
+              await deleteSessionService(sessionId)
+              await loadSessions()
               Toast.show({ type: 'success', text1: 'Success', text2: 'Session deleted' })
             } catch (err) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: 'Failed to delete session. Please try again.',
+                text2: err instanceof Error ? err.message : 'Failed to delete session. Please try again.',
               })
             } finally {
               setDeletingSessionId(null)
@@ -106,47 +121,13 @@ function HistoryScreen() {
     )
   }
 
-  const displaySessions =
-    isAuthenticated && workoutInfo
-      ? serverDown
-        ? workoutInfo.sessions ?? []
-        : !isLoading
-          ? workoutInfo.sessions ?? []
-          : []
-      : []
-
-  const hasNoSessions =
-    isAuthenticated &&
-    (serverDown && workoutInfo ? displaySessions.length === 0 : !isLoading && workoutInfo !== null && displaySessions.length === 0)
-
-  // During retry, freeze the screen - don't react to any state changes
-  if (!isRetrying && serverDown && isAuthenticated && workoutInfo === null) {
-    return <View style={[styles.container, { backgroundColor: colors.screen }]} />
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyTitleRow}>
-            <TouchableOpacity onPress={() => navigation.navigate('Login' as never)}>
-              <Text style={styles.emptyTitleLoginLink}>Log in</Text>
-            </TouchableOpacity>
-            <Text style={styles.emptyTitle}> to see your sessions</Text>
-          </View>
-          <Text style={styles.emptyText}>
-            Your workout sessions will appear here once you log in and complete workouts.
-          </Text>
-        </View>
-      </View>
-    )
-  }
-
-  if (!isRetrying && isLoading && !(serverDown && isAuthenticated && workoutInfo !== null)) {
+  if (loading) {
     return <View style={styles.container} />
   }
 
-  const renderRightActions = (sessionId: number) => (
+  const hasNoSessions = sessions.length === 0
+
+  const renderRightActions = (sessionId: string) => (
     <TouchableOpacity
       style={styles.swipeDelete}
       onPress={() => handleDeleteSession(sessionId)}
@@ -174,10 +155,10 @@ function HistoryScreen() {
         >
           <View style={styles.headerBlock}>
             <Text style={styles.headerSubtitle}>
-              {displaySessions.length} session{displaySessions.length !== 1 ? 's' : ''}
+              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
             </Text>
           </View>
-          {displaySessions.map((session) => (
+          {sessions.map((session) => (
             <Swipeable
               key={session.id}
               renderRightActions={() => renderRightActions(session.id)}
@@ -190,7 +171,20 @@ function HistoryScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.sessionCardInner}>
-                  <Text style={styles.sessionTitle}>{session.name?.trim() || 'Workout'}</Text>
+                  <View style={styles.sessionTitleRow}>
+                    <Text style={styles.sessionTitle} numberOfLines={1}>
+                      {session.name?.trim() || 'Workout'}
+                    </Text>
+                    {session.isFromDefaultWorkout ? (
+                      <View style={styles.defaultTag}>
+                        <Text style={styles.defaultTagText}>Default</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.customTag}>
+                        <Text style={styles.customTagText}>Custom</Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.sessionMetaRow}>
                     <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
                     <Text style={styles.sessionMetaText}>{formatSessionDate(session.createdAt)}</Text>
@@ -200,9 +194,7 @@ function HistoryScreen() {
                     <Text style={styles.sessionMetaText}>{formatDuration(session)}</Text>
                   </View>
                   <Text style={styles.sessionSummary}>
-                    {session.exerciseCount != null && session.setCount != null
-                      ? `${session.exerciseCount} exercise${session.exerciseCount !== 1 ? 's' : ''} • ${session.setCount} set${session.setCount !== 1 ? 's' : ''}`
-                      : '— exercises • — sets'}
+                    {`${session.exerciseCount ?? 0} exercise${(session.exerciseCount ?? 0) !== 1 ? 's' : ''} • ${session.setCount ?? 0} set${(session.setCount ?? 0) !== 1 ? 's' : ''}`}
                   </Text>
                   {!session.completedAt && (
                     <View style={styles.statusChipIncomplete}>
@@ -210,7 +202,12 @@ function HistoryScreen() {
                     </View>
                   )}
                 </View>
-                <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
+                <Ionicons
+                  name="chevron-back-outline"
+                  size={18}
+                  color={colors.error}
+                  style={styles.swipeHintIcon}
+                />
               </TouchableOpacity>
             </Swipeable>
           ))}
@@ -282,11 +279,39 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  sessionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
   sessionTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 6,
+    flex: 1,
+  },
+  defaultTag: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  defaultTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accentText,
+  },
+  customTag: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  customTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accentText,
   },
   sessionMetaRow: {
     flexDirection: 'row',
@@ -330,6 +355,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,
+  },
+  swipeHintIcon: {
+    opacity: 0.4,
   },
 })
 

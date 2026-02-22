@@ -4,6 +4,7 @@ import {
   FlatList,
   Linking,
   Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -449,12 +450,10 @@ function ExercisesScreen() {
         animationType="fade"
         onRequestClose={() => setInfoExercise(null)}
       >
-        <TouchableOpacity
-          style={styles.infoOverlay}
-          activeOpacity={1}
-          onPress={() => setInfoExercise(null)}
-        >
-          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.infoModalBox}>
+        <View style={styles.infoOverlay}>
+          <Pressable style={styles.infoBackdrop} onPress={() => setInfoExercise(null)} />
+
+          <View style={styles.infoModalBox}>
             {infoExercise ? (
               <View style={styles.infoModalInner}>
                 <View style={styles.sheetHandle} />
@@ -490,13 +489,14 @@ function ExercisesScreen() {
                   contentContainerStyle={styles.infoModalScrollContent}
                   showsVerticalScrollIndicator={true}
                   bounces={false}
+                  keyboardShouldPersistTaps="handled"
                 >
                   {renderInfoContent(infoExercise)}
                 </ScrollView>
               </View>
             ) : null}
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   )
@@ -669,6 +669,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
     alignItems: 'stretch',
+  },
+  infoBackdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   infoModalBox: {
     backgroundColor: colors.card,

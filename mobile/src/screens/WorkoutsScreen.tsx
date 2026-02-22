@@ -2,6 +2,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -9,10 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { Swipeable } from 'react-native-gesture-handler'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
 import type { Workout } from '@shared/types/workouts.types'
-import { getWorkoutsService } from '../services/workouts.service'
+import { deleteWorkoutService, getWorkoutsService } from '../services/workouts.service'
+import { createSessionService } from '../services/sessions.service'
 import { colors } from '../theme/colors'
 
 type Filter = 'all' | 'default' | 'custom'
@@ -23,6 +26,7 @@ function WorkoutsScreen() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [loading, setLoading] = useState(true)
   const [startingWorkoutId, setStartingWorkoutId] = useState<string | null>(null)
+  const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null)
   const navigation = useNavigation()
 
   const loadWorkouts = useCallback(async () => {
@@ -61,19 +65,74 @@ function WorkoutsScreen() {
 
   const handleStartWorkout = async (workout: Workout) => {
     setStartingWorkoutId(workout.id)
-    // TODO: local session creation for offline
-    Toast.show({
-      type: 'info',
-      text1: 'Offline mode',
-      text2: 'Starting session from workout will be available when session flow is wired to local.',
-    })
-    setStartingWorkoutId(null)
+    try {
+      const newSession = await createSessionService('', workout.id)
+      if (!newSession) {
+        throw new Error('Failed to create session')
+      }
+      const nav = navigation as any
+      nav.navigate('SessionDetail', { id: newSession.id, initialSession: newSession })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start workout'
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: message,
+      })
+    } finally {
+      setStartingWorkoutId(null)
+    }
   }
 
   const handleWorkoutClick = (id: string) => {
     const nav = navigation as any
     nav.navigate('WorkoutDetail', { id })
   }
+
+  const handleDeleteWorkout = useCallback(
+    (workout: Workout) => {
+      if (workout.isDefaultWorkout === true) {
+        Toast.show({ type: 'error', text1: 'Cannot delete', text2: 'Default workouts cannot be deleted.' })
+        return
+      }
+
+      Alert.alert('Delete workout?', 'This action cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingWorkoutId(workout.id)
+              await deleteWorkoutService(workout.id)
+              await loadWorkouts()
+              Toast.show({ type: 'success', text1: 'Workout deleted' })
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Failed to delete workout'
+              Toast.show({ type: 'error', text1: 'Error', text2: msg })
+            } finally {
+              setDeletingWorkoutId(null)
+            }
+          },
+        },
+      ])
+    },
+    [loadWorkouts]
+  )
+
+  const renderRightActions = useCallback(
+    (workout: Workout) => (
+      <TouchableOpacity
+        style={styles.swipeDelete}
+        onPress={() => handleDeleteWorkout(workout)}
+        disabled={deletingWorkoutId === workout.id}
+      >
+        <Ionicons name="trash-outline" size={24} color={colors.primaryText} />
+        <Text style={styles.swipeDeleteText}>Delete</Text>
+      </TouchableOpacity>
+    ),
+    [deletingWorkoutId, handleDeleteWorkout]
+  )
 
   const renderFilterTabs = () => (
     <View style={styles.filterRow}>
@@ -110,8 +169,8 @@ function WorkoutsScreen() {
     const isDefault = workout.isDefaultWorkout === true
     const starting = startingWorkoutId === workout.id
 
-    return (
-      <View key={workout.id} style={styles.workoutCard}>
+    const card = (
+      <View style={styles.workoutCard}>
         <TouchableOpacity
           style={styles.workoutCardTop}
           onPress={() => handleWorkoutClick(workout.id)}
@@ -134,7 +193,11 @@ function WorkoutsScreen() {
             </View>
             {meta ? <Text style={styles.workoutMeta}>{meta}</Text> : null}
           </View>
-          <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
+          {isDefault ? (
+            <Ionicons name="chevron-forward" size={22} color={colors.textMuted} style={styles.chevronSpacer} />
+          ) : (
+            <Ionicons name="chevron-back-outline" size={18} color={colors.error} style={styles.swipeHintIcon} />
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.startWorkoutButton, starting && styles.buttonDisabled]}
@@ -151,6 +214,19 @@ function WorkoutsScreen() {
           )}
         </TouchableOpacity>
       </View>
+    )
+
+    if (isDefault) return <View key={workout.id}>{card}</View>
+
+    return (
+      <Swipeable
+        key={workout.id}
+        renderRightActions={() => renderRightActions(workout)}
+        friction={2}
+        rightThreshold={40}
+      >
+        {card}
+      </Swipeable>
     )
   }
 
@@ -271,6 +347,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  chevronSpacer: {
+    opacity: 0,
+  },
+  swipeHintIcon: {
+    opacity: 0.4,
+  },
   workoutCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,7 +391,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    opacity: 0.7,
   },
   customTagText: {
     fontSize: 12,
@@ -336,6 +417,21 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  swipeDelete: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginBottom: 12,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  swipeDeleteText: {
+    color: colors.primaryText,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
 })
 

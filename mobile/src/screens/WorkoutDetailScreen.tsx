@@ -1,5 +1,6 @@
-import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import React, { useCallback, useEffect, useState } from 'react'
+import { RouteProp, useFocusEffect, useRoute, useNavigation } from '@react-navigation/native'
+import type { StackNavigationProp } from '@react-navigation/stack'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,31 +13,45 @@ import {
 } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import type { Set as SetType, WorkoutWithExercises } from '@shared/types/workouts.types'
+import { Swipeable } from 'react-native-gesture-handler'
+import Ionicons from '@expo/vector-icons/Ionicons'
+import * as Crypto from 'expo-crypto'
+import type { Exercise, Set as SetType, WorkoutExercise, WorkoutWithExercises } from '@shared/types/workouts.types'
 import type { RootStackParamList } from '../../App'
-import { getWorkoutByIdService } from '../services/workouts.service'
+import { getWorkoutByIdService, updateWorkoutService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type WorkoutDetailRouteProp = RouteProp<RootStackParamList, 'WorkoutDetail'>
 
 function WorkoutDetailScreen() {
   const route = useRoute<WorkoutDetailRouteProp>()
-  const navigation = useNavigation()
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>()
   const insets = useSafeAreaInsets()
-  const { id } = route.params
-  const [workout, setWorkout] = useState<WorkoutWithExercises | null>(null)
+  const id = route.params.id
+  const selectedExercise = route.params.selectedExercise
+  const replacingWorkoutExerciseId = route.params.replacingWorkoutExerciseId
+
+  const [draft, setDraft] = useState<WorkoutWithExercises | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
-  const [editingSets, setEditingSets] = useState<Map<string, { targetReps: number; targetWeight: number }>>(new Map())
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const isReadOnly = draft?.isDefaultWorkout === true
+
+  const setDraftAndDirty = useCallback((next: WorkoutWithExercises) => {
+    setDraft(next)
+    setDirty(true)
+  }, [])
 
   const fetchWorkout = useCallback(async (workoutId: string) => {
     try {
       setLoading(true)
       setError(null)
       const data = await getWorkoutByIdService(workoutId)
-      setWorkout(data ?? null)
-      setEditingSets(new Map())
+      setDraft(data ?? null)
+      setDirty(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -52,51 +67,228 @@ function WorkoutDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (id) fetchWorkout(id)
-    }, [id, fetchWorkout])
+      // Don't overwrite local draft when returning from picker or when there are unsaved edits.
+      if (!id) return
+      if (dirty) return
+      if (selectedExercise) return
+      fetchWorkout(id)
+    }, [id, fetchWorkout, dirty, selectedExercise])
   )
 
-  const updateSetValue = (setId: string, field: 'targetReps' | 'targetWeight', value: number) => {
-    setEditingSets((prev) => {
-      const newMap = new Map(prev)
-      const current = newMap.get(setId)
-      if (!current) {
-        let targetSet: SetType | null = null
-        for (const workoutExercise of workout?.workoutExercises ?? []) {
-          const foundSet = workoutExercise.sets.find((s) => s.id === setId)
-          if (foundSet) {
-            targetSet = foundSet
-            break
+  // Consume exercise selection from picker (add/replace), then clear params.
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedExercise) return
+      if (isReadOnly) return
+
+      ;(navigation as any).setParams({
+        selectedExercise: undefined,
+        replacingWorkoutExerciseId: undefined,
+      })
+
+      const nextExerciseFull: Exercise = {
+        id: selectedExercise.id,
+        name: selectedExercise.name,
+        link: null,
+        info: null,
+        imageName: null,
+        bodyPart: null,
+        equipment: null,
+      }
+
+      setDraft((prev) => {
+        if (!prev) return prev
+
+        const target =
+          typeof replacingWorkoutExerciseId === 'string'
+            ? prev.workoutExercises.find((we) => we.id === replacingWorkoutExerciseId)
+            : null
+
+        const existsElsewhere = prev.workoutExercises.some((we) => we.exercise.id === nextExerciseFull.id)
+        if (existsElsewhere) {
+          const isReplacingSame = target?.exercise.id === nextExerciseFull.id
+          if (!isReplacingSame) {
+            Toast.show({
+              type: 'error',
+              text1: 'Already added',
+              text2: 'That exercise is already in this workout.',
+            })
+            return prev
           }
         }
-        if (targetSet) {
-          newMap.set(setId, {
-            targetReps: targetSet.targetReps,
-            targetWeight: targetSet.targetWeight,
-            [field]: value,
-          })
-        }
-      } else {
-        newMap.set(setId, { ...current, [field]: value })
-      }
-      return newMap
-    })
-  }
 
-  const saveSetUpdate = async (set: SetType) => {
-    const edited = editingSets.get(set.id)
-    if (!edited) return
-    if (!workout || workout.isDefaultWorkout) return
-    // TODO: local set update when offline persistence is wired
-    setEditingSets((prev) => {
-      const newMap = new Map(prev)
-      newMap.delete(set.id)
-      return newMap
-    })
-  }
+        if (typeof replacingWorkoutExerciseId === 'string') {
+          if (!target) return prev
+          setDirty(true)
+          return {
+            ...prev,
+            workoutExercises: prev.workoutExercises.map((we) =>
+              we.id === replacingWorkoutExerciseId ? { ...we, exercise: nextExerciseFull } : we
+            ),
+          }
+        }
+
+        const nextOrder =
+          prev.workoutExercises.length > 0
+            ? Math.max(...prev.workoutExercises.map((we) => we.order ?? 0)) + 1
+            : 1
+        const newWorkoutExercise: WorkoutExercise = {
+          id: Crypto.randomUUID(),
+          workoutId: prev.id,
+          exercise: nextExerciseFull,
+          order: nextOrder,
+          sets: [
+            {
+              id: Crypto.randomUUID(),
+              setNumber: 1,
+              targetReps: 0,
+              targetWeight: 0,
+            },
+          ],
+        }
+
+        setDirty(true)
+        return { ...prev, workoutExercises: [...prev.workoutExercises, newWorkoutExercise] }
+      })
+    }, [
+      selectedExercise,
+      replacingWorkoutExerciseId,
+      isReadOnly,
+      navigation,
+    ])
+  )
+
+  const updateWorkoutName = useCallback(
+    (name: string) => {
+      if (!draft || isReadOnly) return
+      setDraftAndDirty({ ...draft, name })
+    },
+    [draft, isReadOnly, setDraftAndDirty]
+  )
+
+  const renumberExerciseOrder = useCallback((exercises: WorkoutExercise[]): WorkoutExercise[] => {
+    return exercises.map((we, index) => ({ ...we, order: index + 1 }))
+  }, [])
+
+  const renumberSets = useCallback((setsList: SetType[]): SetType[] => {
+    return setsList.map((s, index) => ({ ...s, setNumber: index + 1 }))
+  }, [])
+
+  const addSet = useCallback(
+    (workoutExerciseId: string) => {
+      if (!draft || isReadOnly) return
+      const next = {
+        ...draft,
+        workoutExercises: draft.workoutExercises.map((we) => {
+          if (we.id !== workoutExerciseId) return we
+          const last = we.sets[we.sets.length - 1]
+          const nextSet: SetType = {
+            id: Crypto.randomUUID(),
+            setNumber: we.sets.length + 1,
+            targetReps: last?.targetReps ?? 0,
+            targetWeight: last?.targetWeight ?? 0,
+          }
+          return { ...we, sets: [...we.sets, nextSet] }
+        }),
+      }
+      setDraftAndDirty(next)
+    },
+    [draft, isReadOnly, setDraftAndDirty]
+  )
+
+  const removeSet = useCallback(
+    (workoutExerciseId: string, setId: string) => {
+      if (!draft || isReadOnly) return
+      const next = {
+        ...draft,
+        workoutExercises: draft.workoutExercises.map((we) => {
+          if (we.id !== workoutExerciseId) return we
+          if (we.sets.length <= 1) return we
+          const filtered = we.sets.filter((s) => s.id !== setId)
+          return { ...we, sets: renumberSets(filtered) }
+        }),
+      }
+      setDraftAndDirty(next)
+    },
+    [draft, isReadOnly, renumberSets, setDraftAndDirty]
+  )
+
+  const updateSetField = useCallback(
+    (
+      workoutExerciseId: string,
+      setId: string,
+      field: 'targetReps' | 'targetWeight',
+      value: number
+    ) => {
+      if (!draft || isReadOnly) return
+      const next = {
+        ...draft,
+        workoutExercises: draft.workoutExercises.map((we) => {
+          if (we.id !== workoutExerciseId) return we
+          return {
+            ...we,
+            sets: we.sets.map((s) => (s.id === setId ? { ...s, [field]: value } : s)),
+          }
+        }),
+      }
+      setDraftAndDirty(next)
+    },
+    [draft, isReadOnly, setDraftAndDirty]
+  )
+
+  const removeExercise = useCallback(
+    (workoutExerciseId: string) => {
+      if (!draft || isReadOnly) return
+      const nextExercises = renumberExerciseOrder(
+        draft.workoutExercises.filter((we) => we.id !== workoutExerciseId)
+      )
+      setDraftAndDirty({ ...draft, workoutExercises: nextExercises })
+    },
+    [draft, isReadOnly, renumberExerciseOrder, setDraftAndDirty]
+  )
+
+  const openExercisePicker = useCallback(
+    (replacingWorkoutExerciseId: string | null) => {
+      if (!draft || isReadOnly) return
+      navigation.navigate('ExercisePicker', {
+        pickerFor: 'workoutDetail',
+        returnToRouteKey: route.key,
+        ...(typeof replacingWorkoutExerciseId === 'string'
+          ? { replacingWorkoutExerciseId }
+          : {}),
+      } as any)
+    },
+    [draft, isReadOnly, navigation, route.key]
+  )
+
+  const summaryText = useMemo(() => {
+    if (!draft) return null
+    const exCount = draft.workoutExercises.length
+    const setCount = draft.workoutExercises.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0)
+    if (exCount === 0) return null
+    return `${exCount} exercise${exCount !== 1 ? 's' : ''}, ${setCount} sets`
+  }, [draft])
+
+  const handleSave = useCallback(async () => {
+    if (!draft || isReadOnly || !dirty) return
+    setSaving(true)
+    try {
+      await updateWorkoutService(draft)
+      const refreshed = await getWorkoutByIdService(draft.id)
+      const next = refreshed ?? draft
+      setDraft(next)
+      setDirty(false)
+      Toast.show({ type: 'success', text1: 'Saved' })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update workout'
+      Toast.show({ type: 'error', text1: 'Save failed', text2: message })
+    } finally {
+      setSaving(false)
+    }
+  }, [dirty, draft, isReadOnly])
 
   const handleCreateSession = async () => {
-    if (!workout) return
+    if (!draft) return
     setCreatingSession(true)
     Toast.show({
       type: 'info',
@@ -106,11 +298,11 @@ function WorkoutDetailScreen() {
     setCreatingSession(false)
   }
 
-  if (!workout && loading) {
+  if (!draft && loading) {
     return <View style={[styles.container, styles.errorContainer, { backgroundColor: colors.screen }]} />
   }
 
-  if (!loading && error && !workout) {
+  if (!loading && error && !draft) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error: {error}</Text>
@@ -121,7 +313,7 @@ function WorkoutDetailScreen() {
     )
   }
 
-  if (!loading && !workout) {
+  if (!loading && !draft) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Workout not found</Text>
@@ -129,7 +321,7 @@ function WorkoutDetailScreen() {
     )
   }
 
-  if (!workout) {
+  if (!draft) {
     return null
   }
 
@@ -145,15 +337,38 @@ function WorkoutDetailScreen() {
 
         <View style={styles.headerCard}>
           <View style={styles.headerContent}>
-            <Text style={styles.workoutName}>{workout.name}</Text>
-            {workout.workoutExercises.length > 0 && (
+            <View style={styles.nameRow}>
+              {isReadOnly ? (
+                <Text style={styles.workoutName}>{draft.name}</Text>
+              ) : (
+                <TextInput
+                  style={[styles.workoutNameInput, dirty && styles.workoutNameInputDirty]}
+                  value={draft.name}
+                  onChangeText={updateWorkoutName}
+                  placeholder="Workout name"
+                  placeholderTextColor={colors.placeholder}
+                />
+              )}
+              {!isReadOnly && dirty && (
+                <TouchableOpacity
+                  style={[styles.saveButtonSmall, saving && styles.buttonDisabled]}
+                  onPress={handleSave}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save workout"
+                >
+                  <Text style={styles.saveButtonSmallText}>{saving ? 'Saving…' : 'Save'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {summaryText && (
               <Text style={styles.workoutSummary}>
-                {workout.workoutExercises.length} exercise{workout.workoutExercises.length !== 1 ? 's' : ''},{' '}
-                {workout.workoutExercises.reduce((acc, ex) => acc + (ex.sets?.length ?? 0), 0)} sets
+                {summaryText}
               </Text>
             )}
             <Text style={styles.workoutDate}>
-              Created: {new Date(workout.createdAt).toLocaleDateString()}
+              Created: {new Date(draft.createdAt).toLocaleDateString()}
             </Text>
           </View>
           <TouchableOpacity
@@ -171,95 +386,163 @@ function WorkoutDetailScreen() {
           </View>
         )}
 
-        {workout.workoutExercises.length === 0 ? (
+        {draft.workoutExercises.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No exercises in this workout</Text>
+            {!isReadOnly && (
+              <TouchableOpacity style={styles.addExerciseButton} onPress={() => openExercisePicker(null)}>
+                <Ionicons name="add" size={20} color={colors.success} />
+                <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
-          <View style={styles.exercisesContainer}>
-            {workout.workoutExercises.map((workoutExercise) => (
-              <View key={workoutExercise.id} style={styles.exerciseCard}>
-                <Text style={styles.exerciseName}>
-                  {workoutExercise.order ?? 0}. {workoutExercise.exercise.name}
-                </Text>
-
-                {workoutExercise.sets.length === 0 ? (
-                  <Text style={styles.noSetsText}>No sets configured</Text>
-                ) : (
-                  <View style={styles.setsContainer}>
-                    <View style={styles.tableHeader}>
-                      <Text style={styles.tableHeaderText}>Set</Text>
-                      <Text style={styles.tableHeaderText}>Weight (kg)</Text>
-                      <Text style={styles.tableHeaderText}>Reps</Text>
-                    </View>
-                    {workoutExercise.sets.map((set) => {
-                      const edited = editingSets.get(set.id)
-                      const displayWeight = edited?.targetWeight ?? set.targetWeight
-                      const displayReps = edited?.targetReps ?? set.targetReps
-                      const readOnly = workout.isDefaultWorkout
-
-                      return (
-                        <View key={set.id} style={styles.setRow}>
-                          <Text style={styles.setNumber}>{set.setNumber}</Text>
-                          {readOnly ? (
-                            <>
-                              <Text style={styles.setValue}>{displayWeight}</Text>
-                              <Text style={styles.setValue}>{displayReps}</Text>
-                            </>
-                          ) : (
-                            <>
-                              <TextInput
-                                style={styles.setInput}
-                                value={displayWeight === 0 ? '' : displayWeight.toString()}
-                                onChangeText={(text) =>
-                                  updateSetValue(set.id, 'targetWeight', parseFloat(text) || 0)
-                                }
-                                onFocus={() => {
-                                  if (!editingSets.has(set.id)) {
-                                    updateSetValue(set.id, 'targetWeight', set.targetWeight)
-                                  }
-                                }}
-                                onBlur={() => {
-                                  const edited = editingSets.get(set.id)
-                                  if (edited) {
-                                    saveSetUpdate(set)
-                                  }
-                                }}
-                                keyboardType="numeric"
-                                placeholder="0"
-                                placeholderTextColor={colors.placeholder}
-                              />
-                              <TextInput
-                                style={styles.setInput}
-                                value={displayReps === 0 ? '' : displayReps.toString()}
-                                onChangeText={(text) =>
-                                  updateSetValue(set.id, 'targetReps', parseInt(text) || 0)
-                                }
-                                onFocus={() => {
-                                  if (!editingSets.has(set.id)) {
-                                    updateSetValue(set.id, 'targetReps', set.targetReps)
-                                  }
-                                }}
-                                onBlur={() => {
-                                  const edited = editingSets.get(set.id)
-                                  if (edited) {
-                                    saveSetUpdate(set)
-                                  }
-                                }}
-                                keyboardType="numeric"
-                                placeholder="0"
-                                placeholderTextColor={colors.placeholder}
-                              />
-                            </>
-                          )}
-                        </View>
-                      )
-                    })}
+          <>
+            <View style={styles.exercisesContainer}>
+              {draft.workoutExercises.map((workoutExercise) => (
+                <View key={workoutExercise.id} style={styles.exerciseCard}>
+                  <View style={styles.exerciseHeader}>
+                    <Text style={styles.exerciseName}>
+                      {workoutExercise.order ?? 0}. {workoutExercise.exercise.name}
+                    </Text>
+                    {!isReadOnly && (
+                      <View style={styles.exerciseActionButtons}>
+                        <TouchableOpacity
+                          style={styles.exerciseActionButton}
+                          onPress={() => openExercisePicker(workoutExercise.id)}
+                        >
+                          <Ionicons name="swap-horizontal-outline" size={20} color={colors.success} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.exerciseActionButton}
+                          onPress={() => removeExercise(workoutExercise.id)}
+                        >
+                          <Ionicons name="trash-outline" size={20} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
-            ))}
-          </View>
+
+                  {(() => {
+                    const ex: any = workoutExercise.exercise as any
+                    const body = ex?.bodyPart?.name as string | undefined
+                    const equip = ex?.equipment?.name as string | undefined
+                    const meta = [body, equip].filter(Boolean).join(' · ')
+                    if (!meta) return null
+                    return <Text style={styles.exerciseMeta}>{meta}</Text>
+                  })()}
+
+                  {workoutExercise.sets.length === 0 ? (
+                    <Text style={styles.noSetsText}>No sets configured</Text>
+                  ) : (
+                    <>
+                      <View style={styles.setsContainer}>
+                        <View style={styles.tableHeaderContainer}>
+                          <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Set</Text>
+                          <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>KG</Text>
+                          <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
+                          <View style={styles.tableHeaderActions} />
+                        </View>
+                        {workoutExercise.sets.map((set) => {
+                          const row = (
+                            <View style={styles.setRowContainer}>
+                              <Text style={styles.setNumber}>{set.setNumber}</Text>
+                              {isReadOnly ? (
+                                <>
+                                  <Text style={styles.setValue}>{set.targetWeight}</Text>
+                                  <Text style={styles.setValue}>{set.targetReps}</Text>
+                                </>
+                              ) : (
+                                <>
+                                  <TextInput
+                                    style={styles.setInput}
+                                    value={set.targetWeight === 0 ? '' : set.targetWeight.toString()}
+                                    onChangeText={(text) =>
+                                      updateSetField(
+                                        workoutExercise.id,
+                                        set.id,
+                                        'targetWeight',
+                                        parseFloat(text) || 0
+                                      )
+                                    }
+                                    keyboardType="numeric"
+                                    placeholder="0"
+                                    placeholderTextColor={colors.placeholder}
+                                  />
+                                  <TextInput
+                                    style={styles.setInput}
+                                    value={set.targetReps === 0 ? '' : set.targetReps.toString()}
+                                    onChangeText={(text) =>
+                                      updateSetField(
+                                        workoutExercise.id,
+                                        set.id,
+                                        'targetReps',
+                                        parseInt(text) || 0
+                                      )
+                                    }
+                                    keyboardType="numeric"
+                                    placeholder="0"
+                                    placeholderTextColor={colors.placeholder}
+                                  />
+                                </>
+                              )}
+                              <View style={styles.setRowActions}>
+                                {!isReadOnly && workoutExercise.sets.length > 1 && (
+                                  <Ionicons
+                                    name="chevron-back-outline"
+                                    size={16}
+                                    color={colors.error}
+                                    style={styles.swipeIconHint}
+                                  />
+                                )}
+                              </View>
+                            </View>
+                          )
+
+                          if (!isReadOnly && workoutExercise.sets.length > 1) {
+                            return (
+                              <Swipeable
+                                key={set.id}
+                                renderRightActions={() => (
+                                  <TouchableOpacity
+                                    style={styles.swipeSetDelete}
+                                    onPress={() => removeSet(workoutExercise.id, set.id)}
+                                  >
+                                    <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
+                                    <Text style={styles.swipeSetDeleteText}>Delete</Text>
+                                  </TouchableOpacity>
+                                )}
+                                friction={2}
+                                rightThreshold={40}
+                              >
+                                {row}
+                              </Swipeable>
+                            )
+                          }
+
+                          return <View key={set.id}>{row}</View>
+                        })}
+                      </View>
+
+                      {!isReadOnly && (
+                        <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(workoutExercise.id)}>
+                          <Ionicons name="add" size={18} color={colors.success} />
+                          <Text style={styles.addSetButtonText}>Add Set</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {!isReadOnly && (
+              <TouchableOpacity style={styles.addExerciseButton} onPress={() => openExercisePicker(null)}>
+                <Ionicons name="add" size={20} color={colors.success} />
+                <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -322,11 +605,40 @@ const styles = StyleSheet.create({
   headerContent: {
     marginBottom: 16,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
   workoutName: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 4,
+  },
+  workoutNameInput: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.text,
+    paddingVertical: 0,
+  },
+  workoutNameInputDirty: {
+    // keep same style; hook for future styling
+  },
+  saveButtonSmall: {
+    backgroundColor: colors.success,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonSmallText: {
+    color: colors.successText,
+    fontSize: 14,
+    fontWeight: '700',
   },
   workoutSummary: {
     fontSize: 15,
@@ -381,11 +693,30 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   exerciseName: {
     fontSize: 20,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 16,
+    flex: 1,
+  },
+  exerciseMeta: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: -10,
+    marginBottom: 12,
+  },
+  exerciseActionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  exerciseActionButton: {
+    padding: 6,
   },
   noSetsText: {
     fontSize: 14,
@@ -394,29 +725,37 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginTop: 8,
   },
-  tableHeader: {
+  tableHeaderContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
     backgroundColor: colors.cardElevated,
+    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    borderRadius: 8,
-    marginBottom: 8,
+    gap: 8,
+  },
+  tableHeaderActions: {
+    width: 24,
   },
   tableHeaderText: {
-    flex: 1,
     fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
-  setRow: {
+  tableHeaderColumn: {
+    flex: 1,
+  },
+  setRowContainer: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    gap: 8,
   },
   setNumber: {
     flex: 1,
@@ -430,10 +769,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: 8,
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     fontSize: 16,
     textAlign: 'center',
-    marginHorizontal: 4,
     backgroundColor: colors.inputBg,
     color: colors.text,
   },
@@ -442,6 +781,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     textAlign: 'center',
+  },
+  setRowActions: {
+    width: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  swipeIconHint: {
+    opacity: 0.4,
+  },
+  swipeSetDelete: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 72,
+    marginVertical: 0,
+    marginRight: 0,
+  },
+  swipeSetDeleteText: {
+    color: colors.primaryText,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  addSetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 12,
+    marginTop: 8,
+  },
+  addSetButtonText: {
+    color: colors.success,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addExerciseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  addExerciseButtonText: {
+    color: colors.success,
+    fontSize: 16,
+    fontWeight: '600',
   },
 })
 

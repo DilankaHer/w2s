@@ -1,4 +1,4 @@
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { CommonActions, useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
+import Toast from 'react-native-toast-message'
 import { getApiErrorMessage } from '../api/errorMessage'
 import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
@@ -102,7 +103,7 @@ type ExercisePickerRouteProp = RouteProp<RootStackParamList, 'ExercisePicker'>
 function ExercisePickerScreen() {
   const route = useRoute<ExercisePickerRouteProp>()
   const navigation = useNavigation<any>()
-  const { pickerFor, sessionId, replacingExerciseId } = route.params ?? {}
+  const { pickerFor, sessionId, replacingExerciseId, replacingWorkoutExerciseId, replacingSessionExerciseId, returnToRouteKey } = route.params ?? {}
   const [optionsExercises, setOptionsExercises] = useState<Exercise[]>([])
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
@@ -283,18 +284,60 @@ function ExercisePickerScreen() {
     (item: Exercise) => {
       const exercise = { id: item.id, name: item.name }
       if (pickerFor === 'createWorkout') {
-        navigation.navigate('CreateWorkout', {
-          selectedExercise: exercise,
-          ...(typeof replacingExerciseId === 'number' ? { replacingExerciseId } : {}),
+        const nextParams =
+          typeof replacingExerciseId === 'string'
+            ? { selectedExercise: exercise, replacingExerciseId }
+            : { selectedExercise: exercise }
+
+        if (typeof returnToRouteKey === 'string' && returnToRouteKey.length > 0) {
+          navigation.dispatch({
+            ...CommonActions.setParams(nextParams),
+            source: returnToRouteKey,
+          })
+          navigation.goBack()
+          return
+        }
+
+        navigation.navigate('CreateWorkout', nextParams)
+      } else if (pickerFor === 'workoutDetail') {
+        const nextParams =
+          typeof replacingWorkoutExerciseId === 'string'
+            ? { selectedExercise: exercise, replacingWorkoutExerciseId }
+            : { selectedExercise: exercise }
+
+        if (typeof returnToRouteKey === 'string' && returnToRouteKey.length > 0) {
+          navigation.dispatch({
+            ...CommonActions.setParams(nextParams),
+            source: returnToRouteKey,
+          })
+          navigation.goBack()
+          return
+        }
+
+        Toast.show({
+          type: 'error',
+          text1: 'Navigation error',
+          text2: 'Could not return selection to workout details.',
         })
       } else if (pickerFor === 'session' && sessionId != null) {
-        navigation.navigate('SessionDetail', {
-          id: sessionId,
-          selectedExercise: exercise,
-        })
+        const nextParams =
+          typeof replacingSessionExerciseId === 'string'
+            ? { selectedExercise: exercise, replacingSessionExerciseId }
+            : { selectedExercise: exercise }
+
+        if (typeof returnToRouteKey === 'string' && returnToRouteKey.length > 0) {
+          navigation.dispatch({
+            ...CommonActions.setParams(nextParams),
+            source: returnToRouteKey,
+          })
+          navigation.goBack()
+          return
+        }
+
+        navigation.navigate('SessionDetail', { id: sessionId, ...nextParams })
       }
     },
-    [pickerFor, sessionId, replacingExerciseId, navigation]
+    [pickerFor, sessionId, replacingExerciseId, replacingWorkoutExerciseId, replacingSessionExerciseId, returnToRouteKey, navigation]
   )
 
   const filterSection = (

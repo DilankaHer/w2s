@@ -15,6 +15,13 @@
       "when": 1771676081512,
       "tag": "0001_careful_infant_terrible",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771785601476,
+      "tag": "0002_redundant_starjammers",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import type { StackNavigationProp } from '@react-navigation/stack'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
     KeyboardAvoidingView,
     Modal,
@@ -16,12 +16,13 @@ import {
 import { Swipeable } from 'react-native-gesture-handler'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
-import { trpc } from '../api/client'
-import { getApiErrorMessage } from '../api/errorMessage'
-import { useAuth } from '../hooks/useAuth'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
-import type { Exercise } from '../types'
+import type { Exercise } from '@shared/types/exercises.types'
+import type { CreateWorkoutInput } from '@shared/types/workouts.types'
+import { getExercisesService } from '../services/exercises.service'
+import { createWorkoutService } from '../services/workouts.service'
 
 type CreateWorkoutRouteProp = RouteProp<RootStackParamList, 'CreateWorkout'>
 
@@ -32,86 +33,23 @@ interface Set {
 }
 
 interface WorkoutExercise {
-  id: number
+  id: string
   order: number
   sets: Set[]
 }
-
-type CreateWorkoutPhase = 'checking' | 'retry' | 'ready'
 
 function CreateWorkoutScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>()
   const route = useRoute<CreateWorkoutRouteProp>()
   const params = route.params
-  const {
-    checkAuth,
-    serverDown,
-    isLoading: authLoading,
-    checkServerOnFocus,
-    registerOnRetrySuccess,
-    unregisterOnRetrySuccess,
-    isAuthenticated,
-  } = useAuth()
-  const [phase, setPhase] = useState<CreateWorkoutPhase>('checking')
+  const insets = useSafeAreaInsets()
   const [workoutName, setWorkoutName] = useState('')
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([])
   const [showExerciseList, setShowExerciseList] = useState(false)
-  const [replacingExerciseId, setReplacingExerciseId] = useState<number | null>(null)
+  const [replacingExerciseId, setReplacingExerciseId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
-  const [exercisesLoading, setExercisesLoading] = useState(false)
-  const [workoutNameExists, setWorkoutNameExists] = useState<boolean | null>(null)
-  const workoutNameCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevServerDownRef = React.useRef(serverDown)
-  const initialCheckRunRef = React.useRef(false)
-
-  // First time: health check, then show form or white + retry
-  useEffect(() => {
-    if (phase !== 'checking' || initialCheckRunRef.current) return
-    initialCheckRunRef.current = true
-
-    const runInitialCheck = async () => {
-      try {
-        await trpc.server.healthCheck.query()
-        setPhase('ready')
-        await fetchExercisesInternal(false)
-      } catch {
-        setPhase('retry')
-      }
-    }
-    runInitialCheck()
-  }, [phase])
-
-  // Transition from retry → ready only when user taps Retry (via callback), not when serverDown flips from another tab/screen
-  useEffect(() => {
-    if (phase !== 'retry') return
-    registerOnRetrySuccess(() => {
-      setPhase('ready')
-      fetchExercisesInternal(false)
-    })
-    return () => unregisterOnRetrySuccess()
-  }, [phase, registerOnRetrySuccess, unregisterOnRetrySuccess])
-
-  // When server comes back while already in form: silent refresh exercises only
-  useEffect(() => {
-    if (serverDown) {
-      prevServerDownRef.current = true
-      return
-    }
-    if (!prevServerDownRef.current) return
-    prevServerDownRef.current = false
-
-    if (phase === 'ready' && !authLoading) {
-      fetchExercisesInternal(true)
-    }
-  }, [serverDown, authLoading, phase])
-
-  useFocusEffect(
-    useCallback(() => {
-      checkServerOnFocus()
-    }, [checkServerOnFocus])
-  )
 
   // Handle return from Exercises picker with selected exercise (only once: clear params first then update state)
   useFocusEffect(
@@ -122,18 +60,8 @@ function CreateWorkoutScreen() {
       // Clear params immediately so a re-run of this effect (e.g. when callback identity changes) won't process again
       ;(navigation as any).setParams({ selectedExercise: undefined, replacingExerciseId: undefined })
 
-      const matched = exercises.find((e) => e.name === selected.name)
-      if (!matched) {
-        Toast.show({
-          type: 'error',
-          text1: 'Exercise not found',
-          text2: 'Please try selecting the exercise again.',
-        })
-        return
-      }
-
-      const selectedId = matched.id
-      const isReplace = typeof replacingId === 'number'
+      const selectedId = selected.id
+      const isReplace = typeof replacingId === 'string'
       if (isReplace) {
         setWorkoutExercises((prev) =>
           prev.map((ex) =>
@@ -154,64 +82,22 @@ function CreateWorkoutScreen() {
           ]
         })
       }
-    }, [params?.selectedExercise, params?.replacingExerciseId, navigation, exercises])
+    }, [params?.selectedExercise, params?.replacingExerciseId, navigation])
   )
 
-  const fetchExercisesInternal = async (silent: boolean) => {
+  const fetchExercisesInternal = useCallback(async () => {
     try {
-      if (!silent) setExercisesLoading(true)
       setError(null)
-      const data = await trpc.exercises.list.query()
+      const data = await getExercisesService()
       setExercises(Array.isArray(data) ? data : [])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to load exercises'))
-    } finally {
-      setExercisesLoading(false)
+      setError(err instanceof Error ? err.message : 'Failed to load exercises')
     }
-  }
-
-  const checkWorkoutName = useCallback(async (value: string) => {
-    if (!isAuthenticated) {
-      setWorkoutNameExists(null)
-      return
-    }
-    const trimmed = value.trim()
-    if (!trimmed) {
-      setWorkoutNameExists(null)
-      return
-    }
-    try {
-      const result = await trpc.workouts.checkWorkoutName.mutate({ name: trimmed })
-      setWorkoutNameExists(result.exists)
-    } catch {
-      setWorkoutNameExists(null)
-    }
-  }, [isAuthenticated])
+  }, [])
 
   useEffect(() => {
-    if (isAuthenticated && phase === 'ready') {
-      if (workoutNameCheckTimeoutRef.current) {
-        clearTimeout(workoutNameCheckTimeoutRef.current)
-        workoutNameCheckTimeoutRef.current = null
-      }
-      const trimmed = workoutName.trim()
-      if (!trimmed) {
-        setWorkoutNameExists(null)
-        return
-      }
-      workoutNameCheckTimeoutRef.current = setTimeout(() => {
-        checkWorkoutName(trimmed)
-        workoutNameCheckTimeoutRef.current = null
-      }, 500) // 500ms debounce
-      return () => {
-        if (workoutNameCheckTimeoutRef.current) {
-          clearTimeout(workoutNameCheckTimeoutRef.current)
-        }
-      }
-    } else {
-      setWorkoutNameExists(null)
-    }
-  }, [workoutName, isAuthenticated, phase, checkWorkoutName])
+    fetchExercisesInternal()
+  }, [fetchExercisesInternal])
 
   const addExercise = (exercise: Exercise) => {
     if (replacingExerciseId !== null) {
@@ -249,28 +135,29 @@ function CreateWorkoutScreen() {
   }
 
   const openExercisePicker = useCallback(
-    (replacingId: number | null) => {
+    (replacingId: string | null) => {
       navigation.navigate('ExercisePicker', {
         pickerFor: 'createWorkout',
-        ...(typeof replacingId === 'number' ? { replacingExerciseId: replacingId } : {}),
+        returnToRouteKey: route.key,
+        ...(typeof replacingId === 'string' ? { replacingExerciseId: replacingId } : {}),
       })
     },
-    [navigation]
+    [navigation, route.key]
   )
 
-  const replaceExercise = (exerciseId: number) => {
+  const replaceExercise = (exerciseId: string) => {
     setReplacingExerciseId(exerciseId)
     openExercisePicker(exerciseId)
   }
 
-  const removeExercise = (exerciseId: number) => {
+  const removeExercise = (exerciseId: string) => {
     const updated = workoutExercises
       .filter((ex) => ex.id !== exerciseId)
       .map((ex, index) => ({ ...ex, order: index + 1 }))
     setWorkoutExercises(updated)
   }
 
-  const addSet = (exerciseId: number) => {
+  const addSet = (exerciseId: string) => {
     setWorkoutExercises(
       workoutExercises.map((ex) => {
         if (ex.id === exerciseId) {
@@ -295,7 +182,7 @@ function CreateWorkoutScreen() {
     )
   }
 
-  const removeSet = (exerciseId: number, setNumber: number) => {
+  const removeSet = (exerciseId: string, setNumber: number) => {
     setWorkoutExercises(
       workoutExercises.map((ex) => {
         if (ex.id === exerciseId && ex.sets.length > 1) {
@@ -313,7 +200,7 @@ function CreateWorkoutScreen() {
   }
 
   const updateSet = (
-    exerciseId: number,
+    exerciseId: string,
     setNumber: number,
     field: 'targetReps' | 'targetWeight',
     value: number
@@ -346,52 +233,39 @@ function CreateWorkoutScreen() {
       return
     }
 
-    // Check if workout name already exists (for authenticated users)
-    if (isAuthenticated) {
-      try {
-        const nameCheck = await trpc.workouts.checkWorkoutName.mutate({ name: workoutName.trim() })
-        if (nameCheck.exists) {
-          setError('A workout with this name already exists')
-          return
-        }
-      } catch (err) {
-        // If check fails, continue anyway (might be network issue)
-      }
-    }
-
     try {
       setSubmitting(true)
       setError(null)
 
-      const workoutPayload = {
-        workout: {
-          name: workoutName.trim(),
-          isWorkout: true,
-          workoutExercises: workoutExercises.map((ex) => ({
-            id: ex.id,
-            order: ex.order,
-            sets: ex.sets,
+      const workoutInput: CreateWorkoutInput = {
+        name: workoutName.trim(),
+        exercises: workoutExercises.map((ex) => ({
+          exerciseId: ex.id,
+          order: ex.order,
+          sets: ex.sets.map((set) => ({
+            setNumber: set.setNumber,
+            targetReps: set.targetReps,
+            targetWeight: set.targetWeight,
           })),
-        },
+        })),
       }
-      await trpc.workouts.create.mutate(workoutPayload)
 
-      // Refresh workout info to get the new workout
-      await checkAuth()
+      await createWorkoutService(workoutInput)
       navigation.navigate('MainTabs' as never)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to create workout'))
+      const message = err instanceof Error ? err.message : 'Failed to create workout'
+      setError(message)
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to create workout. Please try again.',
+        text2: message,
       })
     } finally {
       setSubmitting(false)
     }
   }
 
-  const getExerciseName = (exerciseId: number) => {
+  const getExerciseName = (exerciseId: string) => {
     return exercises?.find((e) => e.id === exerciseId)?.name || 'Unknown'
   }
 
@@ -406,17 +280,15 @@ function CreateWorkoutScreen() {
     (ex) => !workoutExercises.some((we) => we.id === ex.id)
   )
 
-  // First time: white until health check passes; then retry dialog (overlay) or form. Already in form + server down: keep form, overlay on top.
-  if (phase !== 'ready') {
-    return <View style={[styles.container, { backgroundColor: colors.screen }]} />
-  }
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) }]}
+      >
         <View style={styles.headerCard}>
           <Text style={styles.title}>Create Workout</Text>
           <View style={styles.nameInputContainer}>
@@ -424,18 +296,13 @@ function CreateWorkoutScreen() {
             <TextInput
               style={[
                 styles.nameInput,
-                (workoutNameExists === true && isAuthenticated) || error
-                  ? styles.nameInputError
-                  : null,
+                error ? styles.nameInputError : null,
               ]}
               value={workoutName}
               onChangeText={setWorkoutName}
               placeholder="Enter workout name"
               placeholderTextColor={colors.placeholder}
             />
-            {workoutNameExists === true && isAuthenticated && (
-              <Text style={styles.errorText}>A workout with this name already exists</Text>
-            )}
             {error && (
               <Text style={styles.errorText}>{error}</Text>
             )}
@@ -445,7 +312,7 @@ function CreateWorkoutScreen() {
         {workoutExercises.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              No exercises added. Click "Add Exercise" to get started.
+              No exercises added. Tap Add Exercise to get started.
             </Text>
             <TouchableOpacity
               style={styles.addExerciseButton}
@@ -591,7 +458,7 @@ function CreateWorkoutScreen() {
               styles.saveButtonDisabled,
           ]}
           onPress={handleSubmit}
-          disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled() || workoutNameExists === true}
+          disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled()}
         >
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>

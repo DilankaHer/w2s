@@ -76,8 +76,8 @@ import {
   //
   export const workoutExercises = sqliteTable('workoutexercises', {
     id: text('id').primaryKey(),
-    workoutId: text('workout_id').notNull(),
-    exerciseId: text('exercise_id').notNull(),
+    workoutId: text('workout_id').notNull().references(() => workouts.id, { onDelete: 'cascade' }),
+    exerciseId: text('exercise_id').notNull().references(() => exercises.id, { onDelete: 'restrict' }),
     order: integer('order').notNull()
   }, (table) => ({
     uniqueWorkoutExercise: uniqueIndex('workoutexercises_unique')
@@ -91,7 +91,7 @@ import {
   //
   export const sets = sqliteTable('sets', {
     id: text('id').primaryKey(),
-    workoutExerciseId: text('workout_exercise_id').notNull(),
+    workoutExerciseId: text('workout_exercise_id').notNull().references(() => workoutExercises.id, { onDelete: 'cascade' }),
     setNumber: integer('set_number').notNull(),
     targetReps: integer('target_reps').notNull(),
     targetWeight: integer('target_weight').notNull()
@@ -113,8 +113,10 @@ import {
     createdAt: text('created_at').notNull(),
     completedAt: text('completed_at'),
     sessionTime: text('session_time'),
-    isSyncedOnce: integer('is_synced_once', { mode: 'boolean' }).default(false),
-    isFromDefaultWorkout: integer('is_from_default_workout', { mode: 'boolean' }).default(false)
+    isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false),
+    isFromDefaultWorkout: integer('is_from_default_workout', { mode: 'boolean' }).notNull().default(false),
+    exerciseCount: integer('exercise_count').notNull().default(0),
+    setCount: integer('set_count').notNull().default(0),
   }, (table) => ({
     userCreatedIdx: index('sessions_user_created_idx')
       .on(table.userId, table.createdAt),
@@ -125,8 +127,8 @@ import {
   //
   export const sessionExercises = sqliteTable('sessionexercises', {
     id: text('id').primaryKey(),
-    sessionId: text('session_id').notNull(),
-    exerciseId: text('exercise_id').notNull(),
+    sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+    exerciseId: text('exercise_id').notNull().references(() => exercises.id, { onDelete: 'restrict' }),
     order: integer('order').notNull()
   }, (table) => ({
     uniqueSessionExercise: uniqueIndex('sessionexercises_unique')
@@ -140,10 +142,10 @@ import {
   //
   export const sessionSets = sqliteTable('sessionsets', {
     id: text('id').primaryKey(),
-    sessionExerciseId: text('session_exercise_id').notNull(),
+    sessionExerciseId: text('session_exercise_id').notNull().references(() => sessionExercises.id, { onDelete: 'cascade' }),
     setNumber: integer('set_number').notNull(),
-    reps: integer('reps'),
-    weight: real('weight')
+    reps: integer('reps').notNull(),
+    weight: real('weight').notNull()
   }, (table) => ({
     uniqueSessionSet: uniqueIndex('sessionsets_unique')
       .on(table.setNumber, table.sessionExerciseId),
