@@ -43,7 +43,7 @@ function formatDuration(session: SessionListItem): string {
   return '—'
 }
 
-function HistoryScreen() {
+function SessionScreen() {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
@@ -361,4 +361,5 @@ const styles = StyleSheet.create({
   },
 })
 
-export default HistoryScreen
+export default SessionScreen
+

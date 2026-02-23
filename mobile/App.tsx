@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext'
 import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
 import ExercisesScreen from './src/screens/ExercisesScreen'
-import HistoryScreen from './src/screens/HistoryScreen'
+import SessionScreen from '@/screens/SessionScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
 import SessionDetailScreen from '@/screens/SessionDetailScreen'
@@ -38,7 +38,7 @@ export type RootStackParamList = {
 export type TabParamList = {
   Workouts: undefined
   Create: undefined
-  History: undefined
+  Session: undefined
   Exercises: undefined
   Profile: undefined
 }
@@ -231,8 +231,8 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="History"
-        component={HistoryScreen}
+        name="Session"
+        component={SessionScreen}
         options={{
           title: 'Sessions',
           tabBarLabel: 'Sessions',
