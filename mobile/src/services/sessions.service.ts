@@ -34,10 +34,11 @@ export const updateSessionService = async (session: SessionTypes.SessionWithExer
     }
 };
 
-export const deleteSessionService = async (id: string): Promise<void> => {
+export const deleteSessionService = async (id: string): Promise<string> => {
     try {
         await deleteSession(id);
+        return "Session deleted successfully";
     } catch (error) {
-        throw new Error("Failed to delete session");
+        throw new Error(error instanceof Error ? error.message : "Failed to delete session");
     }
 };

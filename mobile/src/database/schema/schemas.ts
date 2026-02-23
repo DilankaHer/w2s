@@ -109,7 +109,8 @@ import {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     userId: text('user_id'),
-    workoutId: text('workout_id'),
+    workoutId: text('workout_id').references(() => workouts.id, { onDelete: 'set null' }),
+    derivedWorkoutId: text('derived_workout_id').references(() => workouts.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull(),
     completedAt: text('completed_at'),
     sessionTime: text('session_time'),
@@ -117,6 +118,7 @@ import {
     isFromDefaultWorkout: integer('is_from_default_workout', { mode: 'boolean' }).notNull().default(false),
     exerciseCount: integer('exercise_count').notNull().default(0),
     setCount: integer('set_count').notNull().default(0),
+    updatedWorkoutAt: text('updated_workout_at'),
   }, (table) => ({
     userCreatedIdx: index('sessions_user_created_idx')
       .on(table.userId, table.createdAt),

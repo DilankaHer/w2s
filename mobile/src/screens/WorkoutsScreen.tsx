@@ -104,9 +104,9 @@ function WorkoutsScreen() {
           onPress: async () => {
             try {
               setDeletingWorkoutId(workout.id)
-              await deleteWorkoutService(workout.id)
+              const msg = await deleteWorkoutService(workout.id)
               await loadWorkouts()
-              Toast.show({ type: 'success', text1: 'Workout deleted' })
+              Toast.show({ type: 'success', text1: 'Success', text2: msg })
             } catch (err) {
               const msg = err instanceof Error ? err.message : 'Failed to delete workout'
               Toast.show({ type: 'error', text1: 'Error', text2: msg })

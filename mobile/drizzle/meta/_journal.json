@@ -22,6 +22,20 @@
       "when": 1771785601476,
       "tag": "0002_redundant_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1771872907570,
+      "tag": "0003_omniscient_manta",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1771875309127,
+      "tag": "0004_public_justice",
+      "breakpoints": true
     }
   ]
 }

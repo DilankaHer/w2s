@@ -18,7 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Crypto from 'expo-crypto'
 import type { Exercise, Set as SetType, WorkoutExercise, WorkoutWithExercises } from '@shared/types/workouts.types'
 import type { RootStackParamList } from '../../App'
-import { getWorkoutByIdService, updateWorkoutService } from '../services/workouts.service'
+import { checkWorkoutNameExistsService, getWorkoutByIdService, updateWorkoutService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type WorkoutDetailRouteProp = RouteProp<RootStackParamList, 'WorkoutDetail'>
@@ -37,6 +37,9 @@ function WorkoutDetailScreen() {
   const [creatingSession, setCreatingSession] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [originalWorkoutName, setOriginalWorkoutName] = useState('')
+  const [workoutNameExists, setWorkoutNameExists] = useState(false)
+  const [checkingWorkoutName, setCheckingWorkoutName] = useState(false)
 
   const isReadOnly = draft?.isDefaultWorkout === true
 
@@ -51,6 +54,8 @@ function WorkoutDetailScreen() {
       setError(null)
       const data = await getWorkoutByIdService(workoutId)
       setDraft(data ?? null)
+      setOriginalWorkoutName(data?.name ?? '')
+      setWorkoutNameExists(false)
       setDirty(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -58,6 +63,39 @@ function WorkoutDetailScreen() {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    let active = true
+    if (!draft || isReadOnly) return
+    const name = (draft.name ?? '').trim()
+    const original = (originalWorkoutName ?? '').trim()
+
+    if (!name || name === original) {
+      setWorkoutNameExists(false)
+      setCheckingWorkoutName(false)
+      return
+    }
+
+    setCheckingWorkoutName(true)
+    const t = setTimeout(async () => {
+      try {
+        const exists = await checkWorkoutNameExistsService(name)
+        if (!active) return
+        setWorkoutNameExists(exists)
+      } catch {
+        if (!active) return
+        setWorkoutNameExists(false)
+      } finally {
+        if (!active) return
+        setCheckingWorkoutName(false)
+      }
+    }, 250)
+
+    return () => {
+      active = false
+      clearTimeout(t)
+    }
+  }, [draft?.name, isReadOnly, originalWorkoutName])
 
   useEffect(() => {
     if (id) {
@@ -140,12 +178,17 @@ function WorkoutDetailScreen() {
           sets: [
             {
               id: Crypto.randomUUID(),
+              workoutExerciseId: '',
               setNumber: 1,
               targetReps: 0,
               targetWeight: 0,
             },
           ],
         }
+        newWorkoutExercise.sets = newWorkoutExercise.sets.map((s) => ({
+          ...s,
+          workoutExerciseId: newWorkoutExercise.id,
+        }))
 
         setDirty(true)
         return { ...prev, workoutExercises: [...prev.workoutExercises, newWorkoutExercise] }
@@ -184,6 +227,7 @@ function WorkoutDetailScreen() {
           const last = we.sets[we.sets.length - 1]
           const nextSet: SetType = {
             id: Crypto.randomUUID(),
+            workoutExerciseId: we.id,
             setNumber: we.sets.length + 1,
             targetReps: last?.targetReps ?? 0,
             targetWeight: last?.targetWeight ?? 0,
@@ -271,21 +315,23 @@ function WorkoutDetailScreen() {
 
   const handleSave = useCallback(async () => {
     if (!draft || isReadOnly || !dirty) return
+    if (checkingWorkoutName || workoutNameExists || !draft.name.trim()) return
     setSaving(true)
     try {
-      await updateWorkoutService(draft)
+      const msg = await updateWorkoutService(draft)
       const refreshed = await getWorkoutByIdService(draft.id)
       const next = refreshed ?? draft
       setDraft(next)
+      setOriginalWorkoutName(next.name ?? '')
       setDirty(false)
-      Toast.show({ type: 'success', text1: 'Saved' })
+      Toast.show({ type: 'success', text1: 'Success', text2: msg })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update workout'
       Toast.show({ type: 'error', text1: 'Save failed', text2: message })
     } finally {
       setSaving(false)
     }
-  }, [dirty, draft, isReadOnly])
+  }, [checkingWorkoutName, dirty, draft, getWorkoutByIdService, isReadOnly, workoutNameExists])
 
   const handleCreateSession = async () => {
     if (!draft) return
@@ -351,16 +397,25 @@ function WorkoutDetailScreen() {
               )}
               {!isReadOnly && dirty && (
                 <TouchableOpacity
-                  style={[styles.saveButtonSmall, saving && styles.buttonDisabled]}
+                  style={[
+                    styles.saveButtonSmall,
+                    (saving || checkingWorkoutName || workoutNameExists || !draft.name.trim()) && styles.buttonDisabled,
+                  ]}
                   onPress={handleSave}
-                  disabled={saving}
+                  disabled={saving || checkingWorkoutName || workoutNameExists || !draft.name.trim()}
                   accessibilityRole="button"
                   accessibilityLabel="Save workout"
                 >
-                  <Text style={styles.saveButtonSmallText}>{saving ? 'Saving…' : 'Save'}</Text>
+                  <Text style={styles.saveButtonSmallText}>
+                    {checkingWorkoutName ? 'Checking…' : saving ? 'Saving…' : 'Save'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
+
+            {!isReadOnly && workoutNameExists ? (
+              <Text style={styles.inlineErrorText}>Workout name already exists</Text>
+            ) : null}
 
             {summaryText && (
               <Text style={styles.workoutSummary}>
@@ -659,6 +714,12 @@ const styles = StyleSheet.create({
     color: colors.successText,
     fontSize: 16,
     fontWeight: '600',
+  },
+  inlineErrorText: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 8,
   },
   errorBox: {
     backgroundColor: colors.errorBg,

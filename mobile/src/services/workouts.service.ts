@@ -1,5 +1,5 @@
 import type * as WorkoutTypes from '@shared/types/workouts.types'
-import { createWorkout, deleteWorkout, getWorkoutById, getWorkouts, updateSet, updateWorkout } from '../database/repositories/workouts.repository'
+import { createWorkout, createWorkoutBySession, deleteWorkout, getWorkoutById, getWorkoutByName, getWorkouts, updateSet, updateWorkout, updateWorkoutBySession } from '../database/repositories/workouts.repository'
 
 export const getWorkoutsService = async (): Promise<WorkoutTypes.Workout[]> => {
     try {
@@ -18,18 +18,48 @@ export const getWorkoutByIdService = async (id: string): Promise<WorkoutTypes.Wo
 }
 
 export const createWorkoutService = async (workout: WorkoutTypes.CreateWorkoutInput): Promise<string> => {
+    if (!/^[a-zA-Z0-9\s-]+$/.test(workout.name)) {
+        throw new Error(
+          "Workout name can only contain letters, numbers, spaces, and hyphens",
+        );
+      }
     try {
-        return await createWorkout(workout);
+        await createWorkout(workout);
+        return "Workout created successfully";
     } catch (error) {
         throw new Error('Failed to create workout');
     }
 }
 
-export const updateWorkoutService = async (workout: WorkoutTypes.WorkoutWithExercises): Promise<void> => {
+export const createWorkoutBySessionService = async (sessionId: string, name: string): Promise<string> => {
+    if (!/^[a-zA-Z0-9\s-]+$/.test(name)) {
+        throw new Error(
+          "Workout name can only contain letters, numbers, spaces, and hyphens",
+        );
+      }
+    try {
+        await createWorkoutBySession(sessionId, name);
+        return "Workout created successfully";
+    } catch (error) {
+        throw new Error(error instanceof Error ? error.message : 'Failed to create workout by session');
+    }
+}
+
+export const updateWorkoutService = async (workout: WorkoutTypes.WorkoutWithExercises): Promise<string> => {
     try {
         await updateWorkout(workout);
+        return "Workout updated successfully";
     } catch (error) {
         throw new Error('Failed to update workout');
+    }
+}
+
+export const updateWorkoutBySessionService = async (sessionId: string): Promise<string> => {
+    try {
+        await updateWorkoutBySession(sessionId);
+        return "Workout updated successfully";
+    } catch (error) {
+        throw new Error(error instanceof Error ? error.message : 'Failed to update workout by session');
     }
 }
 
@@ -41,10 +71,20 @@ export const updateSetService = async (set: WorkoutTypes.Set): Promise<void> => 
     }
 }
 
-export const deleteWorkoutService = async (id: string): Promise<void> => {
+export const deleteWorkoutService = async (id: string): Promise<string> => {
     try {
         await deleteWorkout(id);
+        return "Workout deleted successfully";
     } catch (error) {
         throw new Error('Failed to delete workout');
+    }
+}
+
+export const checkWorkoutNameExistsService = async (name: string): Promise<boolean> => {
+    try {
+        const workout = await getWorkoutByName(name);
+        return !!workout;
+    } catch (error) {
+        throw new Error('Failed to check workout name exists');
     }
 }

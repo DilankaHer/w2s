@@ -103,9 +103,9 @@ function SessionScreen() {
           onPress: async () => {
             try {
               setDeletingSessionId(sessionId)
-              await deleteSessionService(sessionId)
+              const msg = await deleteSessionService(sessionId)
               await loadSessions()
-              Toast.show({ type: 'success', text1: 'Success', text2: 'Session deleted' })
+              Toast.show({ type: 'success', text1: 'Success', text2: msg })
             } catch (err) {
               Toast.show({
                 type: 'error',

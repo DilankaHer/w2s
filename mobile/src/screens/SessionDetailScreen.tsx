@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import * as Crypto from 'expo-crypto'
 import type * as SessionTypes from '@shared/types/sessions.types'
 import type { RootStackParamList } from '../../App'
 import { createSessionService, deleteSessionService, getSessionByIdService, updateSessionService } from '../services/sessions.service'
+import { checkWorkoutNameExistsService, createWorkoutBySessionService, updateWorkoutBySessionService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
@@ -43,6 +45,8 @@ type UISession = {
   completedAt: string | null
   sessionTime: string | null
   isFromDefaultWorkout?: boolean
+  derivedWorkoutId?: string | null
+  updatedWorkoutAt?: string | null
   sessionExercises: UISessionExercise[]
 }
 
@@ -73,6 +77,8 @@ function mapSharedToUi(shared: SessionTypes.SessionWithExercises): UISession {
     completedAt: shared.completedAt ?? null,
     sessionTime: shared.sessionTime ?? null,
     isFromDefaultWorkout: shared.isFromDefaultWorkout,
+    derivedWorkoutId: shared.derivedWorkoutId ?? null,
+    updatedWorkoutAt: shared.updatedWorkoutAt ?? null,
     sessionExercises: (shared.sessionExercises ?? []).map((se) => {
       const body = se.exercise?.bodyPart?.name
       const equip = se.exercise?.equipment?.name
@@ -107,8 +113,51 @@ export default function SessionDetailScreen() {
   const [startingNew, setStartingNew] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [nowTickMs, setNowTickMs] = useState<number>(0)
+  const [showCreateWorkoutModal, setShowCreateWorkoutModal] = useState(false)
+  const [createWorkoutName, setCreateWorkoutName] = useState('')
+  const [creatingWorkout, setCreatingWorkout] = useState(false)
+  const [updatingWorkout, setUpdatingWorkout] = useState(false)
+  const [createWorkoutNameExists, setCreateWorkoutNameExists] = useState(false)
+  const [checkingCreateWorkoutName, setCheckingCreateWorkoutName] = useState(false)
 
   const isReadOnly = session?.completedAt != null
+  const canCreateWorkout = !!session?.completedAt && !session?.derivedWorkoutId
+  const canUpdateWorkout =
+    !!session?.completedAt &&
+    !!session?.workoutId &&
+    !session?.isFromDefaultWorkout &&
+    !session?.updatedWorkoutAt
+
+  useEffect(() => {
+    let active = true
+    if (!showCreateWorkoutModal) return
+    const name = createWorkoutName.trim()
+    if (!name) {
+      setCreateWorkoutNameExists(false)
+      setCheckingCreateWorkoutName(false)
+      return
+    }
+
+    setCheckingCreateWorkoutName(true)
+    const t = setTimeout(async () => {
+      try {
+        const exists = await checkWorkoutNameExistsService(name)
+        if (!active) return
+        setCreateWorkoutNameExists(exists)
+      } catch {
+        if (!active) return
+        setCreateWorkoutNameExists(false)
+      } finally {
+        if (!active) return
+        setCheckingCreateWorkoutName(false)
+      }
+    }, 250)
+
+    return () => {
+      active = false
+      clearTimeout(t)
+    }
+  }, [createWorkoutName, showCreateWorkoutModal])
 
   useEffect(() => {
     if (!session) return
@@ -144,6 +193,7 @@ export default function SessionDetailScreen() {
         return
       }
       setSession(mapSharedToUi(data))
+      setCreateWorkoutName(data.name ?? '')
       setDirty(false)
     } catch (err) {
       setSession(null)
@@ -151,6 +201,13 @@ export default function SessionDetailScreen() {
     } finally {
       setLoading(false)
     }
+  }, [id])
+
+  const refreshSession = useCallback(async () => {
+    const data = await getSessionByIdService(id)
+    if (!data) throw new Error('Session not found')
+    setSession(mapSharedToUi(data))
+    setCreateWorkoutName(data.name ?? '')
   }, [id])
 
   useEffect(() => {
@@ -449,7 +506,8 @@ export default function SessionDetailScreen() {
         onPress: async () => {
           try {
             setDeleting(true)
-            await deleteSessionService(session.id)
+            const msg = await deleteSessionService(session.id)
+            Toast.show({ type: 'success', text1: 'Success', text2: msg })
             navigation.navigate('MainTabs' as never)
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Failed to delete session'
@@ -477,6 +535,51 @@ export default function SessionDetailScreen() {
     }
   }, [navigation, session])
 
+  const handleCreateWorkout = useCallback(async () => {
+    if (!session || !session.completedAt) return
+    if (!createWorkoutName.trim() || createWorkoutNameExists) return
+    try {
+      setCreatingWorkout(true)
+      const msg = await createWorkoutBySessionService(session.id, createWorkoutName.trim() || session.name)
+      Toast.show({ type: 'success', text1: 'Success', text2: msg })
+      setShowCreateWorkoutModal(false)
+      await refreshSession()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create workout'
+      Toast.show({ type: 'error', text1: 'Error', text2: msg })
+    } finally {
+      setCreatingWorkout(false)
+    }
+  }, [createWorkoutName, refreshSession, session])
+
+  const handleUpdateWorkout = useCallback(async () => {
+    if (!session || !session.completedAt) return
+    Alert.alert(
+      'Update workout?',
+      'This will overwrite the workout template with the exercises and sets from this session.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Update',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUpdatingWorkout(true)
+              const msg = await updateWorkoutBySessionService(session.id)
+              Toast.show({ type: 'success', text1: 'Success', text2: msg })
+              await refreshSession()
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Failed to update workout'
+              Toast.show({ type: 'error', text1: 'Error', text2: msg })
+            } finally {
+              setUpdatingWorkout(false)
+            }
+          },
+        },
+      ]
+    )
+  }, [refreshSession, session])
+
   const handleGoToWorkouts = useCallback(() => {
     navigation.navigate('MainTabs', { screen: 'Workouts' } as any)
   }, [navigation])
@@ -500,6 +603,50 @@ export default function SessionDetailScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Modal
+        transparent
+        visible={showCreateWorkoutModal}
+        animationType="fade"
+        onRequestClose={() => setShowCreateWorkoutModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Create Workout</Text>
+            <Text style={styles.modalSubtitle}>Name your new workout template</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={createWorkoutName}
+              onChangeText={setCreateWorkoutName}
+              placeholder="Workout name"
+              placeholderTextColor={colors.placeholder}
+              autoFocus
+            />
+            {createWorkoutNameExists ? (
+              <Text style={styles.inlineErrorText}>Workout name already exists</Text>
+            ) : null}
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={[styles.secondaryButton, creatingWorkout && styles.buttonDisabled]}
+                onPress={() => setShowCreateWorkoutModal(false)}
+                disabled={creatingWorkout}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  (creatingWorkout || checkingCreateWorkoutName || createWorkoutNameExists || !createWorkoutName.trim()) &&
+                    styles.buttonDisabled,
+                ]}
+                onPress={handleCreateWorkout}
+                disabled={creatingWorkout || checkingCreateWorkoutName || createWorkoutNameExists || !createWorkoutName.trim()}
+              >
+                <Text style={styles.primaryButtonText}>{creatingWorkout ? 'Creating…' : 'Create'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <View style={styles.headerCard}>
           <TextInput
@@ -673,6 +820,32 @@ export default function SessionDetailScreen() {
         </View>
       ) : (
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {(canCreateWorkout || canUpdateWorkout) ? (
+            <View style={styles.bottomRow}>
+              {canCreateWorkout ? (
+                <TouchableOpacity
+                  style={[styles.primaryButton, (creatingWorkout || updatingWorkout) && styles.buttonDisabled]}
+                  onPress={() => {
+                    setCreateWorkoutName(session.name ?? '')
+                    setCreateWorkoutNameExists(false)
+                    setShowCreateWorkoutModal(true)
+                  }}
+                  disabled={creatingWorkout || updatingWorkout}
+                >
+                  <Text style={styles.primaryButtonText}>Create Workout</Text>
+                </TouchableOpacity>
+              ) : null}
+              {canUpdateWorkout ? (
+                <TouchableOpacity
+                  style={[styles.primaryButton, (creatingWorkout || updatingWorkout) && styles.buttonDisabled]}
+                  onPress={handleUpdateWorkout}
+                  disabled={creatingWorkout || updatingWorkout}
+                >
+                  <Text style={styles.primaryButtonText}>{updatingWorkout ? 'Updating…' : 'Update Workout'}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.bottomRow}>
             <TouchableOpacity style={styles.secondaryButton} onPress={handleGoToWorkouts}>
               <Text style={styles.secondaryButtonText}>Go to Workouts</Text>
@@ -740,5 +913,35 @@ const styles = StyleSheet.create({
   secondaryButton: { flex: 1, backgroundColor: colors.card, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   secondaryButtonText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   buttonDisabled: { opacity: 0.6 },
+  inlineErrorText: { color: colors.error, fontSize: 12, fontWeight: '600', marginBottom: 10 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 6 },
+  modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 12 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    marginBottom: 12,
+  },
+  modalRow: { flexDirection: 'row', gap: 10 },
 })
 

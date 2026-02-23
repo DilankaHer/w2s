@@ -9,6 +9,8 @@ interface Session {
     sessionTime?: string | null;
     isSynced?: boolean;
     isFromDefaultWorkout?: boolean;
+    derivedWorkoutId?: string | null;
+    updatedWorkoutAt?: string | null;
 }
 
 interface SessionWithExercises extends Session {

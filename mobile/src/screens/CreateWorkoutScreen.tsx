@@ -22,7 +22,7 @@ import { colors } from '../theme/colors'
 import type { Exercise } from '@shared/types/exercises.types'
 import type { CreateWorkoutInput } from '@shared/types/workouts.types'
 import { getExercisesService } from '../services/exercises.service'
-import { createWorkoutService } from '../services/workouts.service'
+import { checkWorkoutNameExistsService, createWorkoutService } from '../services/workouts.service'
 
 type CreateWorkoutRouteProp = RouteProp<RootStackParamList, 'CreateWorkout'>
 
@@ -50,6 +50,40 @@ function CreateWorkoutScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
+  const [workoutNameExists, setWorkoutNameExists] = useState(false)
+  const [checkingWorkoutName, setCheckingWorkoutName] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    const name = workoutName.trim()
+
+    if (!name) {
+      setWorkoutNameExists(false)
+      setCheckingWorkoutName(false)
+      return
+    }
+
+    setCheckingWorkoutName(true)
+    const t = setTimeout(async () => {
+      try {
+        const exists = await checkWorkoutNameExistsService(name)
+        if (!active) return
+        setWorkoutNameExists(exists)
+      } catch {
+        if (!active) return
+        // If name check fails, don't block saving.
+        setWorkoutNameExists(false)
+      } finally {
+        if (!active) return
+        setCheckingWorkoutName(false)
+      }
+    }, 250)
+
+    return () => {
+      active = false
+      clearTimeout(t)
+    }
+  }, [workoutName])
 
   // Handle return from Exercises picker with selected exercise (only once: clear params first then update state)
   useFocusEffect(
@@ -250,7 +284,8 @@ function CreateWorkoutScreen() {
         })),
       }
 
-      await createWorkoutService(workoutInput)
+      const msg = await createWorkoutService(workoutInput)
+      Toast.show({ type: 'success', text1: 'Success', text2: msg })
       navigation.navigate('MainTabs' as never)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create workout'
@@ -303,6 +338,9 @@ function CreateWorkoutScreen() {
               placeholder="Enter workout name"
               placeholderTextColor={colors.placeholder}
             />
+            {workoutNameExists ? (
+              <Text style={styles.errorText}>Workout name already exists</Text>
+            ) : null}
             {error && (
               <Text style={styles.errorText}>{error}</Text>
             )}
@@ -454,13 +492,27 @@ function CreateWorkoutScreen() {
         <TouchableOpacity
           style={[
             styles.saveButton,
-            (submitting || workoutExercises.length === 0 || !areAllSetsFilled()) &&
+            (submitting ||
+              checkingWorkoutName ||
+              workoutNameExists ||
+              !workoutName.trim() ||
+              workoutExercises.length === 0 ||
+              !areAllSetsFilled()) &&
               styles.saveButtonDisabled,
           ]}
           onPress={handleSubmit}
-          disabled={submitting || workoutExercises.length === 0 || !areAllSetsFilled()}
+          disabled={
+            submitting ||
+            checkingWorkoutName ||
+            workoutNameExists ||
+            !workoutName.trim() ||
+            workoutExercises.length === 0 ||
+            !areAllSetsFilled()
+          }
         >
-          <Text style={styles.saveButtonText}>Save</Text>
+          <Text style={styles.saveButtonText}>
+            {checkingWorkoutName ? 'Checking…' : 'Save'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 

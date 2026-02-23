@@ -40,7 +40,7 @@ interface Set {
     setNumber: number;
     targetReps: number;
     targetWeight: number;
-    workoutExerciseId?: string;
+    workoutExerciseId: string;
 }
 
 export type { Workout, WorkoutWithExercises, WorkoutExercise, Exercise, CreateWorkoutInput, Set };
