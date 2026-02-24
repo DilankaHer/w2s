@@ -1,9 +1,10 @@
 import { db } from "../database";
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import { exercises } from "../schema/schemas";
-import * as SharedTypes from "@shared/types/exercises.types";
+import * as ExerciseTypes from "@shared/types/exercises.types";
+import * as Crypto from "expo-crypto";
 
-export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string): Promise<SharedTypes.Exercise[]> {
+export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string): Promise<ExerciseTypes.Exercise[]> {
     const conditions = []
 
     if (bodyPartId) {
@@ -19,9 +20,93 @@ export async function getExercises(bodyPartId?: string, equipmentId?: string, se
     }
     return await db.query.exercises.findMany({
         where: conditions.length > 0 ? and(...conditions) : undefined,
+        columns: {
+            id: true,
+            name: true,
+            isDefaultExercise: true,
+        },
         with: {
             bodyPart: true,
             equipment: true,
         },
     })
+}
+
+export async function getExerciseById(id: string): Promise<ExerciseTypes.Exercise | undefined> {
+    return await db.query.exercises.findFirst({
+        where: eq(exercises.id, id),
+        with: {
+            bodyPart: true,
+            equipment: true,
+        },
+    });
+}
+
+export async function getExerciseByName(name: string): Promise<ExerciseTypes.Exercise | undefined> {
+  return await db.query.exercises.findFirst({
+      where: sql`${exercises.name} COLLATE NOCASE = ${name}`,
+      with: {
+        bodyPart: true,
+        equipment: true,
+      },
+  });
+}
+
+export async function createExercise(exercise: ExerciseTypes.Exercise): Promise<ExerciseTypes.Exercise | undefined> {
+    const exerciseId = Crypto.randomUUID();
+    await db.insert(exercises).values({
+        id: exerciseId,
+        name: exercise.name,
+        bodyPartId: exercise.bodyPart?.id,
+        equipmentId: exercise.equipment?.id,
+        link: exercise.link,
+        info: exercise.info,
+    });
+    return await db.query.exercises.findFirst({
+        where: eq(exercises.id, exerciseId),
+        columns: {
+            id: true,
+            name: true,
+            isDefaultExercise: true,
+        },
+        with: {
+            bodyPart: true,
+            equipment: true,
+        },
+    });
+}
+
+export async function updateExercise(exercise: ExerciseTypes.Exercise): Promise<ExerciseTypes.Exercise | undefined> {
+    await db.update(exercises).set({
+        name: exercise.name,
+        bodyPartId: exercise.bodyPart?.id,
+        equipmentId: exercise.equipment?.id,
+        link: exercise.link,
+        info: exercise.info,
+    }).where(eq(exercises.id, exercise.id));
+
+    return await db.query.exercises.findFirst({
+        where: eq(exercises.id, exercise.id),
+        columns: {
+            id: true,
+            name: true,
+            isDefaultExercise: true,
+        },
+        with: {
+            bodyPart: true,
+            equipment: true,
+        },
+    });
+}
+
+export async function getBodyParts(): Promise<ExerciseTypes.BodyPart[]> {
+    return await db.query.bodyParts.findMany();
+}
+
+export async function getEquipment(): Promise<ExerciseTypes.Equipment[]> {
+    return await db.query.equipment.findMany();
+}
+
+export async function deleteExercise(id: string): Promise<void> {
+    await db.delete(exercises).where(eq(exercises.id, id));
 }

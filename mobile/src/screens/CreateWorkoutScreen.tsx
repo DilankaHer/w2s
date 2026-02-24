@@ -95,6 +95,26 @@ function CreateWorkoutScreen() {
       ;(navigation as any).setParams({ selectedExercise: undefined, replacingExerciseId: undefined })
 
       const selectedId = selected.id
+
+      // Ensure the new/selected exercise can be rendered immediately (avoids "Unknown" until refetch completes).
+      setExercises((prev) => {
+        if (prev.some((e) => e.id === selectedId)) return prev
+        return [
+          ...prev,
+          {
+            id: selectedId,
+            name: selected.name,
+            link: null,
+            info: null,
+            imageName: null,
+            bodyPart: null,
+            equipment: null,
+            // Unknown here until refetch; keep type-safe and conservative.
+            isDefaultExercise: false,
+          },
+        ]
+      })
+
       const isReplace = typeof replacingId === 'string'
       if (isReplace) {
         setWorkoutExercises((prev) =>
@@ -132,6 +152,13 @@ function CreateWorkoutScreen() {
   useEffect(() => {
     fetchExercisesInternal()
   }, [fetchExercisesInternal])
+
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh list when coming back from CreateExercise/Picker.
+      fetchExercisesInternal()
+    }, [fetchExercisesInternal])
+  )
 
   const addExercise = (exercise: Exercise) => {
     if (replacingExerciseId !== null) {

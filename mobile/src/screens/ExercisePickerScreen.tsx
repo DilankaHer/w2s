@@ -1,4 +1,4 @@
-import { CommonActions, useNavigation, useRoute } from '@react-navigation/native'
+import { CommonActions, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -15,11 +15,12 @@ import {
   View,
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
+import { Swipeable } from 'react-native-gesture-handler'
 import Toast from 'react-native-toast-message'
 import { getApiErrorMessage } from '../api/errorMessage'
 import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
-import { getExercisesService } from '../services/exercises.service'
+import { getExerciseByIdService, getExercisesService } from '../services/exercises.service'
 import type { BodyPart, Equipment, Exercise } from '@shared/types/exercises.types'
 
 type ChipOption = { id: string; name: string }
@@ -115,8 +116,13 @@ function ExercisePickerScreen() {
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([])
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([])
   const [infoExercise, setInfoExercise] = useState<Exercise | null>(null)
+  const [infoExerciseFull, setInfoExerciseFull] = useState<Exercise | null>(null)
+  const [infoLoading, setInfoLoading] = useState(false)
+  const [infoError, setInfoError] = useState<string | null>(null)
+  const [infoReloadToken, setInfoReloadToken] = useState(0)
 
   const didMountSearchEffect = useRef(false)
+  const openSwipeableRef = useRef<Swipeable | null>(null)
 
   const deriveBodyParts = useCallback((source: Exercise[]): BodyPart[] => {
     const map = new Map<string, BodyPart>()
@@ -166,6 +172,23 @@ function ExercisePickerScreen() {
     fetchOptions()
     fetchExercises(false, undefined, undefined, undefined)
   }, [fetchExercises, fetchOptions])
+
+  useFocusEffect(
+    useCallback(() => {
+      // Close any open swipe row when returning to this screen.
+      openSwipeableRef.current?.close()
+      openSwipeableRef.current = null
+
+      // Keep list fresh when returning from CreateExercise.
+      fetchOptions()
+      fetchExercises(
+        true,
+        selectedBodyPartId ?? undefined,
+        selectedEquipmentId ?? undefined,
+        searchQuery.trim() || undefined
+      )
+    }, [fetchExercises, fetchOptions, searchQuery, selectedBodyPartId, selectedEquipmentId])
+  )
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
@@ -280,6 +303,53 @@ function ExercisePickerScreen() {
 
   const hasActiveFilters = selectedBodyPartId != null || selectedEquipmentId != null || searchQuery.trim().length > 0
 
+  const openCreateExercise = useCallback(() => {
+    navigation.navigate('CreateExercise', {
+      pickerFor,
+      sessionId,
+      returnToRouteKey,
+      replacingExerciseId,
+      replacingWorkoutExerciseId,
+      replacingSessionExerciseId,
+    })
+  }, [
+    navigation,
+    pickerFor,
+    replacingExerciseId,
+    replacingSessionExerciseId,
+    replacingWorkoutExerciseId,
+    returnToRouteKey,
+    sessionId,
+  ])
+
+  const openEditExercise = useCallback(
+    (exerciseId: string) => {
+      // Prevent editing default exercises at UI entrypoint
+      const ex = exercises.find((x) => x.id === exerciseId)
+      if (ex?.isDefaultExercise) return
+
+      navigation.navigate('CreateExercise', {
+        exerciseId,
+        pickerFor,
+        sessionId,
+        returnToRouteKey,
+        replacingExerciseId,
+        replacingWorkoutExerciseId,
+        replacingSessionExerciseId,
+      })
+    },
+    [
+      exercises,
+      navigation,
+      pickerFor,
+      replacingExerciseId,
+      replacingSessionExerciseId,
+      replacingWorkoutExerciseId,
+      returnToRouteKey,
+      sessionId,
+    ]
+  )
+
   const handleSelectExercise = useCallback(
     (item: Exercise) => {
       const exercise = { id: item.id, name: item.name }
@@ -342,6 +412,16 @@ function ExercisePickerScreen() {
 
   const filterSection = (
     <View style={styles.filterSectionSticky}>
+      <TouchableOpacity
+        style={styles.createExerciseButton}
+        onPress={openCreateExercise}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel="Create new exercise"
+      >
+        <Ionicons name="add-circle-outline" size={20} color={colors.primaryText} />
+        <Text style={styles.createExerciseButtonText}>Create exercise</Text>
+      </TouchableOpacity>
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
@@ -376,9 +456,19 @@ function ExercisePickerScreen() {
     const bodyName = item.bodyPart?.name ?? '—'
     const equipName = item.equipment?.name ?? '—'
     const subtitle = [bodyName, equipName].filter((s) => s !== '—').join(' · ') || '—'
-    return (
+    const canEdit = item.isDefaultExercise === false
+
+    let rowSwipeable: Swipeable | null = null
+    const closeRow = () => {
+      rowSwipeable?.close()
+      if (openSwipeableRef.current === rowSwipeable) {
+        openSwipeableRef.current = null
+      }
+    }
+
+    const card = (
       <TouchableOpacity
-        style={styles.card}
+        style={styles.cardInner}
         onPress={() => handleSelectExercise(item)}
         activeOpacity={0.7}
         accessibilityRole="button"
@@ -386,32 +476,148 @@ function ExercisePickerScreen() {
       >
         <View style={styles.cardImageSlot}>
           <View style={styles.imagePlaceholder}>
-            {item.imageName ? null : (
-              <Ionicons name="barbell-outline" size={28} color={colors.textSecondary} />
-            )}
+            <Ionicons name="barbell-outline" size={28} color={colors.textSecondary} />
           </View>
         </View>
         <View style={styles.cardContent}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
             {item.name}
           </Text>
           <Text style={styles.cardSubtitle} numberOfLines={1}>
             {subtitle}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.infoIconButton}
-          onPress={() => setInfoExercise(item)}
-          hitSlop={8}
-          accessibilityLabel="Exercise info"
-        >
-          <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
-        </TouchableOpacity>
+
+        <View style={styles.cardTrailing}>
+          {canEdit ? (
+            <View pointerEvents="none" style={styles.swipeHintWrap}>
+              <Ionicons
+                name="chevron-back-outline"
+                size={16}
+                color={colors.primary}
+                style={styles.swipeHintIcon}
+              />
+            </View>
+          ) : null}
+          <TouchableOpacity
+            style={styles.infoIconButton}
+            onPress={() => setInfoExercise(item)}
+            hitSlop={8}
+            accessibilityLabel="Exercise info"
+          >
+            <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
+    )
+
+    if (!canEdit) {
+      return <View style={styles.cardOuter}>{card}</View>
+    }
+
+    return (
+      <View style={styles.cardOuter}>
+        <Swipeable
+          ref={(ref) => {
+            rowSwipeable = ref
+          }}
+          renderRightActions={() => (
+            <TouchableOpacity
+              style={styles.swipeActionEdit}
+              onPress={() => {
+                closeRow()
+                openEditExercise(item.id)
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.name}`}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.primaryText} />
+            </TouchableOpacity>
+          )}
+          onSwipeableWillOpen={() => {
+            if (openSwipeableRef.current && openSwipeableRef.current !== rowSwipeable) {
+              openSwipeableRef.current.close()
+            }
+            openSwipeableRef.current = rowSwipeable
+          }}
+          onSwipeableWillClose={() => {
+            if (openSwipeableRef.current === rowSwipeable) {
+              openSwipeableRef.current = null
+            }
+          }}
+          friction={2}
+          rightThreshold={40}
+        >
+          {card}
+        </Swipeable>
+      </View>
     )
   }
 
-  const renderInfoContent = (exercise: Exercise) => {
+  useEffect(() => {
+    const id = infoExercise?.id
+    if (!id) {
+      setInfoExerciseFull(null)
+      setInfoError(null)
+      setInfoLoading(false)
+      return
+    }
+
+    let active = true
+    ;(async () => {
+      setInfoLoading(true)
+      setInfoError(null)
+      setInfoExerciseFull(null)
+      try {
+        const data = await getExerciseByIdService(id)
+        if (!active) return
+        if (!data) throw new Error('Exercise not found')
+        setInfoExerciseFull(data)
+      } catch (err) {
+        if (!active) return
+        setInfoError(err instanceof Error ? err.message : 'Failed to load exercise info')
+      } finally {
+        if (!active) return
+        setInfoLoading(false)
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [infoExercise?.id, infoReloadToken])
+
+  const renderInfoContent = (exercise: Exercise | null) => {
+    if (infoLoading) {
+      return (
+        <View style={styles.infoCard}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.infoLoadingText}>Loading…</Text>
+        </View>
+      )
+    }
+    if (infoError) {
+      return (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoErrorText}>{infoError}</Text>
+          <TouchableOpacity
+            style={styles.infoRetryButton}
+            onPress={() => setInfoReloadToken((x) => x + 1)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.infoRetryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+    if (!exercise) {
+      return (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoNone}>No info</Text>
+        </View>
+      )
+    }
+
     const rawInfo = exercise.info
     let info: unknown = rawInfo
     if (typeof rawInfo === 'string' && rawInfo.trim()) {
@@ -440,21 +646,7 @@ function ExercisePickerScreen() {
     } else {
       infoNode = <Text style={styles.infoNone}>No info</Text>
     }
-    return (
-      <View style={styles.infoSection}>
-        <Text style={styles.infoSectionLabel}>Info</Text>
-        <View style={styles.infoCard}>{infoNode}</View>
-        {exercise.link ? (
-          <TouchableOpacity
-            style={styles.watchVideoButton}
-            onPress={() => exercise.link && Linking.openURL(exercise.link)}
-          >
-            <Ionicons name="play-circle-outline" size={20} color={colors.primaryText} />
-            <Text style={styles.watchVideoText}>Watch video</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    )
+    return <View style={styles.infoCard}>{infoNode}</View>
   }
 
   const renderEmpty = () => {
@@ -554,7 +746,19 @@ function ExercisePickerScreen() {
                   showsVerticalScrollIndicator={true}
                   bounces={false}
                 >
-                  {renderInfoContent(infoExercise)}
+                  <View style={styles.infoSection}>
+                    <Text style={styles.infoSectionLabel}>Info</Text>
+                    {renderInfoContent(infoExerciseFull)}
+                    {infoExerciseFull?.link ? (
+                      <TouchableOpacity
+                        style={styles.watchVideoButton}
+                        onPress={() => infoExerciseFull.link && Linking.openURL(infoExerciseFull.link)}
+                      >
+                        <Ionicons name="play-circle-outline" size={20} color={colors.primaryText} />
+                        <Text style={styles.watchVideoText}>Watch video</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 </ScrollView>
               </View>
             ) : null}
@@ -620,6 +824,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  createExerciseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.success,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+  createExerciseButtonText: {
+    color: colors.primaryText,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   filterSectionSticky: {
     paddingTop: 12,
     paddingBottom: 8,
@@ -667,16 +887,19 @@ const styles = StyleSheet.create({
   listContentEmpty: {
     flexGrow: 1,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
+  cardOuter: {
     marginHorizontal: 16,
     marginBottom: 12,
+    backgroundColor: colors.card,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  cardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   cardImageSlot: {
     marginRight: 12,
@@ -701,6 +924,27 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  cardTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  swipeHintWrap: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+  },
+  swipeHintIcon: {
+    opacity: 0.75,
+  },
+  swipeActionEdit: {
+    backgroundColor: colors.primary,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 72,
   },
   emptyContainer: {
     paddingVertical: 48,
@@ -853,6 +1097,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
+    gap: 12,
+  },
+  infoLoadingText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  infoErrorText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  infoRetryButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  infoRetryButtonText: {
+    color: colors.primaryText,
+    fontWeight: '800',
+    fontSize: 13,
   },
   infoList: {
     gap: 10,

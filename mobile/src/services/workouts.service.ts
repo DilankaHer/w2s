@@ -82,7 +82,7 @@ export const deleteWorkoutService = async (id: string): Promise<string> => {
 
 export const checkWorkoutNameExistsService = async (name: string): Promise<boolean> => {
     try {
-        const workout = await getWorkoutByName(name);
+        const workout = await getWorkoutByName(name.trim());
         return !!workout;
     } catch (error) {
         throw new Error('Failed to check workout name exists');

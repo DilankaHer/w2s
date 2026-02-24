@@ -10,6 +10,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import Toast from 'react-native-toast-message'
 import { AuthProvider, useAuth } from './src/contexts/AuthContext'
 import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
+import CreateExerciseScreen from '@/screens/CreateExerciseScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
 import ExercisesScreen from './src/screens/ExercisesScreen'
 import SessionScreen from '@/screens/SessionScreen'
@@ -33,6 +34,17 @@ export type RootStackParamList = {
   SessionDetail: { id: string; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult; replacingSessionExerciseId?: string }
   CreateWorkout: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: string } | undefined
   ExercisePicker: { pickerFor: 'createWorkout' | 'session' | 'workoutDetail'; sessionId?: string; replacingExerciseId?: string; replacingWorkoutExerciseId?: string; replacingSessionExerciseId?: string; returnToRouteKey?: string }
+  CreateExercise:
+    | {
+        pickerFor?: 'createWorkout' | 'session' | 'workoutDetail'
+        sessionId?: string
+        returnToRouteKey?: string
+        replacingExerciseId?: string
+        replacingWorkoutExerciseId?: string
+        replacingSessionExerciseId?: string
+        exerciseId?: string
+      }
+    | undefined
 }
 
 export type TabParamList = {
@@ -525,6 +537,11 @@ function RootNavigator() {
           name="ExercisePicker"
           component={ExercisePickerScreen}
           options={{ title: 'Select Exercise' }}
+        />
+        <Stack.Screen
+          name="CreateExercise"
+          component={CreateExerciseScreen}
+          options={{ title: 'Add Exercise' }}
         />
       </Stack.Navigator>
       {/* {serverDown && hasEnteredApp && <ServerDownOverlay />} */}

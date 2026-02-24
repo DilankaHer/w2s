@@ -88,6 +88,7 @@ export async function seed() {
       bodyPartId: bp['Legs'],
       equipmentId: eq['Barbell-Standard'],
       link: 'https://youtube.com/shorts/PPmvh7gBTi0',
+      isDefaultExercise: true,
       info: [
         "Bar placement: high bar on upper traps (more quads) or low bar 2–3 inches lower (more glutes/low back)",
         "Walk-out: 1 step clear, 2nd to match feet, 3rd only if needed",
@@ -101,6 +102,7 @@ export async function seed() {
       bodyPartId: bp['Chest'],
       equipmentId: eq['Barbell-Standard'],
       link: 'https://youtube.com/shorts/hWbUlkb5Ms4',
+      isDefaultExercise: true,
       info: [
         "Arch: Slight curve in upper back — tuck shoulder blades, chest up. For powerlifting use a bigger arch; keep feet, glutes, upper back, and head planted.",
         "Grip: About 1.5× shoulder width, squeeze the bar hard. Wider grip = more chest; closer grip = more triceps.",
@@ -114,6 +116,7 @@ export async function seed() {
       bodyPartId: bp['Back'],
       equipmentId: eq['Barbell-Standard'],
       link: 'https://youtube.com/shorts/ZaTM37cfiDs',
+      isDefaultExercise: true,
       info: [
         "Stance: Shins about one inch from the bar, feet hip-width, toes slightly out. Bar over the middle of your foot.",
         "Grip: Hinge at the hips with nearly straight knees (no squatting). Grip just outside your shins — over/under, hook, or strapped. Shins on the bar, pointing straight up.",
@@ -127,6 +130,7 @@ export async function seed() {
       name: 'Overhead Press',
       bodyPartId: bp['Shoulders'],
       equipmentId: eq['Barbell-Standard'],
+      isDefaultExercise: true,
       info: [],
     },
     {
@@ -134,6 +138,7 @@ export async function seed() {
       bodyPartId: bp['Back'],
       equipmentId: eq['Barbell-Standard'],
       link: "https://www.youtube.com/shorts/Nqh7q3zDCoQ",
+      isDefaultExercise: true,
       info: [
         "Set the bar around knee height and grip it with a wide overhand grip.",
         "Stabilize: feet hip-width, pelvis level, core engaged.",
@@ -147,6 +152,7 @@ export async function seed() {
       bodyPartId: bp['Back'],
       equipmentId: eq['Pull-up bar'],
       link: "https://www.youtube.com/shorts/ZPG8OsHKXLw",
+      isDefaultExercise: true,
       info: [
         "Grip: Stand on a bench, arms bent to 90°, grab the bar with an overhand grip and thumb over the bar for better back activation.",
         "Setup: Step off the bench slowly, straighten your legs by flexing your quads, and brace your core to bring your feet forward.",
@@ -160,6 +166,7 @@ export async function seed() {
       bodyPartId: bp['Chest'],
       equipmentId: eq['Dip bar'],
       link: "https://www.youtube.com/shorts/CrbIq-T-h8I",
+      isDefaultExercise: true,
       info: [
         "Start at the top: arms straight, shoulders down, slight external rotation. Neutral or slightly rounded spine, glutes on, legs straight.",
         "Begin the dip: Lean slightly forward, bend the elbows, let spine and hips flex. Shoulder blades neutral or retracted.",
@@ -172,6 +179,7 @@ export async function seed() {
       bodyPartId: bp['Chest'],
       equipmentId: eq['Bodyweight'],
       link: "https://youtube.com/shorts/c-lBErfxszs?si=6UHHFVAbUZ-QW64y",
+      isDefaultExercise: true,
       info: [
         "Start on your knees with your hands slightly wider than shoulder-width.",
         "Rock forward so your shoulders are over your hands, then come up onto your toes.",
@@ -186,6 +194,7 @@ export async function seed() {
       bodyPartId: bp['Arms'],
       equipmentId: eq['Dumbbell'],
       link: "https://www.youtube.com/shorts/2jpteC44QKg",
+      isDefaultExercise: true,
       info: [
         "Roll your shoulders back.",
         "Squeeze your glutes.",
@@ -199,6 +208,7 @@ export async function seed() {
       bodyPartId: bp['Legs'],
       equipmentId: eq['Machine'],
       link: "https://www.youtube.com/shorts/nDh_BlnLCGc",
+      isDefaultExercise: true,
       info: [
         "Foot position: Higher feet = more glutes; lower feet = more quads. Shoulder-width stance with toes slightly out is a good default.",
         "Controlled negative: Resist the weight on the way down instead of letting it drop to get a better quad stretch.",
@@ -217,6 +227,7 @@ export async function seed() {
     imageName: null,
     bodyPartId: ex.bodyPartId,
     equipmentId: ex.equipmentId,
+    isDefaultExercise: ex.isDefaultExercise,
   }));
 
   await db.insert(exercises).values(exerciseRows);
@@ -236,7 +247,6 @@ export async function seed() {
     {
       id: fullBodyId,
       name: 'Full Body Beginner',
-      userId: null,
       isDefaultWorkout: true,
       exerciseCount: 5,
       setCount: 15,
@@ -245,7 +255,6 @@ export async function seed() {
     {
       id: upperBodyId,
       name: 'Upper Body Focus',
-      userId: null,
       isDefaultWorkout: true,
       exerciseCount: 3,
       setCount: 9,

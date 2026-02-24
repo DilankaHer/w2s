@@ -2,7 +2,7 @@ import { db } from "../database";
 import { workouts, workoutExercises, sets, sessions } from "../schema/schemas";
 import * as Crypto from "expo-crypto";
 import * as WorkoutTypes from "@shared/types/workouts.types";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 export async function createWorkout(input: WorkoutTypes.CreateWorkoutInput) {
   const workoutId = Crypto.randomUUID();
@@ -351,6 +351,6 @@ export async function deleteWorkout(id: string) {
 
 export async function getWorkoutByName(name: string) {
   return await db.query.workouts.findFirst({
-    where: eq(workouts.name, name),
+    where: sql`${workouts.name} COLLATE NOCASE = ${name}`,
   });
 }

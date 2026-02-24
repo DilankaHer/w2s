@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
     sqliteTable,
     text,
@@ -48,9 +49,10 @@ import {
     info: text('info'), // JSON as string
     imageName: text('image_name'),
     bodyPartId: text('body_part_id'),
-    equipmentId: text('equipment_id')
+    equipmentId: text('equipment_id'),
+    isDefaultExercise: integer('is_default_exercise', { mode: 'boolean' }).notNull().default(false),
   }, (table) => ({
-    nameUnique: uniqueIndex('exercises_name_unique').on(table.name),
+    nameUnique: uniqueIndex('exercises_name_unique').on(sql`${table.name} COLLATE NOCASE`),
   }));
   
   //
@@ -59,16 +61,15 @@ import {
   export const workouts = sqliteTable('workouts', {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
-    userId: text('user_id'),
     isDefaultWorkout: integer('is_default_workout', { mode: 'boolean' }).notNull().default(false),
     exerciseCount: integer('exercise_count').notNull().default(0),
     setCount: integer('set_count').notNull().default(0),
     createdAt: text('created_at').notNull()
   }, (table) => ({
     userNameUnique: uniqueIndex('workouts_user_name_unique')
-      .on(table.userId, table.name),
+      .on(sql`${table.name} COLLATE NOCASE`),
     userCreatedIdx: index('workouts_user_created_idx')
-      .on(table.userId, table.createdAt),
+      .on(table.createdAt),
   }));
   
   //
@@ -108,7 +109,6 @@ import {
   export const sessions = sqliteTable('sessions', {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
-    userId: text('user_id'),
     workoutId: text('workout_id').references(() => workouts.id, { onDelete: 'set null' }),
     derivedWorkoutId: text('derived_workout_id').references(() => workouts.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull(),
@@ -121,7 +121,7 @@ import {
     updatedWorkoutAt: text('updated_workout_at'),
   }, (table) => ({
     userCreatedIdx: index('sessions_user_created_idx')
-      .on(table.userId, table.createdAt),
+      .on(table.createdAt),
   }));
   
   //
