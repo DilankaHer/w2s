@@ -13,7 +13,7 @@ const API_REQUEST_TIMEOUT_MS = 4_000
 const getApiBaseUrl = (): string => {
   // Priority: EXPO_PUBLIC_API_URL env var > Expo config extra > default
 
-  console.log("process.env.APP_ENV", process.env.APP_ENV)
+  console.log("process.env.APP_ENV", process.env.EXPO_PUBLIC_APP_ENV)
   console.log("Constants.expoConfig?.extra", Constants.expoConfig?.extra)
   const configUrl = Constants.expoConfig?.extra?.apiUrl
 

@@ -3,9 +3,10 @@
   "main": "index.js",
   "version": "1.0.0",
   "scripts": {
-    "start": "cross-env APP_ENV=local expo start",
-    "start:prod": "cross-env APP_ENV=production expo start",
+    "start": "cross-env NODE_ENV=local expo start",
+    "start:prod": "cross-env NODE_ENV=production expo start",
     "reset-project": "node ./scripts/reset-project.js",
+    "build:prod": "cross-env NODE_ENV=production npx expo run:android --variant release",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

@@ -1,9 +1,3 @@
-import dotenv from 'dotenv'
-
-dotenv.config(
-    { path: `.env.${process.env.APP_ENV || 'local'}` }
-)
-
 export default {
     expo: {
       name: "w2s-mobile",
@@ -20,6 +14,7 @@ export default {
       },
   
       android: {
+        package: "com.duvaher.w2s",
         adaptiveIcon: {
           backgroundColor: "#E6F4FE",
           foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -55,8 +50,8 @@ export default {
       },
   
       extra: {
-        apiUrl: process.env.API_URL,
-        appEnv: process.env.APP_ENV,
+        apiUrl: process.env.EXPO_PUBLIC_API_URL,
+        appEnv: process.env.EXPO_PUBLIC_APP_ENV,
       },
     },
   };
