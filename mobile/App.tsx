@@ -5,10 +5,11 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { StatusBar } from 'expo-status-bar'
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
-import { AuthProvider, useAuth } from './src/contexts/AuthContext'
+import { AuthProvider } from './src/contexts/AuthContext'
 import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
 import CreateExerciseScreen from '@/screens/CreateExerciseScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
@@ -35,16 +36,16 @@ export type RootStackParamList = {
   CreateWorkout: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: string } | undefined
   ExercisePicker: { pickerFor: 'createWorkout' | 'session' | 'workoutDetail'; sessionId?: string; replacingExerciseId?: string; replacingWorkoutExerciseId?: string; replacingSessionExerciseId?: string; returnToRouteKey?: string }
   CreateExercise:
-    | {
-        pickerFor?: 'createWorkout' | 'session' | 'workoutDetail'
-        sessionId?: string
-        returnToRouteKey?: string
-        replacingExerciseId?: string
-        replacingWorkoutExerciseId?: string
-        replacingSessionExerciseId?: string
-        exerciseId?: string
-      }
-    | undefined
+  | {
+    pickerFor?: 'createWorkout' | 'session' | 'workoutDetail'
+    sessionId?: string
+    returnToRouteKey?: string
+    replacingExerciseId?: string
+    replacingWorkoutExerciseId?: string
+    replacingSessionExerciseId?: string
+    exerciseId?: string
+  }
+  | undefined
 }
 
 export type TabParamList = {
@@ -93,40 +94,33 @@ function AddButtonTab(props: any) {
 }
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
-  const insets = useSafeAreaInsets()
-
   return (
-    <View
-      style={[
-        customTabBarStyles.container,
-        {
-          paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 8,
-          height: 52 + Math.max(insets.bottom, 8),
-        },
-      ]}
+    <SafeAreaView
+      edges={['bottom']}
+      style={{ backgroundColor: colors.tabBar }}
     >
-      <View style={customTabBarStyles.row}>
-        {state.routes.map((route: any, index: number) => {
-          const { options } = descriptors[route.key]
-          const isFocused = state.index === index
-          const label = options.tabBarLabel ?? options.title ?? route.name
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            })
-            if (!event.defaultPrevented) {
-              navigation.navigate(route.name)
+      <View style={customTabBarStyles.container}>
+        <View style={customTabBarStyles.row}>
+          {state.routes.map((route: any, index: number) => {
+            const { options } = descriptors[route.key]
+            const isFocused = state.index === index
+            const label = options.tabBarLabel ?? options.title ?? route.name
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              })
+              if (!event.defaultPrevented) {
+                navigation.navigate(route.name)
+              }
             }
-          }
-          if (route.name === 'Create' && options.tabBarButton) {
-            const TabButton = options.tabBarButton
-            return <TabButton key={route.key} to={undefined} href={undefined} onPress={onPress} onLongPress={() => {}} accessibilityRole="button" accessibilityState={{ selected: isFocused }} accessibilityLabel={typeof label === 'string' ? label : undefined} testID={undefined} style={customTabBarStyles.fabSlot} />
-          }
-          const iconName = options.tabBarIcon
-            ? (() => {
+            if (route.name === 'Create' && options.tabBarButton) {
+              const TabButton = options.tabBarButton
+              return <TabButton key={route.key} to={undefined} href={undefined} onPress={onPress} onLongPress={() => { }} accessibilityRole="button" accessibilityState={{ selected: isFocused }} accessibilityLabel={typeof label === 'string' ? label : undefined} testID={undefined} style={customTabBarStyles.fabSlot} />
+            }
+            const iconName = options.tabBarIcon
+              ? (() => {
                 const result = options.tabBarIcon({
                   focused: isFocused,
                   color: isFocused ? colors.tabActive : colors.tabInactive,
@@ -134,43 +128,38 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 })
                 return result
               })()
-            : null
-          const tint = isFocused ? colors.tabActive : colors.tabInactive
-          return (
-            <TouchableOpacity
-              key={route.key}
-              onPress={onPress}
-              style={customTabBarStyles.tab}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isFocused }}
-              accessibilityLabel={typeof label === 'string' ? label : undefined}
-            >
-              <View style={customTabBarStyles.iconWrap}>{iconName}</View>
-              <Text style={[customTabBarStyles.label, { color: tint }]} numberOfLines={1}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
+              : null
+            const tint = isFocused ? colors.tabActive : colors.tabInactive
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={onPress}
+                style={customTabBarStyles.tab}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isFocused }}
+                accessibilityLabel={typeof label === 'string' ? label : undefined}
+              >
+                <View style={customTabBarStyles.iconWrap}>{iconName}</View>
+                <Text style={[customTabBarStyles.label, { color: tint }]} numberOfLines={1}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   )
 }
 
 const customTabBarStyles = StyleSheet.create({
   container: {
-    backgroundColor: colors.tabBar,
     borderTopWidth: 1,
     borderTopColor: colors.tabBarBorder,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
   },
   row: {
-    flex: 1,
+    // height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
@@ -206,7 +195,6 @@ function MainTabs() {
         headerTitleStyle: { fontWeight: 'bold' },
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
-        tabBarStyle: { display: 'none' },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
@@ -297,7 +285,7 @@ const stackScreenOptions = {
   headerTitleStyle: {
     fontWeight: 'bold' as const,
   },
-  contentStyle: { backgroundColor: colors.screen },
+  contentStyle: { backgroundColor: colors.screen, padding: 16, paddingBottom: 30 },
 }
 
 function SplashScreen() {
@@ -334,128 +322,6 @@ const splashStyles = StyleSheet.create({
   },
 })
 
-function ServerDownScreen() {
-  const { retryServer, isLoading } = useAuth()
-  return (
-    <View style={serverDownStyles.container}>
-      <Text style={serverDownStyles.title}>Server is down</Text>
-      <Text style={serverDownStyles.subtitle}>Please try again later.</Text>
-      <TouchableOpacity
-        style={[serverDownStyles.retryButton, isLoading && serverDownStyles.buttonDisabled]}
-        onPress={() => retryServer()}
-        disabled={isLoading}
-      >
-        <Text style={serverDownStyles.retryButtonText}>
-          {isLoading ? 'Connecting…' : 'Retry'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
-
-const serverDownStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.screen,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: colors.primaryText,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-})
-
-function ServerDownOverlay() {
-  const insets = useSafeAreaInsets()
-  const { retryServer, isLoading } = useAuth()
-  return (
-    <View style={overlayStyles.backdrop} pointerEvents="auto">
-      <View style={[overlayStyles.toast, { marginTop: insets.top + 8 }]}>
-        <Text style={overlayStyles.toastText}>Server is down</Text>
-        <TouchableOpacity
-          style={[overlayStyles.retryButton, isLoading && overlayStyles.buttonDisabled]}
-          onPress={() => retryServer()}
-          disabled={isLoading}
-        >
-          <Text style={overlayStyles.retryButtonText}>
-            {isLoading ? 'Connecting…' : 'Retry'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  )
-}
-
-const overlayStyles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-  },
-  toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginHorizontal: 24,
-    maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  toastText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    flex: 1,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  retryButtonText: {
-    color: colors.primaryText,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-})
-
 function RootNavigator() {
   const { success, error } = useMigrations(db, migrations);
   const [isDbReady, setIsDbReady] = useState(false);
@@ -484,54 +350,51 @@ function RootNavigator() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.screen }}>
-      <Stack.Navigator
-        initialRouteName="MainTabs"
-        screenOptions={stackScreenOptions}
+    <Stack.Navigator
+      initialRouteName="MainTabs"
+      screenOptions={stackScreenOptions}
+    >
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ headerShown: false, cardStyle: { backgroundColor: colors.screen } }}
+      />
+      <Stack.Screen
+        name="MainTabs"
+        options={{ headerShown: false }}
       >
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false, cardStyle: { backgroundColor: colors.screen } }}
-        />
-        <Stack.Screen
-          name="MainTabs"
-          options={{ headerShown: false }}
-        >
-          {() => <MainTabs />}
-        </Stack.Screen>
-        <Stack.Screen
-          name="WorkoutDetail"
-          component={WorkoutDetailScreen}
-          options={{
-            title: 'Workout Details',
-          }}
-        />
-        <Stack.Screen
-          name="SessionDetail"
-          options={{ title: 'Workout Session' }}
-        >
-          {() => <SessionDetailScreen />}
-        </Stack.Screen>
-        <Stack.Screen
-          name="CreateWorkout"
-          options={{ title: 'Create Workout' }}
-        >
-          {() => <CreateWorkoutScreen />}
-        </Stack.Screen>
-        <Stack.Screen
-          name="ExercisePicker"
-          component={ExercisePickerScreen}
-          options={{ title: 'Select Exercise' }}
-        />
-        <Stack.Screen
-          name="CreateExercise"
-          component={CreateExerciseScreen}
-          options={{ title: 'Add Exercise' }}
-        />
-      </Stack.Navigator>
-      {/* {serverDown && hasEnteredApp && <ServerDownOverlay />} */}
-    </View>
+        {() => <MainTabs />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="WorkoutDetail"
+        component={WorkoutDetailScreen}
+        options={{
+          title: 'Workout Details',
+        }}
+      />
+      <Stack.Screen
+        name="SessionDetail"
+        options={{ title: 'Workout Session' }}
+      >
+        {() => <SessionDetailScreen />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="CreateWorkout"
+        options={{ title: 'Create Workout' }}
+      >
+        {() => <CreateWorkoutScreen />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="ExercisePicker"
+        component={ExercisePickerScreen}
+        options={{ title: 'Select Exercise' }}
+      />
+      <Stack.Screen
+        name="CreateExercise"
+        component={CreateExerciseScreen}
+      // options={{ title: 'Add Exercise' }}
+      />
+    </Stack.Navigator>
   )
 }
 

@@ -153,55 +153,55 @@ function CreateExerciseScreen() {
   useEffect(() => {
     if (!isEdit || !exerciseId) return
     let active = true
-    ;(async () => {
-      setLoadingExisting(true)
-      try {
-        const ex = await getExerciseByIdService(exerciseId)
-        if (!active) return
-        if (!ex) throw new Error('Exercise not found')
-        if (ex.isDefaultExercise) {
-          Toast.show({ type: 'error', text1: 'Not editable', text2: 'Default exercises cannot be edited.' })
-          navigation.goBack()
-          return
-        }
+      ; (async () => {
+        setLoadingExisting(true)
+        try {
+          const ex = await getExerciseByIdService(exerciseId)
+          if (!active) return
+          if (!ex) throw new Error('Exercise not found')
+          if (ex.isDefaultExercise) {
+            Toast.show({ type: 'error', text1: 'Not editable', text2: 'Default exercises cannot be edited.' })
+            navigation.goBack()
+            return
+          }
 
-        setName(ex.name ?? '')
-        setInitialName(ex.name ?? '')
-        setLink(ex.link ?? '')
-        setSelectedBodyPart(ex.bodyPart ?? null)
-        setSelectedEquipment(ex.equipment ?? null)
+          setName(ex.name ?? '')
+          setInitialName(ex.name ?? '')
+          setLink(ex.link ?? '')
+          setSelectedBodyPart(ex.bodyPart ?? null)
+          setSelectedEquipment(ex.equipment ?? null)
 
-        const rawInfo = ex.info
-        let nextLines: string[] = ['']
-        if (Array.isArray(rawInfo)) {
-          nextLines = rawInfo.length > 0 ? rawInfo.map((x) => (typeof x === 'string' ? x : String(x))) : ['']
-        } else if (typeof rawInfo === 'string' && rawInfo.trim()) {
-          try {
-            const parsed = JSON.parse(rawInfo)
-            if (Array.isArray(parsed)) {
-              nextLines = parsed.length > 0 ? parsed.map((x) => (typeof x === 'string' ? x : String(x))) : ['']
-            } else if (typeof parsed === 'string') {
-              nextLines = [parsed]
-            } else {
+          const rawInfo = ex.info
+          let nextLines: string[] = ['']
+          if (Array.isArray(rawInfo)) {
+            nextLines = rawInfo.length > 0 ? rawInfo.map((x) => (typeof x === 'string' ? x : String(x))) : ['']
+          } else if (typeof rawInfo === 'string' && rawInfo.trim()) {
+            try {
+              const parsed = JSON.parse(rawInfo)
+              if (Array.isArray(parsed)) {
+                nextLines = parsed.length > 0 ? parsed.map((x) => (typeof x === 'string' ? x : String(x))) : ['']
+              } else if (typeof parsed === 'string') {
+                nextLines = [parsed]
+              } else {
+                nextLines = [rawInfo]
+              }
+            } catch {
               nextLines = [rawInfo]
             }
-          } catch {
-            nextLines = [rawInfo]
           }
+          setInfoLines(nextLines.length > 0 ? nextLines : [''])
+        } catch (err) {
+          Toast.show({
+            type: 'error',
+            text1: 'Load failed',
+            text2: err instanceof Error ? err.message : 'Could not load exercise',
+          })
+          navigation.goBack()
+        } finally {
+          if (!active) return
+          setLoadingExisting(false)
         }
-        setInfoLines(nextLines.length > 0 ? nextLines : [''])
-      } catch (err) {
-        Toast.show({
-          type: 'error',
-          text1: 'Load failed',
-          text2: err instanceof Error ? err.message : 'Could not load exercise',
-        })
-        navigation.goBack()
-      } finally {
-        if (!active) return
-        setLoadingExisting(false)
-      }
-    })()
+      })()
 
     return () => {
       active = false
@@ -358,17 +358,17 @@ function CreateExerciseScreen() {
             // re-run effect by toggling state
             setLoadingOptions(true)
             setOptionsError(null)
-            ;(async () => {
-              try {
-                const [bp, eq] = await Promise.all([getBodyPartsService(), getEquipmentService()])
-                setBodyParts(Array.isArray(bp) ? bp : [])
-                setEquipment(Array.isArray(eq) ? eq : [])
-              } catch (err) {
-                setOptionsError(err instanceof Error ? err.message : 'Failed to load options')
-              } finally {
-                setLoadingOptions(false)
-              }
-            })()
+              ; (async () => {
+                try {
+                  const [bp, eq] = await Promise.all([getBodyPartsService(), getEquipmentService()])
+                  setBodyParts(Array.isArray(bp) ? bp : [])
+                  setEquipment(Array.isArray(eq) ? eq : [])
+                } catch (err) {
+                  setOptionsError(err instanceof Error ? err.message : 'Failed to load options')
+                } finally {
+                  setLoadingOptions(false)
+                }
+              })()
           }} style={styles.retryPill}>
             <Text style={styles.retryPillText}>Retry</Text>
           </TouchableOpacity>
@@ -422,149 +422,144 @@ function CreateExerciseScreen() {
     )
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(24, insets.bottom + 24) }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.section}>
-          <Text style={styles.label}>Name</Text>
-          <TextInput
-            value={name}
-            onChangeText={(v) => {
-              setDidTouchName(true)
-              setName(v)
-            }}
-            placeholder="e.g. Barbell Bench Press"
-            placeholderTextColor={colors.placeholder}
-            style={[
-              styles.input,
-              trimmedName.length === 0 && styles.inputRequired,
-              exerciseNameExists && styles.inputError,
-            ]}
-            autoCapitalize="words"
-            autoCorrect={false}
-            returnKeyType="next"
-          />
-          {didTouchName && trimmedName.length === 0 ? (
-            <Text style={styles.nameRequiredText}>Name is required</Text>
-          ) : checkingExerciseName ? (
-            <Text style={styles.nameHelperText}>Checking name…</Text>
-          ) : exerciseNameExists ? (
-            <Text style={styles.nameErrorText}>Exercise name already exists</Text>
-          ) : null}
-        </View>
+  const formContent = (
+    <>
+      <View style={styles.section}>
+        <Text style={styles.label}>Name</Text>
+        <TextInput
+          value={name}
+          onChangeText={(v) => {
+            setDidTouchName(true)
+            setName(v)
+          }}
+          placeholder="e.g. Barbell Bench Press"
+          placeholderTextColor={colors.placeholder}
+          style={[
+            styles.input,
+            trimmedName.length === 0 && styles.inputRequired,
+            exerciseNameExists && styles.inputError,
+          ]}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="next"
+        />
+        {didTouchName && trimmedName.length === 0 ? (
+          <Text style={styles.nameRequiredText}>Name is required</Text>
+        ) : checkingExerciseName ? (
+          <Text style={styles.nameHelperText}>Checking name…</Text>
+        ) : exerciseNameExists ? (
+          <Text style={styles.nameErrorText}>Exercise name already exists</Text>
+        ) : null}
+      </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Body part</Text>
-          <TouchableOpacity
-            style={[styles.selectRow, !selectedBodyPart && styles.selectRowError]}
-            onPress={() => setShowBodyPartModal(true)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Select body part"
-          >
-            <Text style={[styles.selectValue, !selectedBodyPart && styles.selectPlaceholder]}>
-              {selectedBodyPart?.name ?? 'Select…'}
-            </Text>
-            <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Equipment</Text>
-          <TouchableOpacity
-            style={[styles.selectRow, !selectedEquipment && styles.selectRowError]}
-            onPress={() => setShowEquipmentModal(true)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Select equipment"
-          >
-            <Text style={[styles.selectValue, !selectedEquipment && styles.selectPlaceholder]}>
-              {selectedEquipment?.name ?? 'Select…'}
-            </Text>
-            <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Link</Text>
-          <TextInput
-            value={link}
-            onChangeText={setLink}
-            placeholder="https://…"
-            placeholderTextColor={colors.placeholder}
-            style={styles.input}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-          />
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.label}>Info (one line per tip)</Text>
-            <TouchableOpacity onPress={addInfoLine} style={styles.addLineButton} activeOpacity={0.75}>
-              <Ionicons name="add" size={18} color={colors.success} />
-              <Text style={styles.addLineButtonText}>Add line</Text>
-            </TouchableOpacity>
-          </View>
-
-          {infoLines.map((line, i) => (
-            <View key={i} style={styles.infoLineRow}>
-              <TextInput
-                value={line}
-                onChangeText={(v) => updateInfoLine(i, v)}
-                placeholder={`Line ${i + 1}`}
-                placeholderTextColor={colors.placeholder}
-                style={[styles.input, styles.infoLineInput]}
-                autoCapitalize="sentences"
-                autoCorrect={true}
-                multiline
-              />
-              {infoLines.length > 1 ? (
-                <TouchableOpacity
-                  onPress={() => removeInfoLine(i)}
-                  style={styles.removeLineButton}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove line ${i + 1}`}
-                >
-                  <Ionicons name="trash-outline" size={18} color={colors.error} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ))}
-        </View>
-
-        {showAddToParent ? <View style={styles.section}>{Checkbox}</View> : null}
-
-        {OptionsSection}
-
+      <View style={styles.section}>
+        <Text style={styles.label}>Body part</Text>
         <TouchableOpacity
-          style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={!canSave}
-          activeOpacity={0.8}
+          style={[styles.selectRow, !selectedBodyPart && styles.selectRowError]}
+          onPress={() => setShowBodyPartModal(true)}
+          activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Save exercise"
+          accessibilityLabel="Select body part"
         >
-          {saving || loadingExisting ? (
-            <ActivityIndicator size="small" color={colors.primaryText} />
-          ) : (
-            <>
-              <Ionicons name={isEdit ? 'save-outline' : 'checkmark'} size={18} color={colors.primaryText} />
-              <Text style={styles.saveButtonText}>{isEdit ? 'Update' : 'Save'}</Text>
-            </>
-          )}
+          <Text style={[styles.selectValue, !selectedBodyPart && styles.selectPlaceholder]}>
+            {selectedBodyPart?.name ?? 'Select…'}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
+      <View style={styles.section}>
+        <Text style={styles.label}>Equipment</Text>
+        <TouchableOpacity
+          style={[styles.selectRow, !selectedEquipment && styles.selectRowError]}
+          onPress={() => setShowEquipmentModal(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Select equipment"
+        >
+          <Text style={[styles.selectValue, !selectedEquipment && styles.selectPlaceholder]}>
+            {selectedEquipment?.name ?? 'Select…'}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Link</Text>
+        <TextInput
+          value={link}
+          onChangeText={setLink}
+          placeholder="https://…"
+          placeholderTextColor={colors.placeholder}
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+        />
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.label}>Info (one line per tip)</Text>
+          <TouchableOpacity onPress={addInfoLine} style={styles.addLineButton} activeOpacity={0.75}>
+            <Ionicons name="add" size={18} color={colors.success} />
+            <Text style={styles.addLineButtonText}>Add line</Text>
+          </TouchableOpacity>
+        </View>
+
+        {infoLines.map((line, i) => (
+          <View key={i} style={styles.infoLineRow}>
+            <TextInput
+              value={line}
+              onChangeText={(v) => updateInfoLine(i, v)}
+              placeholder={`Line ${i + 1}`}
+              placeholderTextColor={colors.placeholder}
+              style={[styles.input, styles.infoLineInput]}
+              autoCapitalize="sentences"
+              autoCorrect={true}
+              multiline
+            />
+            {infoLines.length > 1 ? (
+              <TouchableOpacity
+                onPress={() => removeInfoLine(i)}
+                style={styles.removeLineButton}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove line ${i + 1}`}
+              >
+                <Ionicons name="trash-outline" size={18} color={colors.error} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ))}
+      </View>
+
+      {showAddToParent ? <View style={styles.section}>{Checkbox}</View> : null}
+
+      {OptionsSection}
+
+      <TouchableOpacity
+        style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+        onPress={handleSave}
+        disabled={!canSave}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel="Save exercise"
+      >
+        {saving || loadingExisting ? (
+          <ActivityIndicator size="small" color={colors.primaryText} />
+        ) : (
+          <>
+            <Ionicons name={isEdit ? 'save-outline' : 'checkmark'} size={18} color={colors.primaryText} />
+            <Text style={styles.saveButtonText}>{isEdit ? 'Update' : 'Save'}</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </>
+  )
+
+  const pickerModalContent = (
+    <>
       {renderPickerModal(
         showBodyPartModal,
         () => setShowBodyPartModal(false),
@@ -576,7 +571,6 @@ function CreateExerciseScreen() {
           setShowBodyPartModal(false)
         }
       )}
-
       {renderPickerModal(
         showEquipmentModal,
         () => setShowEquipmentModal(false),
@@ -588,18 +582,44 @@ function CreateExerciseScreen() {
           setShowEquipmentModal(false)
         }
       )}
-    </KeyboardAvoidingView>
+    </>
+  )
+
+  const createExerciseContent = (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.form}>
+        {formContent}
+        {pickerModalContent}
+      </View>
+    </ScrollView>
+  )
+
+  return (
+    Platform.OS === 'ios' ? (
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        {createExerciseContent}
+      </KeyboardAvoidingView>
+    ) : (
+      createExerciseContent
+    )
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.screen,
+    backgroundColor: colors.screen
   },
   content: {
     padding: 16,
-    gap: 14,
+    paddingBottom: 30,
+  },
+  form: {
+    gap: 20,
   },
   section: {
     gap: 8,

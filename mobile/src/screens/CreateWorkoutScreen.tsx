@@ -3,20 +3,20 @@ import type { RouteProp } from '@react-navigation/native'
 import type { StackNavigationProp } from '@react-navigation/stack'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { Swipeable } from 'react-native-gesture-handler'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
 import type { Exercise } from '@shared/types/exercises.types'
@@ -91,8 +91,8 @@ function CreateWorkoutScreen() {
       const selected = params?.selectedExercise
       const replacingId = params?.replacingExerciseId
       if (!selected) return
-      // Clear params immediately so a re-run of this effect (e.g. when callback identity changes) won't process again
-      ;(navigation as any).setParams({ selectedExercise: undefined, replacingExerciseId: undefined })
+        // Clear params immediately so a re-run of this effect (e.g. when callback identity changes) won't process again
+        ; (navigation as any).setParams({ selectedExercise: undefined, replacingExerciseId: undefined })
 
       const selectedId = selected.id
 
@@ -167,9 +167,9 @@ function CreateWorkoutScreen() {
         workoutExercises.map((ex) =>
           ex.id === replacingExerciseId
             ? {
-                ...ex,
-                id: exercise.id,
-              }
+              ...ex,
+              id: exercise.id,
+            }
             : ex
         )
       )
@@ -342,16 +342,9 @@ function CreateWorkoutScreen() {
     (ex) => !workoutExercises.some((we) => we.id === ex.id)
   )
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) }]}
-      >
-        <View style={styles.headerCard}>
+  const createWorkoutContent = (
+    <>
+    <View style={styles.headerCard}>
           <Text style={styles.title}>Create Workout</Text>
           <View style={styles.nameInputContainer}>
             <Text style={styles.label}>Workout Name</Text>
@@ -391,118 +384,118 @@ function CreateWorkoutScreen() {
           <>
             {workoutExercises.map((workoutExercise) => {
               return (
-              <View key={workoutExercise.id} style={styles.exerciseCard}>
-                <View style={styles.exerciseHeader}>
-                  <Text style={styles.exerciseName}>
-                    {workoutExercise.order}. {getExerciseName(workoutExercise.id)}
-                  </Text>
-                  <View style={styles.exerciseActionButtons}>
-                    <TouchableOpacity
-                      style={styles.exerciseActionButton}
-                      onPress={() => replaceExercise(workoutExercise.id)}
-                    >
-                      <Ionicons name="swap-horizontal-outline" size={20} color={colors.success} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.exerciseActionButton}
-                      onPress={() => removeExercise(workoutExercise.id)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {workoutExercise.sets.length === 0 ? (
-                  <Text style={styles.noSetsText}>No sets configured</Text>
-                ) : (
-                  <>
-                    <View style={styles.setsContainer}>
-                      <View style={styles.tableHeaderContainer}>
-                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Set</Text>
-                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>KG</Text>
-                        <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
-                        <View style={styles.tableHeaderActions} />
-                      </View>
-                      {workoutExercise.sets.map((set) => {
-                        const setRowContent = (
-                          <View style={styles.setRowContainer}>
-                            <Text style={styles.setNumber}>{set.setNumber}</Text>
-                            <TextInput
-                              style={styles.setInput}
-                              value={set.targetWeight === 0 ? '' : set.targetWeight.toString()}
-                              onChangeText={(text) =>
-                                updateSet(
-                                  workoutExercise.id,
-                                  set.setNumber,
-                                  'targetWeight',
-                                  parseFloat(text) || 0
-                                )
-                              }
-                              keyboardType="numeric"
-                              placeholder="0"
-                              placeholderTextColor={colors.placeholder}
-                            />
-                            <TextInput
-                              style={styles.setInput}
-                              value={set.targetReps === 0 ? '' : set.targetReps.toString()}
-                              onChangeText={(text) =>
-                                updateSet(
-                                  workoutExercise.id,
-                                  set.setNumber,
-                                  'targetReps',
-                                  parseInt(text) || 0
-                                )
-                              }
-                              keyboardType="numeric"
-                              placeholder="0"
-                              placeholderTextColor={colors.placeholder}
-                            />
-                            <View style={styles.setRowActions}>
-                              {workoutExercise.sets.length > 1 && (
-                                <Ionicons 
-                                  name="chevron-back-outline" 
-                                  size={16} 
-                                  color={colors.error} 
-                                  style={styles.swipeIconHint}
-                                />
-                              )}
-                            </View>
-                          </View>
-                        )
-
-                        if (workoutExercise.sets.length > 1) {
-                          return (
-                            <Swipeable
-                              key={set.setNumber}
-                              renderRightActions={() => (
-                                <TouchableOpacity
-                                  style={styles.swipeSetDelete}
-                                  onPress={() => removeSet(workoutExercise.id, set.setNumber)}
-                                >
-                                  <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
-                                  <Text style={styles.swipeSetDeleteText}>Delete</Text>
-                                </TouchableOpacity>
-                              )}
-                              friction={2}
-                              rightThreshold={40}
-                            >
-                              {setRowContent}
-                            </Swipeable>
-                          )
-                        }
-                        return <View key={set.setNumber}>{setRowContent}</View>
-                      })}
+                <View key={workoutExercise.id} style={styles.exerciseCard}>
+                  <View style={styles.exerciseHeader}>
+                    <Text style={styles.exerciseName}>
+                      {workoutExercise.order}. {getExerciseName(workoutExercise.id)}
+                    </Text>
+                    <View style={styles.exerciseActionButtons}>
+                      <TouchableOpacity
+                        style={styles.exerciseActionButton}
+                        onPress={() => replaceExercise(workoutExercise.id)}
+                      >
+                        <Ionicons name="swap-horizontal-outline" size={20} color={colors.success} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.exerciseActionButton}
+                        onPress={() => removeExercise(workoutExercise.id)}
+                      >
+                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      style={styles.addSetButton}
-                      onPress={() => addSet(workoutExercise.id)}
-                    >
-                      <Ionicons name="add" size={18} color={colors.success} />
-                      <Text style={styles.addSetButtonText}>Add Set</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
+                  </View>
+
+                  {workoutExercise.sets.length === 0 ? (
+                    <Text style={styles.noSetsText}>No sets configured</Text>
+                  ) : (
+                    <>
+                      <View style={styles.setsContainer}>
+                        <View style={styles.tableHeaderContainer}>
+                          <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Set</Text>
+                          <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>KG</Text>
+                          <Text style={[styles.tableHeaderText, styles.tableHeaderColumn]}>Reps</Text>
+                          <View style={styles.tableHeaderActions} />
+                        </View>
+                        {workoutExercise.sets.map((set) => {
+                          const setRowContent = (
+                            <View style={styles.setRowContainer}>
+                              <Text style={styles.setNumber}>{set.setNumber}</Text>
+                              <TextInput
+                                style={styles.setInput}
+                                value={set.targetWeight === 0 ? '' : set.targetWeight.toString()}
+                                onChangeText={(text) =>
+                                  updateSet(
+                                    workoutExercise.id,
+                                    set.setNumber,
+                                    'targetWeight',
+                                    parseFloat(text) || 0
+                                  )
+                                }
+                                keyboardType="numeric"
+                                placeholder="0"
+                                placeholderTextColor={colors.placeholder}
+                              />
+                              <TextInput
+                                style={styles.setInput}
+                                value={set.targetReps === 0 ? '' : set.targetReps.toString()}
+                                onChangeText={(text) =>
+                                  updateSet(
+                                    workoutExercise.id,
+                                    set.setNumber,
+                                    'targetReps',
+                                    parseInt(text) || 0
+                                  )
+                                }
+                                keyboardType="numeric"
+                                placeholder="0"
+                                placeholderTextColor={colors.placeholder}
+                              />
+                              <View style={styles.setRowActions}>
+                                {workoutExercise.sets.length > 1 && (
+                                  <Ionicons
+                                    name="chevron-back-outline"
+                                    size={16}
+                                    color={colors.error}
+                                    style={styles.swipeIconHint}
+                                  />
+                                )}
+                              </View>
+                            </View>
+                          )
+
+                          if (workoutExercise.sets.length > 1) {
+                            return (
+                              <Swipeable
+                                key={set.setNumber}
+                                renderRightActions={() => (
+                                  <TouchableOpacity
+                                    style={styles.swipeSetDelete}
+                                    onPress={() => removeSet(workoutExercise.id, set.setNumber)}
+                                  >
+                                    <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
+                                    <Text style={styles.swipeSetDeleteText}>Delete</Text>
+                                  </TouchableOpacity>
+                                )}
+                                friction={2}
+                                rightThreshold={40}
+                              >
+                                {setRowContent}
+                              </Swipeable>
+                            )
+                          }
+                          return <View key={set.setNumber}>{setRowContent}</View>
+                        })}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.addSetButton}
+                        onPress={() => addSet(workoutExercise.id)}
+                      >
+                        <Ionicons name="add" size={18} color={colors.success} />
+                        <Text style={styles.addSetButtonText}>Add Set</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               )
             })}
 
@@ -525,7 +518,7 @@ function CreateWorkoutScreen() {
               !workoutName.trim() ||
               workoutExercises.length === 0 ||
               !areAllSetsFilled()) &&
-              styles.saveButtonDisabled,
+            styles.saveButtonDisabled,
           ]}
           onPress={handleSubmit}
           disabled={
@@ -541,56 +534,68 @@ function CreateWorkoutScreen() {
             {checkingWorkoutName ? 'Checking…' : 'Save'}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
 
-      <Modal
-        visible={showExerciseList}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowExerciseList(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Exercise</Text>
-              <TouchableOpacity onPress={() => setShowExerciseList(false)}>
-                <Text style={styles.modalCloseText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-            {availableExercises.length > 0 ? (
-              <ScrollView style={styles.modalList}>
-                {availableExercises.map((exercise) => (
-                  <TouchableOpacity
-                    key={exercise.id}
-                    style={styles.modalItem}
-                    onPress={() => addExercise(exercise)}
-                  >
-                    <Text style={styles.modalItemText}>{exercise.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.modalEmpty}>
-                <Text style={styles.modalEmptyText}>No exercises available</Text>
+        <Modal
+          visible={showExerciseList}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowExerciseList(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Exercise</Text>
+                <TouchableOpacity onPress={() => setShowExerciseList(false)}>
+                  <Text style={styles.modalCloseText}>Close</Text>
+                </TouchableOpacity>
               </View>
-            )}
+              {availableExercises.length > 0 ? (
+                <ScrollView style={styles.modalList}>
+                  {availableExercises.map((exercise) => (
+                    <TouchableOpacity
+                      key={exercise.id}
+                      style={styles.modalItem}
+                      onPress={() => addExercise(exercise)}
+                    >
+                      <Text style={styles.modalItemText}>{exercise.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.modalEmpty}>
+                  <Text style={styles.modalEmptyText}>No exercises available</Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+    </>
+  )
+
+  return Platform.OS === 'ios' ? (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior="padding"
+    >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {createWorkoutContent}
+      </ScrollView>
     </KeyboardAvoidingView>
+  ) : (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {createWorkoutContent}
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.screen,
-  },
-  scrollView: {
-    flex: 1,
+    backgroundColor: colors.screen
   },
   content: {
     padding: 16,
+    paddingBottom: 30,
   },
   headerCard: {
     backgroundColor: colors.card,

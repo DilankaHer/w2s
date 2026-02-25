@@ -132,6 +132,7 @@ function WorkoutDetailScreen() {
         imageName: null,
         bodyPart: null,
         equipment: null,
+        isDefaultExercise: false,
       }
 
       setDraft((prev) => {
@@ -371,17 +372,9 @@ function WorkoutDetailScreen() {
     return null
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) }]}
-      >
-
-        <View style={styles.headerCard}>
+  const workoutDetailContent = (
+    <>
+      <View style={styles.headerCard}>
           <View style={styles.headerContent}>
             <View style={styles.nameRow}>
               {isReadOnly ? (
@@ -599,8 +592,21 @@ function WorkoutDetailScreen() {
             )}
           </>
         )}
+    </>
+  )
+
+  return (
+    Platform.OS === 'ios' ? (
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {workoutDetailContent}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    ) : (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {workoutDetailContent}
       </ScrollView>
-    </KeyboardAvoidingView>
+    )
   )
 }
 
@@ -609,11 +615,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.screen,
   },
-  scrollView: {
-    flex: 1,
-  },
   content: {
     padding: 16,
+    paddingBottom: 30,
   },
   errorContainer: {
     flex: 1,
