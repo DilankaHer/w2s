@@ -57,6 +57,20 @@
       "when": 1771956915125,
       "tag": "0007_puzzling_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1772005729730,
+      "tag": "0008_vengeful_emma_frost",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1772008925190,
+      "tag": "0009_fresh_stone_men",
+      "breakpoints": true
     }
   ]
 }

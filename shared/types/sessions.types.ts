@@ -24,6 +24,7 @@ interface SessionExercise {
     exercise?: Exercise;
     order: number;
     sessionSets?: SessionSet[];
+    isSynced?: boolean;
 }
 
 interface SessionSet {
@@ -32,6 +33,7 @@ interface SessionSet {
     reps: number;
     weight: number;
     sessionExerciseId: string;
+    isSynced?: boolean;
 }
 
 export type { Session, SessionWithExercises, SessionExercise, SessionSet };

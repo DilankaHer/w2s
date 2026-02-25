@@ -7,6 +7,7 @@ interface Workout {
     name: string;
     exerciseCount: number;
     setCount: number;
+    isSynced?: boolean;
 }
 
 interface WorkoutWithExercises extends Workout {
@@ -33,6 +34,7 @@ interface WorkoutExercise {
     exercise: Exercise;
     exerciseId?: string;
     sets: Set[];
+    isSynced?: boolean;
 }
 
 interface Set {
@@ -41,6 +43,7 @@ interface Set {
     targetReps: number;
     targetWeight: number;
     workoutExerciseId: string;
+    isSynced?: boolean;
 }
 
 export type { Workout, WorkoutWithExercises, WorkoutExercise, Exercise, CreateWorkoutInput, Set };

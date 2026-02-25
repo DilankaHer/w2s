@@ -1,3 +1,6 @@
+import * as SessionTypes from "@shared/types/sessions.types";
+import { and, eq, inArray } from "drizzle-orm";
+import * as Crypto from "expo-crypto";
 import { db } from "../database";
 import {
   sessionExercises,
@@ -5,43 +8,45 @@ import {
   sessionSets,
   workouts,
 } from "../schema/schemas";
-import { and, eq, inArray } from "drizzle-orm";
-import * as Crypto from "expo-crypto";
-import * as SessionTypes from "@shared/types/sessions.types";
+import { insertDeletedRows } from "./delete-rows.repository";
 
 export async function getSessions(): Promise<SessionTypes.Session[]> {
-    return await db.query.sessions.findMany({
-      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-    });
-  }
+  return await db.query.sessions.findMany({
+    orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+  });
+}
 
-  export async function getSessionById(
-    id: string,
-  ): Promise<SessionTypes.SessionWithExercises | undefined> {
-    return await db.query.sessions.findFirst({
-      where: (sessions, { eq }) => eq(sessions.id, id),
-      with: {
-        sessionExercises: {
-          with: {
-            exercise: {
-              with: {
-                bodyPart: true,
-                equipment: true,
-              },
-            },
-            sessionSets: {
-              orderBy: (sessionSets, { asc }) => [asc(sessionSets.setNumber)],
+export async function getSessionById(
+  id: string,
+): Promise<SessionTypes.SessionWithExercises | undefined> {
+  return await db.query.sessions.findFirst({
+    where: (sessions, { eq }) => eq(sessions.id, id),
+    with: {
+      sessionExercises: {
+        with: {
+          exercise: {
+            with: {
+              bodyPart: true,
+              equipment: true,
             },
           },
-          orderBy: (se, { asc }) => [asc(se.order)],
+          sessionSets: {
+            orderBy: (sessionSets, { asc }) => [asc(sessionSets.setNumber)],
+          },
         },
+        orderBy: (se, { asc }) => [asc(se.order)],
       },
-    });
-  }
+    },
+  });
+}
 
-  export async function deleteSession(id: string) {
-    await db.delete(sessions).where(eq(sessions.id, id));
-  }
+export async function deleteSession(id: string) {
+  await db.delete(sessions).where(eq(sessions.id, id)).returning().then(async ([session]) => {
+    if (session && session.isSynced) {
+      await insertDeletedRows([{ tableName: 'sessions', rowId: session.id }]);
+    }
+  });
+}
 
 export async function createSession(
   sessionId: string,
@@ -208,26 +213,26 @@ export async function updateSession(
         setNumber: s.setNumber,
         reps: s.reps,
         weight: s.weight,
-    })));
+      })));
       exerciseCount++;
       setCount += se.sessionSets?.length ?? 0;
     }
     if (existingExerciseIds.size > 0) {
-        await tx
-          .delete(sessionExercises)
-          .where(
-            and(
-              eq(sessionExercises.sessionId, session.id),
-              inArray(
-                sessionExercises.exerciseId,
-                Array.from(existingExerciseIds),
-              ),
+      await tx
+        .delete(sessionExercises)
+        .where(
+          and(
+            eq(sessionExercises.sessionId, session.id),
+            inArray(
+              sessionExercises.exerciseId,
+              Array.from(existingExerciseIds),
             ),
-          );
-      }
-      if (sessionSetsToAdd.length > 0) {
-        await tx.insert(sessionSets).values(sessionSetsToAdd);
-      }
+          ),
+        );
+    }
+    if (sessionSetsToAdd.length > 0) {
+      await tx.insert(sessionSets).values(sessionSetsToAdd);
+    }
     await tx
       .update(sessions)
       .set({

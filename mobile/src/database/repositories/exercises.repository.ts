@@ -3,6 +3,7 @@ import { and, eq, like, sql } from "drizzle-orm";
 import { exercises } from "../schema/schemas";
 import * as ExerciseTypes from "@shared/types/exercises.types";
 import * as Crypto from "expo-crypto";
+import { insertDeletedRows } from "./delete-rows.repository";
 
 export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string): Promise<ExerciseTypes.Exercise[]> {
     const conditions = []
@@ -83,6 +84,7 @@ export async function updateExercise(exercise: ExerciseTypes.Exercise): Promise<
         equipmentId: exercise.equipment?.id,
         link: exercise.link,
         info: exercise.info,
+        isSynced: false,
     }).where(eq(exercises.id, exercise.id));
 
     return await db.query.exercises.findFirst({
@@ -108,5 +110,9 @@ export async function getEquipment(): Promise<ExerciseTypes.Equipment[]> {
 }
 
 export async function deleteExercise(id: string): Promise<void> {
-    await db.delete(exercises).where(eq(exercises.id, id));
+    await db.delete(exercises).where(eq(exercises.id, id)).returning().then(async ([exercise]) => {
+        if (exercise && exercise.isSynced) {
+            await insertDeletedRows([{ tableName: 'exercises', rowId: exercise.id }]);
+        }
+    });
 }

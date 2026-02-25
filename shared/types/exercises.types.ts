@@ -7,6 +7,7 @@ export interface Exercise {
     bodyPart: BodyPart | null;
     equipment: Equipment | null;
     isDefaultExercise: boolean;
+    isSynced?: boolean;
 }
 
 export interface BodyPart {
