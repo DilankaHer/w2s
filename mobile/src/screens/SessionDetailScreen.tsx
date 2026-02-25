@@ -581,7 +581,7 @@ export default function SessionDetailScreen() {
   }, [refreshSession, session])
 
   const handleGoToWorkouts = useCallback(() => {
-    navigation.navigate('MainTabs', { screen: 'Workouts' } as any)
+    navigation.navigate('MainTabs' as never)
   }, [navigation])
 
   if (loading) {

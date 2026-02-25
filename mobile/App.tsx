@@ -58,17 +58,14 @@ export type TabParamList = {
 const Stack = createStackNavigator<RootStackParamList>()
 const Tab = createBottomTabNavigator<TabParamList>()
 
-// Placeholder component for the Create tab (never actually rendered)
 function CreatePlaceholder() {
   return null
 }
 
-// Create tab button: inline with other tabs (no floating circle) so it fits the bar
 function AddButtonTab(props: any) {
   const navigation = useNavigation()
 
   const handlePress = () => {
-    // Resolve root navigator (stack); custom tab bar can run in a context where getParent() is null
     let rootNav: any = navigation
     while (rootNav?.getParent?.()) {
       rootNav = rootNav.getParent()
@@ -126,17 +123,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           }
           if (route.name === 'Create' && options.tabBarButton) {
             const TabButton = options.tabBarButton
-            return <TabButton key={route.key} to={undefined} href={undefined} onPress={onPress} onLongPress={() => { }} accessibilityRole="button" accessibilityState={{ selected: isFocused }} accessibilityLabel={typeof label === 'string' ? label : undefined} testID={undefined} style={customTabBarStyles.fabSlot} />
+            return <TabButton key={route.key} to={undefined} href={undefined} onPress={onPress} onLongPress={() => {}} accessibilityRole="button" accessibilityState={{ selected: isFocused }} accessibilityLabel={typeof label === 'string' ? label : undefined} testID={undefined} style={customTabBarStyles.fabSlot} />
           }
           const iconName = options.tabBarIcon
             ? (() => {
-              const result = options.tabBarIcon({
-                focused: isFocused,
-                color: isFocused ? colors.tabActive : colors.tabInactive,
-                size: 24,
-              })
-              return result
-            })()
+                const result = options.tabBarIcon({
+                  focused: isFocused,
+                  color: isFocused ? colors.tabActive : colors.tabInactive,
+                  size: 24,
+                })
+                return result
+              })()
             : null
           const tint = isFocused ? colors.tabActive : colors.tabInactive
           return (
@@ -199,27 +196,18 @@ const customTabBarStyles = StyleSheet.create({
 })
 
 function MainTabs() {
-  const insets = useSafeAreaInsets()
-
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.header,
-        },
+        headerStyle: { backgroundColor: colors.header },
         headerTintColor: colors.headerText,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerTitleStyle: { fontWeight: 'bold' },
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: { display: 'none' },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
       <Tab.Screen
@@ -301,6 +289,7 @@ const styles = StyleSheet.create({
 })
 
 const stackScreenOptions = {
+  animation: 'slide_from_right' as const,
   headerStyle: {
     backgroundColor: colors.header,
   },
@@ -516,9 +505,6 @@ function RootNavigator() {
           component={WorkoutDetailScreen}
           options={{
             title: 'Workout Details',
-            headerStyle: { backgroundColor: colors.header },
-            headerTintColor: colors.headerText,
-            animation: 'slide_from_right'
           }}
         />
         <Stack.Screen
