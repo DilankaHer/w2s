@@ -172,10 +172,17 @@ export default function SessionDetailScreen() {
   const openExercisePicker = useCallback(
     (replacingId: string | null) => {
       if (!session || isReadOnly) return
+      const excludedExerciseIds =
+        typeof replacingId === 'string'
+          ? session.sessionExercises
+              .filter((se) => se.id !== replacingId)
+              .map((se) => se.exerciseId)
+          : session.sessionExercises.map((se) => se.exerciseId)
       navigation.navigate('ExercisePicker', {
         pickerFor: 'session',
         sessionId: session.id,
         returnToRouteKey: route.key,
+        excludedExerciseIds,
         ...(typeof replacingId === 'string' ? { replacingSessionExerciseId: replacingId } : {}),
       } as any)
     },
@@ -613,17 +620,19 @@ export default function SessionDetailScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Create Workout</Text>
             <Text style={styles.modalSubtitle}>Name your new workout template</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={createWorkoutName}
-              onChangeText={setCreateWorkoutName}
-              placeholder="Workout name"
-              placeholderTextColor={colors.placeholder}
-              autoFocus
-            />
-            {createWorkoutNameExists ? (
-              <Text style={styles.inlineErrorText}>Workout name already exists</Text>
-            ) : null}
+            <View style={styles.modalInputWrap}>
+              <TextInput
+                style={styles.modalInput}
+                value={createWorkoutName}
+                onChangeText={setCreateWorkoutName}
+                placeholder="Workout name"
+                placeholderTextColor={colors.placeholder}
+                autoFocus
+              />
+              {createWorkoutNameExists ? (
+                <Text style={styles.modalErrorText}>Workout name already exists</Text>
+              ) : null}
+            </View>
             <View style={styles.modalRow}>
               <TouchableOpacity
                 style={[styles.secondaryButton, creatingWorkout && styles.buttonDisabled]}
@@ -695,19 +704,28 @@ export default function SessionDetailScreen() {
               ) : null}
             </View>
 
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderText, styles.col]}>Set</Text>
-              <Text style={[styles.tableHeaderText, styles.col]}>KG</Text>
-              <Text style={[styles.tableHeaderText, styles.col]}>Reps</Text>
-              <View style={styles.actionsCol} />
-            </View>
+            <View style={styles.setsContainer}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, styles.col]}>Set</Text>
+                <Text style={[styles.tableHeaderText, styles.col]}>KG</Text>
+                <Text style={[styles.tableHeaderText, styles.col]}>Reps</Text>
+                <View style={styles.actionsCol} />
+              </View>
 
-            {se.sets.map((s) => {
+              {se.sets.map((s) => {
               const canComplete = (s.reps ?? 0) > 0
               const completed = s.isCompleted === true
 
               const row = (
-                <View style={[styles.row, !isReadOnly && completed && styles.rowCompleted]}>
+                <View
+                  style={[
+                    styles.row,
+                    !isReadOnly && completed && styles.rowCompleted,
+                    !session.completedAt &&
+                      (s.reps ?? 0) <= 0 &&
+                      styles.setRowInvalid,
+                  ]}
+                >
                   <Text style={styles.setNumber}>{s.setNumber}</Text>
                   <TextInput
                     style={styles.input}
@@ -776,12 +794,13 @@ export default function SessionDetailScreen() {
               return <View key={s.id}>{row}</View>
             })}
 
-            {!isReadOnly ? (
-              <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(se.id)}>
-                <Ionicons name="add" size={18} color={colors.success} />
-                <Text style={styles.addSetButtonText}>Add Set</Text>
-              </TouchableOpacity>
-            ) : null}
+              {!isReadOnly ? (
+                <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(se.id)}>
+                  <Ionicons name="add" size={18} color={colors.success} />
+                  <Text style={styles.addSetButtonText}>Add Set</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         ))}
 
@@ -885,6 +904,18 @@ const styles = StyleSheet.create({
   exerciseMeta: { fontSize: 13, color: colors.textSecondary, marginBottom: 0 },
   exerciseActionButtons: { flexDirection: 'row', gap: 8 },
   exerciseActionButton: { padding: 6 },
+  setsContainer: { marginTop: 0 },
+  setRowInvalid: {
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.accent,
+    borderBottomColor: colors.accent,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
   tableHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardElevated, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8, gap: 8, marginBottom: 8 },
   tableHeaderText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textAlign: 'center', textTransform: 'uppercase' },
   col: { flex: 1 },
@@ -932,6 +963,10 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 6 },
   modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 12 },
+  modalInputWrap: {
+    gap: 4,
+    marginBottom: 12,
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.inputBorder,
@@ -940,7 +975,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: colors.text,
     backgroundColor: colors.inputBg,
-    marginBottom: 12,
+  },
+  modalErrorText: {
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: '600',
   },
   modalRow: { flexDirection: 'row', gap: 10 },
 })

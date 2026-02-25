@@ -4,7 +4,14 @@ import { createStackNavigator } from '@react-navigation/stack'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { StatusBar } from 'expo-status-bar'
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -34,7 +41,7 @@ export type RootStackParamList = {
   WorkoutDetail: { id: string; selectedExercise?: ExercisePickerResult; replacingWorkoutExerciseId?: string }
   SessionDetail: { id: string; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult; replacingSessionExerciseId?: string }
   CreateWorkout: { selectedExercise?: ExercisePickerResult; replacingExerciseId?: string } | undefined
-  ExercisePicker: { pickerFor: 'createWorkout' | 'session' | 'workoutDetail'; sessionId?: string; replacingExerciseId?: string; replacingWorkoutExerciseId?: string; replacingSessionExerciseId?: string; returnToRouteKey?: string }
+  ExercisePicker: { pickerFor: 'createWorkout' | 'session' | 'workoutDetail'; sessionId?: string; replacingExerciseId?: string; replacingWorkoutExerciseId?: string; replacingSessionExerciseId?: string; returnToRouteKey?: string; excludedExerciseIds?: string[] }
   CreateExercise:
   | {
     pickerFor?: 'createWorkout' | 'session' | 'workoutDetail'
@@ -94,6 +101,21 @@ function AddButtonTab(props: any) {
 }
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [])
+
+  if (keyboardVisible) {
+    return null
+  }
+
   return (
     <SafeAreaView
       edges={['bottom']}
@@ -196,6 +218,7 @@ function MainTabs() {
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tab.Screen

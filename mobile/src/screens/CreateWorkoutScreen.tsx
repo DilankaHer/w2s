@@ -197,13 +197,18 @@ function CreateWorkoutScreen() {
 
   const openExercisePicker = useCallback(
     (replacingId: string | null) => {
+      const excludedExerciseIds =
+        typeof replacingId === 'string'
+          ? workoutExercises.filter((ex) => ex.id !== replacingId).map((ex) => ex.id)
+          : workoutExercises.map((ex) => ex.id)
       navigation.navigate('ExercisePicker', {
         pickerFor: 'createWorkout',
         returnToRouteKey: route.key,
+        excludedExerciseIds,
         ...(typeof replacingId === 'string' ? { replacingExerciseId: replacingId } : {}),
       })
     },
-    [navigation, route.key]
+    [navigation, route.key, workoutExercises]
   )
 
   const replaceExercise = (exerciseId: string) => {
@@ -334,7 +339,7 @@ function CreateWorkoutScreen() {
   const areAllSetsFilled = () => {
     if (workoutExercises.length === 0) return false
     return workoutExercises.some((ex) =>
-      ex.sets.some((set) => set.targetReps > 0 && set.targetWeight > 0)
+      ex.sets.some((set) => set.targetReps > 0)
     )
   }
 
@@ -351,7 +356,8 @@ function CreateWorkoutScreen() {
             <TextInput
               style={[
                 styles.nameInput,
-                error ? styles.nameInputError : null,
+                !workoutName.trim() && styles.nameInputRequired,
+                (error || workoutNameExists) && styles.nameInputError,
               ]}
               value={workoutName}
               onChangeText={setWorkoutName}
@@ -418,7 +424,12 @@ function CreateWorkoutScreen() {
                         </View>
                         {workoutExercise.sets.map((set) => {
                           const setRowContent = (
-                            <View style={styles.setRowContainer}>
+                            <View
+                              style={[
+                                styles.setRowContainer,
+                                set.targetReps === 0 && styles.setRowInvalid,
+                              ]}
+                            >
                               <Text style={styles.setNumber}>{set.setNumber}</Text>
                               <TextInput
                                 style={styles.setInput}
@@ -633,8 +644,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBg,
     marginBottom: 0,
   },
+  nameInputRequired: {
+    borderColor: colors.accent,
+  },
   nameInputError: {
-    borderColor: colors.error,
+    borderColor: colors.accent,
   },
   errorBox: {
     backgroundColor: colors.errorBg,
@@ -651,8 +665,8 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     color: colors.error,
-    marginTop: 0,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 0,
   },
   emptyContainer: {
     backgroundColor: colors.card,
@@ -708,6 +722,17 @@ const styles = StyleSheet.create({
   },
   setsContainer: {
     marginTop: 8,
+  },
+  setRowInvalid: {
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.accent,
+    borderBottomColor: colors.accent,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 2,
   },
   tableHeaderContainer: {
     flexDirection: 'row',

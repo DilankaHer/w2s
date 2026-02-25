@@ -104,7 +104,7 @@ type ExercisePickerRouteProp = RouteProp<RootStackParamList, 'ExercisePicker'>
 function ExercisePickerScreen() {
   const route = useRoute<ExercisePickerRouteProp>()
   const navigation = useNavigation<any>()
-  const { pickerFor, sessionId, replacingExerciseId, replacingWorkoutExerciseId, replacingSessionExerciseId, returnToRouteKey } = route.params ?? {}
+  const { pickerFor, sessionId, replacingExerciseId, replacingWorkoutExerciseId, replacingSessionExerciseId, returnToRouteKey, excludedExerciseIds = [] } = route.params ?? {}
   const [optionsExercises, setOptionsExercises] = useState<Exercise[]>([])
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
@@ -239,6 +239,15 @@ function ExercisePickerScreen() {
       })
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [optionsExercises, equipmentList, selectedBodyPartId])
+
+  const excludedSet = useMemo(
+    () => new Set(excludedExerciseIds ?? []),
+    [excludedExerciseIds]
+  )
+  const filteredExercises = useMemo(
+    () => exercises.filter((ex) => !excludedSet.has(ex.id)),
+    [exercises, excludedSet]
+  )
 
   const onSelectBodyPart = useCallback(
     (id: string | null) => {
@@ -654,7 +663,11 @@ function ExercisePickerScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {exercises.length === 0 ? 'No exercises available.' : 'No exercises match your filters.'}
+          {exercises.length === 0
+            ? 'No exercises available.'
+            : filteredExercises.length === 0
+              ? `No exercises to add (all matching are already in this ${pickerFor === 'session' ? 'session' : 'workout'}).`
+              : 'No exercises match your filters.'}
         </Text>
         {hasActiveFilters && (
           <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
@@ -689,11 +702,11 @@ function ExercisePickerScreen() {
     <View style={styles.container}>
       {filterSection}
       <FlatList
-        data={exercises}
+        data={filteredExercises}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[styles.listContent, exercises.length === 0 && styles.listContentEmpty]}
+        contentContainerStyle={[styles.listContent, filteredExercises.length === 0 && styles.listContentEmpty]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         keyboardShouldPersistTaps="handled"
       />

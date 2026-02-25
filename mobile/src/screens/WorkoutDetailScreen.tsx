@@ -295,9 +295,16 @@ function WorkoutDetailScreen() {
   const openExercisePicker = useCallback(
     (replacingWorkoutExerciseId: string | null) => {
       if (!draft || isReadOnly) return
+      const excludedExerciseIds =
+        typeof replacingWorkoutExerciseId === 'string'
+          ? draft.workoutExercises
+              .filter((we) => we.id !== replacingWorkoutExerciseId)
+              .map((we) => we.exercise.id)
+          : draft.workoutExercises.map((we) => we.exercise.id)
       navigation.navigate('ExercisePicker', {
         pickerFor: 'workoutDetail',
         returnToRouteKey: route.key,
+        excludedExerciseIds,
         ...(typeof replacingWorkoutExerciseId === 'string'
           ? { replacingWorkoutExerciseId }
           : {}),
@@ -381,7 +388,12 @@ function WorkoutDetailScreen() {
                 <Text style={styles.workoutName}>{draft.name}</Text>
               ) : (
                 <TextInput
-                  style={[styles.workoutNameInput, dirty && styles.workoutNameInputDirty]}
+                  style={[
+                    styles.workoutNameInput,
+                    dirty && styles.workoutNameInputDirty,
+                    !draft.name.trim() && styles.workoutNameInputRequired,
+                    workoutNameExists && styles.workoutNameInputError,
+                  ]}
                   value={draft.name}
                   onChangeText={updateWorkoutName}
                   placeholder="Workout name"
@@ -493,7 +505,14 @@ function WorkoutDetailScreen() {
                         </View>
                         {workoutExercise.sets.map((set) => {
                           const row = (
-                            <View style={styles.setRowContainer}>
+                            <View
+                              style={[
+                                styles.setRowContainer,
+                                !isReadOnly &&
+                                  set.targetReps === 0 &&
+                                  styles.setRowInvalid,
+                              ]}
+                            >
                               <Text style={styles.setNumber}>{set.setNumber}</Text>
                               {isReadOnly ? (
                                 <>
@@ -681,10 +700,21 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
-    paddingVertical: 0,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.inputBg,
   },
   workoutNameInputDirty: {
     // keep same style; hook for future styling
+  },
+  workoutNameInputRequired: {
+    borderColor: colors.accent,
+  },
+  workoutNameInputError: {
+    borderColor: colors.accent,
   },
   saveButtonSmall: {
     backgroundColor: colors.success,
@@ -723,7 +753,7 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 8,
+    marginTop: 4,
   },
   errorBox: {
     backgroundColor: colors.errorBg,
@@ -789,6 +819,17 @@ const styles = StyleSheet.create({
   },
   setsContainer: {
     marginTop: 8,
+  },
+  setRowInvalid: {
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.accent,
+    borderBottomColor: colors.accent,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 2,
   },
   tableHeaderContainer: {
     flexDirection: 'row',

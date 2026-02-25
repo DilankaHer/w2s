@@ -54,7 +54,7 @@ function CreateExerciseScreen() {
   const [name, setName] = useState('')
   const [initialName, setInitialName] = useState('')
   const [link, setLink] = useState('')
-  const [infoLines, setInfoLines] = useState<string[]>([''])
+  const [infoText, setInfoText] = useState('')
   const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart | null>(null)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [addToParent, setAddToParent] = useState(showAddToParent)
@@ -172,24 +172,24 @@ function CreateExerciseScreen() {
           setSelectedEquipment(ex.equipment ?? null)
 
           const rawInfo = ex.info
-          let nextLines: string[] = ['']
+          let lines: string[] = []
           if (Array.isArray(rawInfo)) {
-            nextLines = rawInfo.length > 0 ? rawInfo.map((x) => (typeof x === 'string' ? x : String(x))) : ['']
+            lines = rawInfo.length > 0 ? rawInfo.map((x) => (typeof x === 'string' ? x : String(x))) : []
           } else if (typeof rawInfo === 'string' && rawInfo.trim()) {
             try {
               const parsed = JSON.parse(rawInfo)
               if (Array.isArray(parsed)) {
-                nextLines = parsed.length > 0 ? parsed.map((x) => (typeof x === 'string' ? x : String(x))) : ['']
+                lines = parsed.length > 0 ? parsed.map((x) => (typeof x === 'string' ? x : String(x))) : []
               } else if (typeof parsed === 'string') {
-                nextLines = [parsed]
+                lines = [parsed]
               } else {
-                nextLines = [rawInfo]
+                lines = [rawInfo]
               }
             } catch {
-              nextLines = [rawInfo]
+              lines = [rawInfo]
             }
           }
-          setInfoLines(nextLines.length > 0 ? nextLines : [''])
+          setInfoText(lines.join('\n'))
         } catch (err) {
           Toast.show({
             type: 'error',
@@ -208,25 +208,13 @@ function CreateExerciseScreen() {
     }
   }, [exerciseId, isEdit, navigation])
 
-  const updateInfoLine = useCallback((index: number, value: string) => {
-    setInfoLines((prev) => prev.map((x, i) => (i === index ? value : x)))
-  }, [])
-
-  const addInfoLine = useCallback(() => {
-    setInfoLines((prev) => [...prev, ''])
-  }, [])
-
-  const removeInfoLine = useCallback((index: number) => {
-    setInfoLines((prev) => {
-      if (prev.length <= 1) return prev
-      return prev.filter((_, i) => i !== index)
-    })
-  }, [])
-
   const infoPayload = useMemo(() => {
-    const lines = infoLines.map((s) => s.trim()).filter(Boolean)
+    const lines = infoText
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
     return lines.length > 0 ? JSON.stringify(lines) : null
-  }, [infoLines])
+  }, [infoText])
 
   const linkPayload = useMemo(() => {
     const v = link.trim()
@@ -426,30 +414,32 @@ function CreateExerciseScreen() {
     <>
       <View style={styles.section}>
         <Text style={styles.label}>Name</Text>
-        <TextInput
-          value={name}
-          onChangeText={(v) => {
-            setDidTouchName(true)
-            setName(v)
-          }}
-          placeholder="e.g. Barbell Bench Press"
-          placeholderTextColor={colors.placeholder}
-          style={[
-            styles.input,
-            trimmedName.length === 0 && styles.inputRequired,
-            exerciseNameExists && styles.inputError,
-          ]}
-          autoCapitalize="words"
-          autoCorrect={false}
-          returnKeyType="next"
-        />
-        {didTouchName && trimmedName.length === 0 ? (
-          <Text style={styles.nameRequiredText}>Name is required</Text>
-        ) : checkingExerciseName ? (
-          <Text style={styles.nameHelperText}>Checking name…</Text>
-        ) : exerciseNameExists ? (
-          <Text style={styles.nameErrorText}>Exercise name already exists</Text>
-        ) : null}
+        <View style={styles.nameFieldInner}>
+          <TextInput
+            value={name}
+            onChangeText={(v) => {
+              setDidTouchName(true)
+              setName(v)
+            }}
+            placeholder="e.g. Barbell Bench Press"
+            placeholderTextColor={colors.placeholder}
+            style={[
+              styles.input,
+              trimmedName.length === 0 && styles.inputRequired,
+              exerciseNameExists && styles.inputError,
+            ]}
+            autoCapitalize="words"
+            autoCorrect={false}
+            returnKeyType="next"
+          />
+          {didTouchName && trimmedName.length === 0 ? (
+            <Text style={styles.nameRequiredText}>Name is required</Text>
+          ) : checkingExerciseName ? (
+            <Text style={styles.nameHelperText}>Checking name…</Text>
+          ) : exerciseNameExists ? (
+            <Text style={styles.nameErrorText}>Exercise name already exists</Text>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -499,39 +489,18 @@ function CreateExerciseScreen() {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.label}>Info (one line per tip)</Text>
-          <TouchableOpacity onPress={addInfoLine} style={styles.addLineButton} activeOpacity={0.75}>
-            <Ionicons name="add" size={18} color={colors.success} />
-            <Text style={styles.addLineButtonText}>Add line</Text>
-          </TouchableOpacity>
-        </View>
-
-        {infoLines.map((line, i) => (
-          <View key={i} style={styles.infoLineRow}>
-            <TextInput
-              value={line}
-              onChangeText={(v) => updateInfoLine(i, v)}
-              placeholder={`Line ${i + 1}`}
-              placeholderTextColor={colors.placeholder}
-              style={[styles.input, styles.infoLineInput]}
-              autoCapitalize="sentences"
-              autoCorrect={true}
-              multiline
-            />
-            {infoLines.length > 1 ? (
-              <TouchableOpacity
-                onPress={() => removeInfoLine(i)}
-                style={styles.removeLineButton}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove line ${i + 1}`}
-              >
-                <Ionicons name="trash-outline" size={18} color={colors.error} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ))}
+        <Text style={styles.label}>Info (one line per tip)</Text>
+        <TextInput
+          value={infoText}
+          onChangeText={setInfoText}
+          placeholder="Enter tips, one per line"
+          placeholderTextColor={colors.placeholder}
+          style={[styles.input, styles.infoMultilineInput]}
+          autoCapitalize="sentences"
+          autoCorrect={true}
+          multiline
+          textAlignVertical="top"
+        />
       </View>
 
       {showAddToParent ? <View style={styles.section}>{Checkbox}</View> : null}
@@ -624,6 +593,9 @@ const styles = StyleSheet.create({
   section: {
     gap: 8,
   },
+  nameFieldInner: {
+    gap: 4,
+  },
   label: {
     fontSize: 12,
     fontWeight: '700',
@@ -641,7 +613,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   inputError: {
-    borderColor: colors.errorBorder,
+    borderColor: colors.accent,
   },
   inputRequired: {
     borderColor: colors.accent,
@@ -692,41 +664,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  addLineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  addLineButtonText: {
-    color: colors.text,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  infoLineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  infoLineInput: {
-    flex: 1,
-    minHeight: 48,
-  },
-  removeLineButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
+  infoMultilineInput: {
+    minHeight: 120,
   },
   checkboxRow: {
     flexDirection: 'row',
