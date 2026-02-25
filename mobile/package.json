@@ -7,8 +7,8 @@
     "start:prod": "cross-env NODE_ENV=production expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "build:prod": "cross-env NODE_ENV=production npx expo run:android --variant release",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint"
   },
