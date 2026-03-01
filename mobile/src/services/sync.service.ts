@@ -31,7 +31,7 @@ export async function syncService() {
     throw new Error("Create a profile first");
   }
   if (!(await hasStoredAuth())) {
-    await trpc.users.createNewToken.query({
+    await trpc.users.createNewToken.mutate({
       id: user.id,
       username: user.username,
       createdAt: user.createdAt,
@@ -48,31 +48,31 @@ export async function syncService() {
   const sessionsToSync = await getSessionsToSync();
   try {
     if (userToSync) {
-      await trpc.users.syncUser.query(userToSync);
+      await trpc.users.syncUser.mutate(userToSync);
       await updateUserSynced();
     }
     if (rowsDeleted.length > 0) {
-      await trpc.deleteRows.deleteDeletedRows.query(rowsDeleted);
+      await trpc.deleteRows.deleteDeletedRows.mutate(rowsDeleted);
       await deleteDeletedRows();
     }
     if (exercisesToSync.length > 0) {
-      await trpc.exercises.syncExercises.query(exercisesToSync);
+      await trpc.exercises.syncExercises.mutate(exercisesToSync);
       await updateExercisesSynced();
     }
     if (workoutsToSync.length > 0) {
-      await trpc.workouts.syncWorkouts.query(workoutsToSync);
+      await trpc.workouts.syncWorkouts.mutate(workoutsToSync);
       await updateWorkoutsSynced();
     }
     if (workoutExercisesToSync.length > 0) {
-      await trpc.workouts.syncWorkoutExercises.query(workoutExercisesToSync);
+      await trpc.workouts.syncWorkoutExercises.mutate(workoutExercisesToSync);
       await updateWorkoutExercisesSynced();
     }
     if (setsToSync.length > 0) {
-      await trpc.workouts.syncSets.query(setsToSync);
+      await trpc.workouts.syncSets.mutate(setsToSync);
       await updateSetsSynced();
     }
     if (sessionsToSync.length > 0) {
-      await trpc.sessions.syncSessions.query(sessionsToSync);
+      await trpc.sessions.syncSessions.mutate(sessionsToSync);
       await updateSessionsSynced();
     }
     return "Sync completed";

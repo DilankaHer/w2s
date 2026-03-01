@@ -19,7 +19,7 @@ export const workoutsRouter = router({
       },
     });
   }),
-  syncWorkouts: protectedProcedure.input(WorkoutsSchema).query(async ({ input, ctx }) => {
+  syncWorkouts: protectedProcedure.input(WorkoutsSchema).mutation(async ({ input, ctx }) => {
     for (const workout of input) {
       await prisma.workout.upsert({
         where: { id: workout.id, userId: ctx.user.userId },
@@ -40,7 +40,7 @@ export const workoutsRouter = router({
       });
     }
   }),
-  syncWorkoutExercises: protectedProcedure.input(WorkoutExercisesSchema).query(async ({ input, ctx }) => {
+  syncWorkoutExercises: protectedProcedure.input(WorkoutExercisesSchema).mutation(async ({ input, ctx }) => {
     for (const workoutExercise of input) {
       await prisma.workoutExercise.upsert({
         where: { id: workoutExercise.id, userId: ctx.user.userId },
@@ -58,7 +58,7 @@ export const workoutsRouter = router({
       });
     }
   }),
-  syncSets: protectedProcedure.input(SetsSchema).query(async ({ input, ctx }) => {
+  syncSets: protectedProcedure.input(SetsSchema).mutation(async ({ input, ctx }) => {
     for (const set of input) {
       await prisma.set.upsert({
         where: { id: set.id, userId: ctx.user.userId },

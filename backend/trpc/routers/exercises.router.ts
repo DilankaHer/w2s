@@ -21,7 +21,7 @@ export const exercisesRouter = router({
     return prisma.equipment.findMany({});
   }),
 
-  syncExercises: protectedProcedure.input(ExercisesSchema).query(async ({ input, ctx }) => {
+  syncExercises: protectedProcedure.input(ExercisesSchema).mutation(async ({ input, ctx }) => {
     for (const exercise of input) {
       await prisma.exercise.upsert({
         where: { id: exercise.id, userId: ctx.user.userId },

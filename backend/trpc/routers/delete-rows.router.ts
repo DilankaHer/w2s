@@ -6,7 +6,7 @@ import { DeletedRowSchemaToSync } from "@w2s/shared/types/deleted-rows.types";
 export const deleteRowsRouter = router({
   deleteDeletedRows: protectedProcedure
     .input(DeletedRowSchemaToSync)
-    .query(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
       await prisma.$transaction(async (tx) => {
         for (const deletedRow of input) {
           switch (deletedRow.tableName) {

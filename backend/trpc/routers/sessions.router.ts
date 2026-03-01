@@ -24,7 +24,7 @@ const formatTime = (seconds: number) => {
 export const sessionsRouter = router({
   syncSessions: protectedProcedure
     .input(SessionsSchemaToSync)
-    .query(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
       await prisma.$transaction(async (tx) => {
         for (const session of input) {
           await tx.session.create({
@@ -44,13 +44,11 @@ export const sessionsRouter = router({
               sessionExercises: {
                 create: session.sessionExercises.map((se) => ({
                   id: se.id,
-                  sessionId: session.id,
                   exerciseId: se.exerciseId,
                   order: se.order,
                   sessionSets: {
                     create: se.sessionSets.map((set) => ({
                       id: set.id,
-                      sessionExerciseId: se.id,
                       setNumber: set.setNumber,
                       reps: set.reps,
                       weight: set.weight,
