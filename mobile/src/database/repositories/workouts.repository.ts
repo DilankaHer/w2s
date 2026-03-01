@@ -4,7 +4,7 @@ import * as Crypto from "expo-crypto";
 import * as WorkoutTypes from "@w2s/shared/types/workouts.types";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { insertDeletedRows } from "./delete-rows.repository";
-import * as DeletedRowInterface from "../interfaces/deleted-row.types";
+import * as DeletedRowInterface from "../interfaces/deleted-row.interface";
 import {
   CreateWorkoutInput,
   updateSetInput,

@@ -387,16 +387,28 @@ export default function SessionDetailScreen() {
         }
 
         if (typeof replacingSessionExerciseId === 'string' && target) {
+          const newSessionExerciseId = Crypto.randomUUID()
+          const newSessionExercise: UISessionExercise = {
+            id: newSessionExerciseId,
+            sessionId: prev.id,
+            exerciseId: selectedExercise.id,
+            order: target.order ?? 0,
+            exerciseName: selectedExercise.name,
+            meta: null,
+            sets: [
+              {
+                id: Crypto.randomUUID(),
+                sessionExerciseId: newSessionExerciseId,
+                setNumber: 1,
+                reps: 0,
+                weight: 0,
+                isCompleted: false,
+                isSynced: false,
+              },
+            ],
+          }
           const nextExercises = prev.sessionExercises.map((se) =>
-            se.id === replacingSessionExerciseId
-              ? {
-                  ...se,
-                  exerciseId: selectedExercise.id,
-                  exerciseName: selectedExercise.name,
-                  meta: null,
-                  sets: se.sets.map((s) => ({ ...s, isCompleted: false })),
-                }
-              : se
+            se.id === replacingSessionExerciseId ? newSessionExercise : se
           )
           setDirty(true)
           return { ...prev, sessionExercises: nextExercises }

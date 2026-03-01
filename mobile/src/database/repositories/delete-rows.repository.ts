@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { db } from "../database";
-import * as DeletedRowInterface from "../interfaces/deleted-row.types";
+import * as DeletedRowInterface from "../interfaces/deleted-row.interface";
 import { deletedRows } from "../schema/schemas";
 import * as DeletedRowTypes from "@w2s/shared/types/deleted-rows.types";
 

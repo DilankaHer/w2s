@@ -19,6 +19,7 @@ import * as Crypto from 'expo-crypto'
 import type { WorkoutById } from '../database/database.types'
 import type { UpdateWorkoutInput } from '../database/interfaces/workout.interface'
 import type { RootStackParamList } from '../../App'
+import { getExerciseByIdService } from '../services/exercises.service'
 import { checkWorkoutNameExistsService, getWorkoutByIdService, updateWorkoutService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
@@ -123,84 +124,121 @@ function WorkoutDetailScreen() {
       if (!selectedExercise) return
       if (isReadOnly) return
 
-      ;(navigation as any).setParams({
-        selectedExercise: undefined,
-        replacingWorkoutExerciseId: undefined,
-      })
+      let cancelled = false
+      ;(async () => {
+        try {
+          const fullExercise = await getExerciseByIdService(selectedExercise.id)
+          if (cancelled || !fullExercise) return
 
-      const nextExerciseFull: ExerciseItem = {
-        id: selectedExercise.id,
-        name: selectedExercise.name,
-        link: null,
-        info: null,
-        imageName: null,
-        bodyPartId: null,
-        equipmentId: null,
-        isDefaultExercise: false,
-        isSynced: false,
-        bodyPart: null,
-        equipment: null,
-      }
-
-      setDraft((prev) => {
-        if (!prev) return prev
-
-        const target =
-          typeof replacingWorkoutExerciseId === 'string'
-            ? prev.workoutExercises.find((we) => we.id === replacingWorkoutExerciseId)
-            : null
-
-        const existsElsewhere = prev.workoutExercises.some((we) => we.exercise.id === nextExerciseFull.id)
-        if (existsElsewhere) {
-          const isReplacingSame = target?.exercise.id === nextExerciseFull.id
-          if (!isReplacingSame) {
-            Toast.show({
-              type: 'error',
-              text1: 'Already added',
-              text2: 'That exercise is already in this workout.',
-            })
-            return prev
+          const nextExerciseFull: ExerciseItem = {
+            id: fullExercise.id,
+            name: fullExercise.name ?? selectedExercise.name,
+            link: fullExercise.link ?? null,
+            info: fullExercise.info ?? null,
+            imageName: fullExercise.imageName ?? null,
+            bodyPartId: fullExercise.bodyPartId ?? null,
+            equipmentId: fullExercise.equipmentId ?? null,
+            isDefaultExercise: fullExercise.isDefaultExercise ?? false,
+            isSynced: fullExercise.isSynced ?? false,
+            bodyPart: fullExercise.bodyPart ?? null,
+            equipment: fullExercise.equipment ?? null,
           }
-        }
 
-        if (typeof replacingWorkoutExerciseId === 'string') {
-          if (!target) return prev
-          setDirty(true)
-          return {
-            ...prev,
-            workoutExercises: prev.workoutExercises.map((we) =>
-              we.id === replacingWorkoutExerciseId ? { ...we, exercise: nextExerciseFull } : we
-            ),
-          }
-        }
+          ;(navigation as any).setParams({
+            selectedExercise: undefined,
+            replacingWorkoutExerciseId: undefined,
+          })
 
-        const nextOrder =
-          prev.workoutExercises.length > 0
-            ? Math.max(...prev.workoutExercises.map((we) => we.order ?? 0)) + 1
-            : 1
-        const newWorkoutExerciseId = Crypto.randomUUID()
-        const newWorkoutExercise: WorkoutExerciseItem = {
-          id: newWorkoutExerciseId,
-          workoutId: prev.id,
-          exerciseId: nextExerciseFull.id,
-          exercise: nextExerciseFull,
-          order: nextOrder,
-          isSynced: false,
-          sets: [
-            {
-              id: Crypto.randomUUID(),
-              workoutExerciseId: newWorkoutExerciseId,
-              setNumber: 1,
-              targetReps: 0,
-              targetWeight: 0,
+          setDraft((prev) => {
+            if (!prev) return prev
+
+            const target =
+              typeof replacingWorkoutExerciseId === 'string'
+                ? prev.workoutExercises.find((we) => we.id === replacingWorkoutExerciseId)
+                : null
+
+            const existsElsewhere = prev.workoutExercises.some((we) => we.exercise.id === nextExerciseFull.id)
+            if (existsElsewhere) {
+              const isReplacingSame = target?.exercise.id === nextExerciseFull.id
+              if (!isReplacingSame) {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Already added',
+                  text2: 'That exercise is already in this workout.',
+                })
+                return prev
+              }
+            }
+
+            if (typeof replacingWorkoutExerciseId === 'string' && target) {
+              setDirty(true)
+              const newWorkoutExerciseId = Crypto.randomUUID()
+              const newWorkoutExercise: WorkoutExerciseItem = {
+                id: newWorkoutExerciseId,
+                workoutId: prev.id,
+                exerciseId: nextExerciseFull.id,
+                exercise: nextExerciseFull,
+                order: target.order ?? 0,
+                isSynced: false,
+                sets: [
+                  {
+                    id: Crypto.randomUUID(),
+                    workoutExerciseId: newWorkoutExerciseId,
+                    setNumber: 1,
+                    targetReps: 0,
+                    targetWeight: 0,
+                    isSynced: false,
+                  },
+                ],
+              }
+              return {
+                ...prev,
+                workoutExercises: prev.workoutExercises.map((we) =>
+                  we.id === replacingWorkoutExerciseId ? newWorkoutExercise : we
+                ),
+              }
+            }
+
+            const nextOrder =
+              prev.workoutExercises.length > 0
+                ? Math.max(...prev.workoutExercises.map((we) => we.order ?? 0)) + 1
+                : 1
+            const newWorkoutExerciseId = Crypto.randomUUID()
+            const newWorkoutExercise: WorkoutExerciseItem = {
+              id: newWorkoutExerciseId,
+              workoutId: prev.id,
+              exerciseId: nextExerciseFull.id,
+              exercise: nextExerciseFull,
+              order: nextOrder,
               isSynced: false,
-            },
-          ],
-        }
+              sets: [
+                {
+                  id: Crypto.randomUUID(),
+                  workoutExerciseId: newWorkoutExerciseId,
+                  setNumber: 1,
+                  targetReps: 0,
+                  targetWeight: 0,
+                  isSynced: false,
+                },
+              ],
+            }
 
-        setDirty(true)
-        return { ...prev, workoutExercises: [...prev.workoutExercises, newWorkoutExercise] }
-      })
+            setDirty(true)
+            return { ...prev, workoutExercises: [...prev.workoutExercises, newWorkoutExercise] }
+          })
+        } catch {
+          if (!cancelled) {
+            ;(navigation as any).setParams({
+              selectedExercise: undefined,
+              replacingWorkoutExerciseId: undefined,
+            })
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Could not load exercise.' })
+          }
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
     }, [
       selectedExercise,
       replacingWorkoutExerciseId,
@@ -334,7 +372,24 @@ function WorkoutDetailScreen() {
     if (checkingWorkoutName || workoutNameExists || !draft.name.trim()) return
     setSaving(true)
     try {
-      const msg = await updateWorkoutService(draft as UpdateWorkoutInput)
+      const payload: UpdateWorkoutInput = {
+        id: draft.id,
+        name: draft.name,
+        workoutExercises: draft.workoutExercises.map((we) => ({
+          id: we.id,
+          order: we.order,
+          exerciseId: we.exerciseId,
+          sets: we.sets.map((s) => ({
+            id: s.id,
+            setNumber: s.setNumber,
+            targetReps: s.targetReps,
+            targetWeight: s.targetWeight,
+            workoutExerciseId: s.workoutExerciseId,
+            ...(s.isSynced !== undefined && { isSynced: s.isSynced }),
+          })),
+        })),
+      }
+      const msg = await updateWorkoutService(payload)
       const refreshed = await getWorkoutByIdService(draft.id)
       const next = refreshed ?? draft
       setDraft(next)
