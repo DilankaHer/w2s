@@ -14,6 +14,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
 import type { User } from '../database/database.types'
+import { syncService } from '../services/sync.service'
 import {
   createUserService,
   getUserService,
@@ -36,6 +37,7 @@ function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [username, setUsername] = useState('')
 
   const stats = {
@@ -114,6 +116,19 @@ function ProfileScreen() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSyncData = async () => {
+    try {
+      setSyncing(true)
+      await syncService()
+      Toast.show({ type: 'success', text1: 'Sync complete', text2: 'Your data has been synced.' })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sync failed'
+      Toast.show({ type: 'error', text1: 'Sync failed', text2: message })
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -236,6 +251,18 @@ function ProfileScreen() {
             )}
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          style={[styles.saveButton, styles.syncButton, syncing && styles.saveButtonDisabled]}
+          onPress={handleSyncData}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <ActivityIndicator size="small" color={colors.primaryText} />
+          ) : (
+            <Text style={styles.saveButtonText}>Sync Data</Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   )
@@ -416,6 +443,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+  },
+  syncButton: {
+    marginTop: 12,
   },
   saveButtonDisabled: {
     opacity: 0.7,

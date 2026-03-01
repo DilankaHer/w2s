@@ -1,15 +1,21 @@
-import { trpc } from "@/api/client";
-import { deleteDeletedRows, getDeletedRows } from "@/database/repositories/delete-rows.repository";
+import { hasStoredAuth, trpc } from "@/api/client";
+import {
+  deleteDeletedRows,
+  getDeletedRows,
+} from "@/database/repositories/delete-rows.repository";
 import {
   getExercisesToSync,
-  updateExercise,
   updateExercisesSynced,
 } from "@/database/repositories/exercises.repository";
 import {
   getSessionsToSync,
   updateSessionsSynced,
 } from "@/database/repositories/sessions.repository";
-import { getUser } from "@/database/repositories/user.repository";
+import {
+  getUser,
+  getUserToSync,
+  updateUserSynced,
+} from "@/database/repositories/user.repository";
 import {
   getSetsToSync,
   getWorkoutExercisesToSync,
@@ -20,8 +26,20 @@ import {
 } from "@/database/repositories/workouts.repository";
 
 export async function syncService() {
-
   const user = await getUser();
+  if (!user) {
+    throw new Error("Create a profile first");
+  }
+  if (!(await hasStoredAuth())) {
+    await trpc.users.createNewToken.query({
+      id: user.id,
+      username: user.username,
+      createdAt: user.createdAt,
+      isMobile: true,
+    });
+  }
+
+  const userToSync = await getUserToSync();
   const rowsDeleted = await getDeletedRows();
   const workoutsToSync = await getWorkoutsToSync();
   const workoutExercisesToSync = await getWorkoutExercisesToSync();
@@ -29,6 +47,10 @@ export async function syncService() {
   const exercisesToSync = await getExercisesToSync();
   const sessionsToSync = await getSessionsToSync();
   try {
+    if (userToSync) {
+      await trpc.users.syncUser.query(userToSync);
+      await updateUserSynced();
+    }
     if (rowsDeleted.length > 0) {
       await trpc.deleteRows.deleteDeletedRows.query(rowsDeleted);
       await deleteDeletedRows();
@@ -53,6 +75,7 @@ export async function syncService() {
       await trpc.sessions.syncSessions.query(sessionsToSync);
       await updateSessionsSynced();
     }
+    return "Sync completed";
   } catch (error) {
     throw new Error("Failed to sync");
   }

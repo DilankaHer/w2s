@@ -69,6 +69,12 @@ async function saveCookies(cookies: Record<string, string>) {
   }
 }
 
+/** Returns true if an auth token is stored (e.g. for sync to decide whether to call createNewToken). */
+export async function hasStoredAuth(): Promise<boolean> {
+  const cookies = await getStoredCookies()
+  return !!(cookies && cookies.auth_token)
+}
+
 /** Clear stored auth token (for testing unauthenticated flow / log out) */
 export async function clearStoredAuth(): Promise<void> {
   try {
