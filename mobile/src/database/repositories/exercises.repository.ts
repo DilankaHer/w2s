@@ -123,3 +123,9 @@ export async function getExercisesToSync(): Promise<ExerciseTypes.Exercise[]> {
     where: eq(exercises.isSynced, false),
   });
 }
+
+export async function updateExercisesSynced() {
+  await db.update(exercises).set({
+    isSynced: true,
+  }).where(eq(exercises.isSynced, false));
+}

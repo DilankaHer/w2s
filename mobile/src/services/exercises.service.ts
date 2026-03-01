@@ -68,11 +68,3 @@ export async function deleteExerciseService(id: string): Promise<string> {
         throw new Error('Failed to delete exercise');
     }
 }
-
-export async function getExercisesToSyncService(): Promise<ExerciseTypes.Exercise[]> {
-    try {
-        return await getExercisesToSync();
-    } catch (error) {
-        throw new Error('Failed to get exercises to sync');
-    }
-}

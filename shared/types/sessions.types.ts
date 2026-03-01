@@ -65,3 +65,5 @@ export const SessionsSchemaToSync = z.array(SessionSchemaToSync);
 export type Session = z.infer<typeof SessionSchema>;
 export type SessionExercise = z.infer<typeof SessionExerciseSchema>;
 export type SessionSet = z.infer<typeof SessionSetSchema>;
+export type SessionExercisesToSync = z.infer<typeof SessionExercisesSchemaToSync>;
+export type SessionToSync = z.infer<typeof SessionSchemaToSync>;

@@ -27,7 +27,7 @@ export const sessionsRouter = router({
     .query(async ({ input, ctx }) => {
       await prisma.$transaction(async (tx) => {
         for (const session of input) {
-          await prisma.session.create({
+          await tx.session.create({
             data: {
               id: session.id,
               name: session.name,

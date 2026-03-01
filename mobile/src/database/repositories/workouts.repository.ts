@@ -422,3 +422,21 @@ export async function getSetsToSync(): Promise<WorkoutTypes.Set[]> {
     where: eq(sets.isSynced, false),
   });
 }
+
+export async function updateWorkoutsSynced() {
+  await db.update(workouts).set({
+    isSynced: true,
+  }).where(eq(workouts.isSynced, false));
+}
+
+export async function updateWorkoutExercisesSynced() {
+  await db.update(workoutExercises).set({
+    isSynced: true,
+  }).where(eq(workoutExercises.isSynced, false));
+}
+
+export async function updateSetsSynced() {
+  await db.update(sets).set({
+    isSynced: true,
+  }).where(eq(sets.isSynced, false));
+}

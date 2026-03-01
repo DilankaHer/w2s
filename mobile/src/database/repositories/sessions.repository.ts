@@ -267,20 +267,21 @@ export async function updateSession(
   });
 }
 
-export async function getSessionsToSync(): Promise<SessionTypes.Session[]> {
+export async function getSessionsToSync(): Promise<SessionTypes.SessionToSync[]> {
   return await db.query.sessions.findMany({
     where: eq(sessions.isSynced, false),
+    with: {
+      sessionExercises: {
+        with: {
+          sessionSets: true,
+        },
+      },
+    },
   });
 }
 
-export async function getSessionExercisesToSync(): Promise<SessionTypes.SessionExercise[]> {
-  return await db.query.sessionExercises.findMany({
-    where: eq(sessionExercises.isSynced, false),
-  });
-}
-
-export async function getSessionSetsToSync(): Promise<SessionTypes.SessionSet[]> {
-  return await db.query.sessionSets.findMany({
-    where: eq(sessionSets.isSynced, false),
-  });
+export async function updateSessionsSynced() {
+  await db.update(sessions).set({
+    isSynced: true,
+  }).where(eq(sessions.isSynced, false));
 }

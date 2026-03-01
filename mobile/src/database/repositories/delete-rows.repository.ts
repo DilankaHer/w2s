@@ -2,6 +2,7 @@ import * as Crypto from "expo-crypto";
 import { db } from "../database";
 import * as DeletedRowInterface from "../interfaces/deleted-row.types";
 import { deletedRows } from "../schema/schemas";
+import * as DeletedRowTypes from "@w2s/shared/types/deleted-rows.types";
 
 export async function insertDeletedRows(
   rowsDeleted: DeletedRowInterface.DeletedRow[],
@@ -15,6 +16,10 @@ export async function insertDeletedRows(
   );
 }
 
-export async function getDeletedRows(): Promise<DeletedRowInterface.DeletedRow[]> {
+export async function getDeletedRows(): Promise<DeletedRowTypes.DeletedRowToSync> {
   return await db.query.deletedRows.findMany();
+}
+
+export async function deleteDeletedRows() {
+  await db.delete(deletedRows);
 }
