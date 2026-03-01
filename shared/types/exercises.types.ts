@@ -1,21 +1,29 @@
-export interface Exercise {
-    id: string;
-    name: string;
-    link?: string | null;
-    info?: string | null;
-    imageName?: string | null;
-    bodyPart: BodyPart | null;
-    equipment: Equipment | null;
-    isDefaultExercise: boolean;
-    isSynced?: boolean;
-}
+import { z } from "zod";
 
-export interface BodyPart {
-    id: string;
-    name: string;
-}
+export const ExerciseSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    bodyPartId: z.string().nullable(),
+    equipmentId: z.string().nullable(),
+    isSynced: z.boolean(),
+    isDefaultExercise: z.boolean(),
+    link: z.string().nullable(),
+    info: z.string().nullable(),
+    imageName: z.string().nullable(),
+});
 
-export interface Equipment {
-    id: string;
-    name: string;
-}
+export const BodyPartSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+});
+
+export const EquipmentSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+}); 
+
+export const ExercisesSchema = z.array(ExerciseSchema);
+
+export type Exercise = z.infer<typeof ExerciseSchema>;
+export type BodyPart = z.infer<typeof BodyPartSchema>;
+export type Equipment = z.infer<typeof EquipmentSchema>;

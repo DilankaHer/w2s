@@ -13,7 +13,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
-import type { User } from '@shared/types/user.types'
+import type { User } from '../database/database.types'
 import {
   createUserService,
   getUserService,

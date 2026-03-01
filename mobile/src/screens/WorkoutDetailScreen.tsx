@@ -16,12 +16,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Swipeable } from 'react-native-gesture-handler'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import * as Crypto from 'expo-crypto'
-import type { Exercise, Set as SetType, WorkoutExercise, WorkoutWithExercises } from '@shared/types/workouts.types'
+import type { WorkoutById } from '../database/database.types'
+import type { UpdateWorkoutInput } from '../database/interfaces/workout.interface'
 import type { RootStackParamList } from '../../App'
 import { checkWorkoutNameExistsService, getWorkoutByIdService, updateWorkoutService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type WorkoutDetailRouteProp = RouteProp<RootStackParamList, 'WorkoutDetail'>
+type WorkoutExerciseItem = NonNullable<WorkoutById>['workoutExercises'][number]
+type SetType = WorkoutExerciseItem['sets'][number]
+type ExerciseItem = NonNullable<WorkoutExerciseItem['exercise']>
 
 function WorkoutDetailScreen() {
   const route = useRoute<WorkoutDetailRouteProp>()
@@ -31,7 +35,7 @@ function WorkoutDetailScreen() {
   const selectedExercise = route.params.selectedExercise
   const replacingWorkoutExerciseId = route.params.replacingWorkoutExerciseId
 
-  const [draft, setDraft] = useState<WorkoutWithExercises | null>(null)
+  const [draft, setDraft] = useState<WorkoutById | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingSession, setCreatingSession] = useState(false)
@@ -43,7 +47,7 @@ function WorkoutDetailScreen() {
 
   const isReadOnly = draft?.isDefaultWorkout === true
 
-  const setDraftAndDirty = useCallback((next: WorkoutWithExercises) => {
+  const setDraftAndDirty = useCallback((next: WorkoutById) => {
     setDraft(next)
     setDirty(true)
   }, [])
@@ -124,15 +128,18 @@ function WorkoutDetailScreen() {
         replacingWorkoutExerciseId: undefined,
       })
 
-      const nextExerciseFull: Exercise = {
+      const nextExerciseFull: ExerciseItem = {
         id: selectedExercise.id,
         name: selectedExercise.name,
         link: null,
         info: null,
         imageName: null,
+        bodyPartId: null,
+        equipmentId: null,
+        isDefaultExercise: false,
+        isSynced: false,
         bodyPart: null,
         equipment: null,
-        isDefaultExercise: false,
       }
 
       setDraft((prev) => {
@@ -171,25 +178,25 @@ function WorkoutDetailScreen() {
           prev.workoutExercises.length > 0
             ? Math.max(...prev.workoutExercises.map((we) => we.order ?? 0)) + 1
             : 1
-        const newWorkoutExercise: WorkoutExercise = {
-          id: Crypto.randomUUID(),
+        const newWorkoutExerciseId = Crypto.randomUUID()
+        const newWorkoutExercise: WorkoutExerciseItem = {
+          id: newWorkoutExerciseId,
           workoutId: prev.id,
+          exerciseId: nextExerciseFull.id,
           exercise: nextExerciseFull,
           order: nextOrder,
+          isSynced: false,
           sets: [
             {
               id: Crypto.randomUUID(),
-              workoutExerciseId: '',
+              workoutExerciseId: newWorkoutExerciseId,
               setNumber: 1,
               targetReps: 0,
               targetWeight: 0,
+              isSynced: false,
             },
           ],
         }
-        newWorkoutExercise.sets = newWorkoutExercise.sets.map((s) => ({
-          ...s,
-          workoutExerciseId: newWorkoutExercise.id,
-        }))
 
         setDirty(true)
         return { ...prev, workoutExercises: [...prev.workoutExercises, newWorkoutExercise] }
@@ -210,7 +217,7 @@ function WorkoutDetailScreen() {
     [draft, isReadOnly, setDraftAndDirty]
   )
 
-  const renumberExerciseOrder = useCallback((exercises: WorkoutExercise[]): WorkoutExercise[] => {
+  const renumberExerciseOrder = useCallback((exercises: WorkoutExerciseItem[]): WorkoutExerciseItem[] => {
     return exercises.map((we, index) => ({ ...we, order: index + 1 }))
   }, [])
 
@@ -232,6 +239,7 @@ function WorkoutDetailScreen() {
             setNumber: we.sets.length + 1,
             targetReps: last?.targetReps ?? 0,
             targetWeight: last?.targetWeight ?? 0,
+            isSynced: false,
           }
           return { ...we, sets: [...we.sets, nextSet] }
         }),
@@ -326,7 +334,7 @@ function WorkoutDetailScreen() {
     if (checkingWorkoutName || workoutNameExists || !draft.name.trim()) return
     setSaving(true)
     try {
-      const msg = await updateWorkoutService(draft)
+      const msg = await updateWorkoutService(draft as UpdateWorkoutInput)
       const refreshed = await getWorkoutByIdService(draft.id)
       const next = refreshed ?? draft
       setDraft(next)
@@ -339,7 +347,7 @@ function WorkoutDetailScreen() {
     } finally {
       setSaving(false)
     }
-  }, [checkingWorkoutName, dirty, draft, getWorkoutByIdService, isReadOnly, workoutNameExists])
+  }, [checkingWorkoutName, dirty, draft, isReadOnly, workoutNameExists])
 
   const handleCreateSession = async () => {
     if (!draft) return

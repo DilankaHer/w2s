@@ -1,6 +1,6 @@
 /**
  * Callback invoked when any API call fails due to timeout or network (server unreachable).
- * AuthProvider sets this to show a toast when the user is already inside the app.
+ * Set via setOnServerUnreachable for optional handling (e.g. toast).
  */
 let onServerUnreachable: (() => void) | null = null
 

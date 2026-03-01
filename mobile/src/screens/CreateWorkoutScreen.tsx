@@ -19,8 +19,8 @@ import Toast from 'react-native-toast-message'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { RootStackParamList } from '../../App'
 import { colors } from '../theme/colors'
-import type { Exercise } from '@shared/types/exercises.types'
-import type { CreateWorkoutInput } from '@shared/types/workouts.types'
+import type { Exercises } from '../database/database.types'
+import type { CreateWorkoutInput } from '../database/interfaces/workout.interface'
 import { getExercisesService } from '../services/exercises.service'
 import { checkWorkoutNameExistsService, createWorkoutService } from '../services/workouts.service'
 
@@ -49,7 +49,7 @@ function CreateWorkoutScreen() {
   const [replacingExerciseId, setReplacingExerciseId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [exercises, setExercises] = useState<Exercises>([])
   const [workoutNameExists, setWorkoutNameExists] = useState(false)
   const [checkingWorkoutName, setCheckingWorkoutName] = useState(false)
 
@@ -160,7 +160,7 @@ function CreateWorkoutScreen() {
     }, [fetchExercisesInternal])
   )
 
-  const addExercise = (exercise: Exercise) => {
+  const addExercise = (exercise: Exercises[number]) => {
     if (replacingExerciseId !== null) {
       // Replace existing exercise
       setWorkoutExercises(

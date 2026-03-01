@@ -1,39 +1,67 @@
-import type { Exercise } from "./exercises.types";
+import z from "zod";
 
-interface Session {
-    id: string;
-    name: string;
-    workoutId: string | null;
-    createdAt: string;
-    completedAt?: string | null;
-    sessionTime?: string | null;
-    isSynced?: boolean;
-    isFromDefaultWorkout?: boolean;
-    derivedWorkoutId?: string | null;
-    updatedWorkoutAt?: string | null;
-}
+const SessionSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    createdAt: z.string(),
+    completedAt: z.string().nullable().optional(),
+    workoutId: z.string().nullable().optional(),
+    sessionTime: z.string().nullable().optional(),
+    isFromDefaultWorkout: z.boolean(),
+    exerciseCount: z.number(),
+    setCount: z.number(),
+    isSynced: z.boolean().optional(),
+    updatedWorkoutAt: z.string().nullable().optional(),
+    derivedWorkoutId: z.string().nullable().optional(),
+});
 
-interface SessionWithExercises extends Session {
-    sessionExercises: SessionExercise[];
-}
+const SessionExerciseSchema = z.object({
+    id: z.string(),
+    sessionId: z.string(),
+    exerciseId: z.string(),
+    order: z.number(),
+    isSynced: z.boolean().optional(),
+});
 
-interface SessionExercise {
-    id: string;
-    sessionId: string;
-    exerciseId: string;
-    exercise?: Exercise;
-    order: number;
-    sessionSets?: SessionSet[];
-    isSynced?: boolean;
-}
+const SessionSetSchema = z.object({
+    id: z.string(),
+    sessionExerciseId: z.string(),
+    setNumber: z.number(),
+    reps: z.number(),
+    weight: z.number(),
+    isSynced: z.boolean().optional(),
+});
 
-interface SessionSet {
-    id: string;
-    setNumber: number;
-    reps: number;
-    weight: number;
-    sessionExerciseId: string;
-    isSynced?: boolean;
-}
+const SessionExercisesSchemaToSync = z.object({
+    id: z.string(),
+    sessionId: z.string(),
+    exerciseId: z.string(),
+    order: z.number(),
+    isSynced: z.boolean().optional(),
+    sessionSets: z.array(SessionSetSchema),
+});
 
-export type { Session, SessionWithExercises, SessionExercise, SessionSet };
+const SessionSchemaToSync = z.object({
+    id: z.string(),
+    name: z.string(),
+    createdAt: z.string(),
+    completedAt: z.string().nullable().optional(),
+    workoutId: z.string().nullable().optional(),
+    sessionTime: z.string().nullable().optional(),
+    isFromDefaultWorkout: z.boolean(),
+    exerciseCount: z.number(),
+    setCount: z.number(),
+    isSynced: z.boolean().optional(),
+    updatedWorkoutAt: z.string().nullable().optional(),
+    derivedWorkoutId: z.string().nullable().optional(),
+    sessionExercises: z.array(SessionExercisesSchemaToSync),
+});
+
+export const SessionsSchema = z.array(SessionSchema);
+export const SessionExercisesSchema = z.array(SessionExerciseSchema);
+export const SessionSetsSchema = z.array(SessionSetSchema);
+export const SessionsSchemaToSync = z.array(SessionSchemaToSync);
+
+export type Session = z.infer<typeof SessionSchema>;
+export type SessionExercise = z.infer<typeof SessionExerciseSchema>;
+export type SessionSet = z.infer<typeof SessionSetSchema>;

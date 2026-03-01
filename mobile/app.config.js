@@ -22,7 +22,7 @@ export default {
           monochromeImage: "./assets/images/android-icon-monochrome.png",
         },
         softwareKeyboardLayoutMode: "resize",
-        edgeToEdgeEnabled: true,
+        edgeToEdgeEnabled: false,
         predictiveBackGestureEnabled: false,
       },
   

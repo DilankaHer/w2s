@@ -23,7 +23,7 @@ export function setCookie(
     }
 }
 
-export function createToken(user: { id: number, username: string }, ctx: ReturnType<typeof createContext>, isMobile: boolean = false) {
+export function createToken(user: { id: string, username: string }, ctx: ReturnType<typeof createContext>, isMobile: boolean = false) {
     const expiresIn = parseInt(process.env.JWT_EXPIRES_IN!);
     const token = jwt.sign(
         {

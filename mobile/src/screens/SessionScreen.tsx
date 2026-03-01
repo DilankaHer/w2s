@@ -12,17 +12,11 @@ import {
 import { Swipeable } from 'react-native-gesture-handler'
 import Toast from 'react-native-toast-message'
 import Ionicons from '@expo/vector-icons/Ionicons'
-import type { Session } from '@shared/types/sessions.types'
+import type { Sessions } from '../database/database.types'
 import { deleteSessionService, getSessionsService } from '../services/sessions.service'
 import { colors } from '../theme/colors'
 
-type SessionListItem = Session & {
-  completedAt?: string | null
-  sessionTime?: string | null
-  exerciseCount?: number
-  setCount?: number
-  isFromDefaultWorkout?: boolean
-}
+type SessionListItem = Sessions[number]
 
 function formatSessionDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -44,7 +38,7 @@ function formatDuration(session: SessionListItem): string {
 }
 
 function SessionScreen() {
-  const [sessions, setSessions] = useState<SessionListItem[]>([])
+  const [sessions, setSessions] = useState<Sessions>([])
   const [loading, setLoading] = useState(true)
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -54,7 +48,7 @@ function SessionScreen() {
     try {
       setLoading(true)
       const data = await getSessionsService()
-      setSessions((Array.isArray(data) ? data : []) as SessionListItem[])
+      setSessions(Array.isArray(data) ? data : [])
     } catch (err) {
       setSessions([])
       Toast.show({

@@ -1,7 +1,9 @@
-import { createExercise, deleteExercise, getBodyParts, getEquipment, getExerciseById, getExerciseByName, getExercises, updateExercise } from "@/database/repositories/exercises.repository";
-import * as ExerciseTypes from "@shared/types/exercises.types";
+import { createExercise, deleteExercise, getBodyParts, getEquipment, getExerciseById, getExerciseByName, getExercises, getExercisesToSync, updateExercise } from "@/database/repositories/exercises.repository";
+import * as dbTypes from "@/database/database.types";
+import { CreateExerciseInput, UpdateExerciseInput } from "@/database/interfaces/exercise.interface";
+import * as ExerciseTypes from "@w2s/shared/types/exercises.types";
 
-export async function getExercisesService(bodyPartId?: string, equipmentId?: string, search?: string): Promise<ExerciseTypes.Exercise[]> {
+export async function getExercisesService(bodyPartId?: string, equipmentId?: string, search?: string): Promise<dbTypes.Exercises> {
     try {
         return await getExercises(bodyPartId, equipmentId, search);
     } catch (error) {
@@ -9,7 +11,7 @@ export async function getExercisesService(bodyPartId?: string, equipmentId?: str
     }
 }
 
-export async function getExerciseByIdService(id: string): Promise<ExerciseTypes.Exercise | undefined> {
+export async function getExerciseByIdService(id: string): Promise<dbTypes.ExerciseById> {
     try {
         return await getExerciseById(id);
     } catch (error) {
@@ -26,7 +28,7 @@ export async function checkExerciseNameExistsService(name: string): Promise<bool
     }
 }
 
-export async function createExerciseService(exercise: ExerciseTypes.Exercise): Promise<ExerciseTypes.Exercise | undefined> {
+export async function createExerciseService(exercise: CreateExerciseInput): Promise<dbTypes.ExerciseCreated> {
     try {
         return await createExercise(exercise);
     } catch (error) {
@@ -34,7 +36,7 @@ export async function createExerciseService(exercise: ExerciseTypes.Exercise): P
     }
 }
 
-export async function updateExerciseService(exercise: ExerciseTypes.Exercise): Promise<ExerciseTypes.Exercise | undefined> {
+export async function updateExerciseService(exercise: UpdateExerciseInput): Promise<dbTypes.ExerciseUpdated> {
     try {
         return await updateExercise(exercise);
     } catch (error) {
@@ -42,7 +44,7 @@ export async function updateExerciseService(exercise: ExerciseTypes.Exercise): P
     }
 }
 
-export async function getBodyPartsService(): Promise<ExerciseTypes.BodyPart[]> {
+export async function getBodyPartsService(): Promise<dbTypes.BodyParts> {
     try {
         return await getBodyParts();
     } catch (error) {
@@ -50,7 +52,7 @@ export async function getBodyPartsService(): Promise<ExerciseTypes.BodyPart[]> {
     }
 }
 
-export async function getEquipmentService(): Promise<ExerciseTypes.Equipment[]> {
+export async function getEquipmentService(): Promise<dbTypes.Equipment> {
     try {
         return await getEquipment();
     } catch (error) {
@@ -64,5 +66,13 @@ export async function deleteExerciseService(id: string): Promise<string> {
         return 'Exercise deleted successfully';
     } catch (error) {
         throw new Error('Failed to delete exercise');
+    }
+}
+
+export async function getExercisesToSyncService(): Promise<ExerciseTypes.Exercise[]> {
+    try {
+        return await getExercisesToSync();
+    } catch (error) {
+        throw new Error('Failed to get exercises to sync');
     }
 }

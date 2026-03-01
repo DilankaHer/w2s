@@ -1,4 +1,4 @@
-import * as SessionTypes from "@shared/types/sessions.types";
+import * as SessionTypes from "@w2s/shared/types/sessions.types";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Crypto from "expo-crypto";
 import { db } from "../database";
@@ -9,8 +9,9 @@ import {
   workouts,
 } from "../schema/schemas";
 import { insertDeletedRows } from "./delete-rows.repository";
+import { UpdateSessionInput } from "../interfaces/session.interfaces";
 
-export async function getSessions(): Promise<SessionTypes.Session[]> {
+export async function getSessions() {
   return await db.query.sessions.findMany({
     orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
   });
@@ -18,7 +19,7 @@ export async function getSessions(): Promise<SessionTypes.Session[]> {
 
 export async function getSessionById(
   id: string,
-): Promise<SessionTypes.SessionWithExercises | undefined> {
+) {
   return await db.query.sessions.findFirst({
     where: (sessions, { eq }) => eq(sessions.id, id),
     with: {
@@ -51,7 +52,7 @@ export async function deleteSession(id: string) {
 export async function createSession(
   sessionId: string,
   workoutId: string,
-): Promise<SessionTypes.SessionWithExercises | undefined> {
+) {
   return await db.transaction(async (tx) => {
     const newSessionId = Crypto.randomUUID();
     let newSession: SessionTypes.Session = {} as SessionTypes.Session;
@@ -78,6 +79,8 @@ export async function createSession(
         createdAt: new Date().toISOString(),
         isFromDefaultWorkout: workout.isDefaultWorkout,
         name: workout.name,
+        exerciseCount: workout.exerciseCount,
+        setCount: workout.setCount,
       };
       for (const we of workout.workoutExercises) {
         const newSessionExerciseId = Crypto.randomUUID();
@@ -117,6 +120,8 @@ export async function createSession(
         createdAt: new Date().toISOString(),
         isFromDefaultWorkout: session.isFromDefaultWorkout,
         name: session.name,
+        exerciseCount: session.exerciseCount,
+        setCount: session.setCount,
       };
       for (const se of session.sessionExercises) {
         const newSessionExerciseId = Crypto.randomUUID();
@@ -163,7 +168,7 @@ export async function createSession(
 }
 
 export async function updateSession(
-  session: SessionTypes.SessionWithExercises,
+  session: UpdateSessionInput,
 ) {
   await db.transaction(async (tx) => {
     let exerciseCount = 0;
@@ -259,5 +264,23 @@ export async function updateSession(
         orderBy: (sessionExercises, { asc }) => [asc(sessionExercises.order)],
       },
     },
+  });
+}
+
+export async function getSessionsToSync(): Promise<SessionTypes.Session[]> {
+  return await db.query.sessions.findMany({
+    where: eq(sessions.isSynced, false),
+  });
+}
+
+export async function getSessionExercisesToSync(): Promise<SessionTypes.SessionExercise[]> {
+  return await db.query.sessionExercises.findMany({
+    where: eq(sessionExercises.isSynced, false),
+  });
+}
+
+export async function getSessionSetsToSync(): Promise<SessionTypes.SessionSet[]> {
+  return await db.query.sessionSets.findMany({
+    where: eq(sessionSets.isSynced, false),
   });
 }

@@ -19,15 +19,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { Swipeable } from 'react-native-gesture-handler'
 import * as Crypto from 'expo-crypto'
-import type * as SessionTypes from '@shared/types/sessions.types'
+import type { SessionById } from '../database/database.types'
+import type { UpdateSessionInput } from '../database/interfaces/session.interfaces'
 import type { RootStackParamList } from '../../App'
 import { createSessionService, deleteSessionService, getSessionByIdService, updateSessionService } from '../services/sessions.service'
 import { checkWorkoutNameExistsService, createWorkoutBySessionService, updateWorkoutBySessionService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
-
-type UISessionSet = SessionTypes.SessionSet & { isCompleted: boolean }
+type SessionSetItem = NonNullable<SessionById>['sessionExercises'][number]['sessionSets'][number]
+type UISessionSet = SessionSetItem & { isCompleted: boolean }
 type UISessionExercise = {
   id: string
   sessionId: string
@@ -67,7 +68,18 @@ function formatTime(totalSeconds: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-function mapSharedToUi(shared: SessionTypes.SessionWithExercises): UISession {
+function mapSharedToUi(shared: SessionById | null | undefined): UISession {
+  if (!shared) {
+    return {
+      id: '',
+      name: '',
+      workoutId: null,
+      createdAt: '',
+      completedAt: null,
+      sessionTime: null,
+      sessionExercises: [],
+    }
+  }
   const completed = shared.completedAt != null
   return {
     id: shared.id,
@@ -313,6 +325,7 @@ export default function SessionDetailScreen() {
           reps: last?.reps ?? 0,
           weight: last?.weight ?? 0,
           isCompleted: false,
+          isSynced: false,
         }
         return { ...se, sets: [...se.sets, nextSet] }
       })
@@ -408,6 +421,7 @@ export default function SessionDetailScreen() {
               reps: 0,
               weight: 0,
               isCompleted: false,
+              isSynced: false,
             },
           ],
         }
@@ -419,11 +433,11 @@ export default function SessionDetailScreen() {
     }, [selectedExercise, replacingSessionExerciseId, session, isReadOnly, navigation])
   )
 
-  const buildUpdatePayload = useCallback((mode: 'proceed' | 'autocomplete'): SessionTypes.SessionWithExercises | null => {
+  const buildUpdatePayload = useCallback((mode: 'proceed' | 'autocomplete'): UpdateSessionInput | null => {
     if (!session) return null
     const now = new Date()
 
-    const sessionExercisesUnordered: SessionTypes.SessionExercise[] = session.sessionExercises
+    const sessionExercisesUnordered: UpdateSessionInput['sessionExercises'] = session.sessionExercises
       .map((se) => {
         const sets = mode === 'autocomplete' ? se.sets : se.sets.filter((s) => s.isCompleted === true)
         return {
@@ -443,7 +457,7 @@ export default function SessionDetailScreen() {
       .filter((se) => (se.sessionSets?.length ?? 0) > 0)
 
     // If "Proceed" filters out exercises with zero completed sets, re-number so order stays contiguous.
-    const sessionExercises: SessionTypes.SessionExercise[] = sessionExercisesUnordered.map((se, index) => ({
+    const sessionExercises: UpdateSessionInput['sessionExercises'] = sessionExercisesUnordered.map((se, index) => ({
       ...se,
       order: index + 1,
     }))
@@ -451,11 +465,8 @@ export default function SessionDetailScreen() {
     return {
       id: session.id,
       name: session.name,
-      workoutId: session.workoutId,
-      createdAt: session.createdAt,
       completedAt: now.toISOString(),
       sessionTime: formatTime(Math.floor((now.getTime() - new Date(session.createdAt).getTime()) / 1000)),
-      isFromDefaultWorkout: session.isFromDefaultWorkout,
       sessionExercises,
     }
   }, [session])

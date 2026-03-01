@@ -13,7 +13,7 @@ import {
 import { Swipeable } from 'react-native-gesture-handler'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
-import type { Workout } from '@shared/types/workouts.types'
+import type { Workouts } from '../database/database.types'
 import { deleteWorkoutService, getWorkoutsService } from '../services/workouts.service'
 import { createSessionService } from '../services/sessions.service'
 import { colors } from '../theme/colors'
@@ -23,7 +23,7 @@ type Filter = 'all' | 'default' | 'custom'
 function WorkoutsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
-  const [workouts, setWorkouts] = useState<Workout[]>([])
+  const [workouts, setWorkouts] = useState<Workouts>([])
   const [loading, setLoading] = useState(true)
   const [startingWorkoutId, setStartingWorkoutId] = useState<string | null>(null)
   const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null)
@@ -57,13 +57,13 @@ function WorkoutsScreen() {
     loadWorkouts()
   }
 
-  const filteredWorkouts = ((): Workout[] => {
+  const filteredWorkouts = ((): Workouts => {
     if (filter === 'default') return workouts.filter((w) => w.isDefaultWorkout === true)
     if (filter === 'custom') return workouts.filter((w) => w.isDefaultWorkout !== true)
     return workouts
   })()
 
-  const handleStartWorkout = async (workout: Workout) => {
+  const handleStartWorkout = async (workout: Workouts[number]) => {
     setStartingWorkoutId(workout.id)
     try {
       const newSession = await createSessionService('', workout.id)
@@ -90,7 +90,7 @@ function WorkoutsScreen() {
   }
 
   const handleDeleteWorkout = useCallback(
-    (workout: Workout) => {
+    (workout: Workouts[number]) => {
       if (workout.isDefaultWorkout === true) {
         Toast.show({ type: 'error', text1: 'Cannot delete', text2: 'Default workouts cannot be deleted.' })
         return
@@ -121,7 +121,7 @@ function WorkoutsScreen() {
   )
 
   const renderRightActions = useCallback(
-    (workout: Workout) => (
+    (workout: Workouts[number]) => (
       <TouchableOpacity
         style={styles.swipeDelete}
         onPress={() => handleDeleteWorkout(workout)}
@@ -157,7 +157,7 @@ function WorkoutsScreen() {
     </View>
   )
 
-  const renderWorkoutCard = (workout: Workout) => {
+  const renderWorkoutCard = (workout: Workouts[number]) => {
     const exerciseCount = workout.exerciseCount ?? 0
     const setCount = workout.setCount ?? 0
     const meta =

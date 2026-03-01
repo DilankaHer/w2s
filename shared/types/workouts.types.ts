@@ -1,49 +1,36 @@
-import type { Exercise } from "./exercises.types";
+import z from "zod";
 
-interface Workout {
-    id: string;
-    isDefaultWorkout: boolean | null;
-    createdAt: string;
-    name: string;
-    exerciseCount: number;
-    setCount: number;
-    isSynced?: boolean;
-}
+const WorkoutSchema = z.object({
+    id: z.string(),
+    isDefaultWorkout: z.boolean().optional(),
+    createdAt: z.string(),
+    name: z.string(),
+    exerciseCount: z.number(),
+    setCount: z.number(),
+    isSynced: z.boolean().optional(),
+});
 
-interface WorkoutWithExercises extends Workout {
-    workoutExercises: WorkoutExercise[];
-}
+const WorkoutExerciseSchema = z.object({
+    id: z.string(),
+    workoutId: z.string(),
+    order: z.number(),
+    exerciseId: z.string(),
+    isSynced: z.boolean().optional(),
+});
 
-interface CreateWorkoutInput {
-    name: string;
-    exercises: {
-        exerciseId: string;
-        order: number;
-        sets: {
-            setNumber: number;
-            targetReps: number;
-            targetWeight: number;
-        }[];
-    }[];
-}
+const SetSchema = z.object({
+    id: z.string(),
+    setNumber: z.number(),
+    targetReps: z.number(),
+    targetWeight: z.number(),
+    workoutExerciseId: z.string(),
+    isSynced: z.boolean().optional(),
+});
 
-interface WorkoutExercise {
-    id: string;
-    workoutId: string;
-    order: number;
-    exercise: Exercise;
-    exerciseId?: string;
-    sets: Set[];
-    isSynced?: boolean;
-}
+export const WorkoutsSchema = z.array(WorkoutSchema);
+export const WorkoutExercisesSchema = z.array(WorkoutExerciseSchema);
+export const SetsSchema = z.array(SetSchema);
 
-interface Set {
-    id: string;
-    setNumber: number;
-    targetReps: number;
-    targetWeight: number;
-    workoutExerciseId: string;
-    isSynced?: boolean;
-}
-
-export type { Workout, WorkoutWithExercises, WorkoutExercise, Exercise, CreateWorkoutInput, Set };
+export type Workout = z.infer<typeof WorkoutSchema>;
+export type WorkoutExercise = z.infer<typeof WorkoutExerciseSchema>;
+export type Set = z.infer<typeof SetSchema>;

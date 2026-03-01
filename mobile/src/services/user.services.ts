@@ -1,7 +1,7 @@
 import { createUser, getUser, updateUser } from "@/database/repositories/user.repository";
-import * as UserTypes from "@shared/types/user.types";
+import type * as dbTypes from "@/database/database.types";
 
-export const createUserService = async (username: string): Promise<UserTypes.User> => {
+export const createUserService = async (username: string): Promise<dbTypes.UserCreated> => {
     try {
         return await createUser(username);
     } catch (error) {
@@ -9,7 +9,7 @@ export const createUserService = async (username: string): Promise<UserTypes.Use
     }
 };
 
-export const getUserService = async (): Promise<UserTypes.User | undefined> => {
+export const getUserService = async (): Promise<dbTypes.User> => {
     try {
         return await getUser();
     } catch (error) {
@@ -17,7 +17,7 @@ export const getUserService = async (): Promise<UserTypes.User | undefined> => {
     }
 };
 
-export const updateUserService = async (username: string): Promise<UserTypes.User | undefined> => {
+export const updateUserService = async (username: string): Promise<dbTypes.UserUpdated> => {
     try {
         return await updateUser(username);
     } catch (error) {

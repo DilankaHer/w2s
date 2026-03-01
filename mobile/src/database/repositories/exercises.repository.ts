@@ -1,11 +1,12 @@
 import { db } from "../database";
 import { and, eq, like, sql } from "drizzle-orm";
 import { exercises } from "../schema/schemas";
-import * as ExerciseTypes from "@shared/types/exercises.types";
+import * as ExerciseTypes from "@w2s/shared/types/exercises.types";
 import * as Crypto from "expo-crypto";
 import { insertDeletedRows } from "./delete-rows.repository";
+import { CreateExerciseInput, UpdateExerciseInput } from "../interfaces/exercise.interface";
 
-export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string): Promise<ExerciseTypes.Exercise[]> {
+export async function getExercises(bodyPartId?: string, equipmentId?: string, search?: string) {
     const conditions = []
 
     if (bodyPartId) {
@@ -33,7 +34,7 @@ export async function getExercises(bodyPartId?: string, equipmentId?: string, se
     })
 }
 
-export async function getExerciseById(id: string): Promise<ExerciseTypes.Exercise | undefined> {
+export async function getExerciseById(id: string) {
     return await db.query.exercises.findFirst({
         where: eq(exercises.id, id),
         with: {
@@ -43,7 +44,7 @@ export async function getExerciseById(id: string): Promise<ExerciseTypes.Exercis
     });
 }
 
-export async function getExerciseByName(name: string): Promise<ExerciseTypes.Exercise | undefined> {
+export async function getExerciseByName(name: string) {
   return await db.query.exercises.findFirst({
       where: sql`${exercises.name} COLLATE NOCASE = ${name}`,
       with: {
@@ -53,13 +54,13 @@ export async function getExerciseByName(name: string): Promise<ExerciseTypes.Exe
   });
 }
 
-export async function createExercise(exercise: ExerciseTypes.Exercise): Promise<ExerciseTypes.Exercise | undefined> {
+export async function createExercise(exercise: CreateExerciseInput) {
     const exerciseId = Crypto.randomUUID();
     await db.insert(exercises).values({
         id: exerciseId,
         name: exercise.name,
-        bodyPartId: exercise.bodyPart?.id,
-        equipmentId: exercise.equipment?.id,
+        bodyPartId: exercise.bodyPartId,
+        equipmentId: exercise.equipmentId,
         link: exercise.link,
         info: exercise.info,
     });
@@ -77,11 +78,11 @@ export async function createExercise(exercise: ExerciseTypes.Exercise): Promise<
     });
 }
 
-export async function updateExercise(exercise: ExerciseTypes.Exercise): Promise<ExerciseTypes.Exercise | undefined> {
+export async function updateExercise(exercise: UpdateExerciseInput) {
     await db.update(exercises).set({
         name: exercise.name,
-        bodyPartId: exercise.bodyPart?.id,
-        equipmentId: exercise.equipment?.id,
+        bodyPartId: exercise.bodyPartId,
+        equipmentId: exercise.equipmentId,
         link: exercise.link,
         info: exercise.info,
         isSynced: false,
@@ -101,18 +102,24 @@ export async function updateExercise(exercise: ExerciseTypes.Exercise): Promise<
     });
 }
 
-export async function getBodyParts(): Promise<ExerciseTypes.BodyPart[]> {
+export async function getBodyParts() {
     return await db.query.bodyParts.findMany();
 }
 
-export async function getEquipment(): Promise<ExerciseTypes.Equipment[]> {
+export async function getEquipment() {
     return await db.query.equipment.findMany();
 }
 
-export async function deleteExercise(id: string): Promise<void> {
+export async function deleteExercise(id: string) {
     await db.delete(exercises).where(eq(exercises.id, id)).returning().then(async ([exercise]) => {
         if (exercise && exercise.isSynced) {
             await insertDeletedRows([{ tableName: 'exercises', rowId: exercise.id }]);
         }
     });
+}
+
+export async function getExercisesToSync(): Promise<ExerciseTypes.Exercise[]> {
+  return await db.query.exercises.findMany({
+    where: eq(exercises.isSynced, false),
+  });
 }

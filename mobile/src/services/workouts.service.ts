@@ -1,7 +1,8 @@
-import type * as WorkoutTypes from '@shared/types/workouts.types'
 import { createWorkout, createWorkoutBySession, deleteWorkout, getWorkoutById, getWorkoutByName, getWorkouts, updateSet, updateWorkout, updateWorkoutBySession } from '../database/repositories/workouts.repository'
+import * as dbTypes from '../database/database.types'
+import { CreateWorkoutInput, updateSetInput, UpdateWorkoutInput } from '@/database/interfaces/workout.interface';
 
-export const getWorkoutsService = async (): Promise<WorkoutTypes.Workout[]> => {
+export const getWorkoutsService = async (): Promise<dbTypes.Workouts> => {
     try {
         return await getWorkouts();
     } catch (error) {
@@ -9,7 +10,7 @@ export const getWorkoutsService = async (): Promise<WorkoutTypes.Workout[]> => {
     }
 }
 
-export const getWorkoutByIdService = async (id: string): Promise<WorkoutTypes.WorkoutWithExercises | undefined> => {
+export const getWorkoutByIdService = async (id: string): Promise<dbTypes.WorkoutById> => {
     try {   
         return await getWorkoutById(id);
     } catch (error) {
@@ -17,7 +18,7 @@ export const getWorkoutByIdService = async (id: string): Promise<WorkoutTypes.Wo
     }
 }
 
-export const createWorkoutService = async (workout: WorkoutTypes.CreateWorkoutInput): Promise<string> => {
+export const createWorkoutService = async (workout: CreateWorkoutInput): Promise<string> => {
     if (!/^[a-zA-Z0-9\s-]+$/.test(workout.name)) {
         throw new Error(
           "Workout name can only contain letters, numbers, spaces, and hyphens",
@@ -45,7 +46,7 @@ export const createWorkoutBySessionService = async (sessionId: string, name: str
     }
 }
 
-export const updateWorkoutService = async (workout: WorkoutTypes.WorkoutWithExercises): Promise<string> => {
+export const updateWorkoutService = async (workout: UpdateWorkoutInput): Promise<string> => {
     try {
         await updateWorkout(workout);
         return "Workout updated successfully";
@@ -63,7 +64,7 @@ export const updateWorkoutBySessionService = async (sessionId: string): Promise<
     }
 }
 
-export const updateSetService = async (set: WorkoutTypes.Set): Promise<void> => {
+export const updateSetService = async (set: updateSetInput): Promise<void> => {
     try {
         await updateSet(set);
     } catch (error) {

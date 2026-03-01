@@ -19,7 +19,8 @@ import {
 import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { RootStackParamList } from '../../App'
-import type { BodyPart, Equipment, Exercise } from '@shared/types/exercises.types'
+import type { BodyParts, Equipment, ExerciseById } from '../database/database.types'
+import type { CreateExerciseInput, UpdateExerciseInput } from '../database/interfaces/exercise.interface'
 import { colors } from '../theme/colors'
 import {
   checkExerciseNameExistsService,
@@ -55,12 +56,12 @@ function CreateExerciseScreen() {
   const [initialName, setInitialName] = useState('')
   const [link, setLink] = useState('')
   const [infoText, setInfoText] = useState('')
-  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart | null>(null)
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
+  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyParts[number] | null>(null)
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment[number] | null>(null)
   const [addToParent, setAddToParent] = useState(showAddToParent)
 
-  const [bodyParts, setBodyParts] = useState<BodyPart[]>([])
-  const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [bodyParts, setBodyParts] = useState<BodyParts>([])
+  const [equipment, setEquipment] = useState<Equipment>([])
   const [loadingOptions, setLoadingOptions] = useState(true)
   const [optionsError, setOptionsError] = useState<string | null>(null)
 
@@ -238,22 +239,42 @@ function CreateExerciseScreen() {
         return
       }
 
-      const payload: Exercise = {
-        id: isEdit ? (exerciseId as string) : '',
-        name: trimmedName,
-        link: linkPayload,
-        info: infoPayload,
-        imageName: null,
-        bodyPart: selectedBodyPart,
-        equipment: selectedEquipment,
-        // This screen only edits/creates custom exercises.
-        isDefaultExercise: false,
+      if (isEdit) {
+        const payload: UpdateExerciseInput = {
+          id: exerciseId as string,
+          name: trimmedName,
+          bodyPartId: selectedBodyPart.id,
+          equipmentId: selectedEquipment.id,
+          link: linkPayload ?? '',
+          info: infoPayload ?? '',
+        }
+        const saved = await updateExerciseService(payload)
+        if (!saved) throw new Error('Exercise could not be updated')
+        Toast.show({ type: 'success', text1: 'Success', text2: 'Exercise updated' })
+        if (showAddToParent && addToParent && typeof returnToRouteKey === 'string' && returnToRouteKey.length > 0) {
+          const selectedExercise = { id: saved.id, name: saved.name }
+          const nextParams: any = { selectedExercise }
+          if (pickerFor === 'createWorkout' && typeof replacingExerciseId === 'string') nextParams.replacingExerciseId = replacingExerciseId
+          else if (pickerFor === 'workoutDetail' && typeof replacingWorkoutExerciseId === 'string') nextParams.replacingWorkoutExerciseId = replacingWorkoutExerciseId
+          else if (pickerFor === 'session' && typeof replacingSessionExerciseId === 'string') nextParams.replacingSessionExerciseId = replacingSessionExerciseId
+          navigation.dispatch({ ...CommonActions.setParams(nextParams), source: returnToRouteKey })
+          navigation.pop(2)
+          return
+        }
+        navigation.goBack()
+        return
       }
+      const payload: CreateExerciseInput = {
+        name: trimmedName,
+        bodyPartId: selectedBodyPart.id,
+        equipmentId: selectedEquipment.id,
+        link: linkPayload ?? '',
+        info: infoPayload ?? '',
+      }
+      const saved = await createExerciseService(payload)
+      if (!saved) throw new Error('Exercise could not be created')
 
-      const saved = isEdit ? await updateExerciseService(payload) : await createExerciseService(payload)
-      if (!saved) throw new Error(isEdit ? 'Exercise could not be updated' : 'Exercise could not be created')
-
-      Toast.show({ type: 'success', text1: 'Success', text2: isEdit ? 'Exercise updated' : 'Exercise created' })
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Exercise created' })
 
       if (showAddToParent && addToParent && typeof returnToRouteKey === 'string' && returnToRouteKey.length > 0) {
         const selectedExercise = { id: saved.id, name: saved.name }

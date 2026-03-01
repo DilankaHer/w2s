@@ -16,13 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
-import { AuthProvider } from './src/contexts/AuthContext'
 import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
 import CreateExerciseScreen from '@/screens/CreateExerciseScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
 import ExercisesScreen from './src/screens/ExercisesScreen'
 import SessionScreen from '@/screens/SessionScreen'
-import LoginScreen from './src/screens/LoginScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
 import SessionDetailScreen from '@/screens/SessionDetailScreen'
 import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen'
@@ -36,7 +34,6 @@ import migrations from './drizzle/migrations'
 export type ExercisePickerResult = { id: string; name: string }
 
 export type RootStackParamList = {
-  Login: { completeSessionId?: string; sessionCreatedAt?: string; session?: unknown; removedSessionExerciseIds?: string[]; createWorkout?: boolean; workoutName?: string } | undefined
   MainTabs: { screen?: keyof TabParamList } | undefined
   WorkoutDetail: { id: string; selectedExercise?: ExercisePickerResult; replacingWorkoutExerciseId?: string }
   SessionDetail: { id: string; initialSession?: unknown; initialCreatedAt?: string; initialCompletedAt?: string; selectedExercise?: ExercisePickerResult; replacingSessionExerciseId?: string }
@@ -361,8 +358,6 @@ function RootNavigator() {
       afterMigration();
     }
   }, [success]);
-  // const { isLoading, isAuthenticated, serverDown, hasEnteredApp } = useAuth()
-
   // if (serverDown && !hasEnteredApp) {
   //   return <ServerDownScreen />
   // }
@@ -377,11 +372,6 @@ function RootNavigator() {
       initialRouteName="MainTabs"
       screenOptions={stackScreenOptions}
     >
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: false, cardStyle: { backgroundColor: colors.screen } }}
-      />
       <Stack.Screen
         name="MainTabs"
         options={{ headerShown: false }}
@@ -425,13 +415,11 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <StatusBar style="light" />
-            <RootNavigator />
-          </NavigationContainer>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <RootNavigator />
           <Toast visibilityTime={3000} />
-        </AuthProvider>
+        </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )

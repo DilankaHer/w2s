@@ -1,78 +1,91 @@
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { StackNavigationProp } from '@react-navigation/stack'
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import Toast from 'react-native-toast-message'
-import { trpc } from '../api/client'
-import { useAuth } from '../hooks/useAuth'
 import type { RootStackParamList } from '../../App'
+import type { Sessions, Workouts } from '../database/database.types'
+import { deleteSessionService, getSessionsService } from '../services/sessions.service'
+import { getWorkoutsService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
 
-interface Session {
-  id: number
-  workoutId: number | null
-  createdAt: string
-  completedAt: string | null
-  sessionTime: string | null
-}
-
 function LandingScreen() {
-  const { workoutInfo, isLoading, checkAuth } = useAuth()
-  const [showAllSessions, setShowAllSessions] = useState(false)
-  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null)
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>()
+  const [workouts, setWorkouts] = useState<Workouts>([])
+  const [sessions, setSessions] = useState<Sessions>([])
+  const [loading, setLoading] = useState(true)
+  const [showAllSessions, setShowAllSessions] = useState(false)
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
 
-  // Only derive lists after API has finished (avoids flash of empty state)
-  const workouts = !isLoading && workoutInfo ? (workoutInfo.workouts ?? []) : []
-  const sessions = !isLoading && workoutInfo ? (workoutInfo.sessions ?? []) : []
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true)
+      const [workoutsData, sessionsData] = await Promise.all([
+        getWorkoutsService(),
+        getSessionsService(),
+      ])
+      setWorkouts(Array.isArray(workoutsData) ? workoutsData : [])
+      setSessions(Array.isArray(sessionsData) ? sessionsData : [])
+    } catch {
+      setWorkouts([])
+      setSessions([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData()
+    }, [loadData])
+  )
+
   const displayedSessions = showAllSessions ? sessions : sessions.slice(0, 5)
 
-  const handleWorkoutClick = (id: number) => {
-    navigation.navigate('WorkoutDetail', { id: String(id) })
+  const handleWorkoutClick = (id: string) => {
+    navigation.navigate('WorkoutDetail', { id })
   }
 
-  const handleSessionClick = (sessionItem: { id: number; createdAt: string; completedAt: string | null }) => {
+  const handleSessionClick = (sessionItem: { id: string; createdAt: string; completedAt: string | null }) => {
     navigation.navigate('SessionDetail', {
-      id: String(sessionItem.id),
+      id: sessionItem.id,
       initialCreatedAt: sessionItem.createdAt,
       initialCompletedAt: sessionItem.completedAt ?? undefined,
     })
   }
 
-  const handleDeleteSession = (sessionId: number) => {
+  const handleDeleteSession = (sessionId: string) => {
     Alert.alert(
       'Are you sure?',
       'This action cannot be undone!',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Yes, delete it!',
           style: 'destructive',
           onPress: async () => {
             try {
               setDeletingSessionId(sessionId)
-              await trpc.sessions.delete.mutate({ id: sessionId })
-              await checkAuth()
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Session deleted',
-              })
+              await deleteSessionService(sessionId)
+              await loadData()
+              Toast.show({ type: 'success', text1: 'Success', text2: 'Session deleted' })
             } catch (err) {
               Toast.show({
                 type: 'error',
                 text1: 'Error',
-                text2: 'Failed to delete session. Please try again.',
+                text2: err instanceof Error ? err.message : 'Failed to delete session. Please try again.',
               })
             } finally {
               setDeletingSessionId(null)
@@ -83,16 +96,14 @@ function LandingScreen() {
     )
   }
 
-  // Only show "Get Started" / empty states after API call is done
-  const hasNoWorkoutInfo =
-    !isLoading &&
-    workoutInfo &&
-    (!workoutInfo.workouts || workoutInfo.workouts.length === 0) &&
-    (!workoutInfo.sessions || workoutInfo.sessions.length === 0)
+  const hasNoWorkoutInfo = workouts.length === 0 && sessions.length === 0
 
-  // Don't render content until API call is done (avoids flash)
-  if (isLoading) {
-    return <View style={[styles.container, styles.content]} />
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.content]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    )
   }
 
   return (

@@ -1,59 +1,45 @@
 import z from "zod";
 import { prisma } from "../../prisma/client";
-import { publicProcedure, router } from "../trpc";
-import { ExerciseInput } from "../interfaces/exercises.interface";
+import { protectedProcedure } from "../middleware/auth.middleware";
+import { router } from "../trpc";
+import { ExercisesSchema } from "@w2s/shared/index";
 
 export const exercisesRouter = router({
-  create: publicProcedure
-    .input(ExerciseInput)
-    .mutation(async ({ input }) => {
-      return prisma.exercise.create({
-        data: { name: input.name, bodyPartId: input.bodyPartId, equipmentId: input.equipmentId },
+  getExercisesToSync: protectedProcedure.query(async () => {
+    return prisma.exercise.findMany({
+      where: {
+        isDefaultExercise: true,
+      },
+    });
+  }),
+
+  getBodyPartsToSync: protectedProcedure.query(async () => {
+    return prisma.bodyPart.findMany({});
+  }),
+
+  getEquipmentToSync: protectedProcedure.query(async () => {
+    return prisma.equipment.findMany({});
+  }),
+
+  syncExercises: protectedProcedure.input(ExercisesSchema).query(async ({ input, ctx }) => {
+    for (const exercise of input) {
+      await prisma.exercise.upsert({
+        where: { id: exercise.id, userId: ctx.user.userId },
+        update: {
+          name: exercise.name,
+          bodyPartId: exercise.bodyPartId,
+          equipmentId: exercise.equipmentId,
+          info: exercise.info ? JSON.parse(exercise.info) : null,
+        },
+        create: {
+          id: exercise.id,
+          name: exercise.name,
+          bodyPartId: exercise.bodyPartId,
+          equipmentId: exercise.equipmentId,
+          info: exercise.info ? JSON.parse(exercise.info) : null,
+          userId: ctx.user.userId,
+        },
       });
-    }),
-
-    add: publicProcedure
-    .input(z.object({ sessionId: z.number(), exerciseId: z.number(), order: z.number() }))
-    .mutation(async ({ input }) => {
-      return prisma.sessionExercise.create({
-        data: { sessionId: input.sessionId, exerciseId: input.exerciseId, order: input.order },
-      });
-    }),
-
-    list: publicProcedure.query(async () => {
-        return prisma.exercise.findMany({
-            include: {
-                bodyPart: true,
-                equipment: true,
-            },
-        })
-    }),
-
-    filterBodyParts: publicProcedure
-    .query(async () => {
-        return prisma.bodyPart.findMany({
-          where: {
-            exercises: {
-              some: {}
-            },
-          },
-          orderBy: {
-            name: 'asc',
-          },
-        })
-    }),
-
-    filterEquipment: publicProcedure
-    .query(async () => {
-        return prisma.equipment.findMany({
-          where: {
-            exercises: {
-              some: {},
-            },
-          },
-          orderBy: {
-            name: 'asc',
-          },
-        })
-    }),
+    }
+  }),
 });

@@ -11,7 +11,7 @@ export const isAuthed = middleware(async ({ ctx, next }) => {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET_KEY!) as {
-      userId: number;
+      userId: string;
       username: string;
     };
 

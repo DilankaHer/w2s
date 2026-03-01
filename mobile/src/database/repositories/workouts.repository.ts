@@ -1,12 +1,17 @@
 import { db } from "../database";
 import { workouts, workoutExercises, sets, sessions } from "../schema/schemas";
 import * as Crypto from "expo-crypto";
-import * as WorkoutTypes from "@shared/types/workouts.types";
+import * as WorkoutTypes from "@w2s/shared/types/workouts.types";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { DeletedRow } from "../interface";
 import { insertDeletedRows } from "./delete-rows.repository";
+import * as DeletedRowInterface from "../interfaces/deleted-row.types";
+import {
+  CreateWorkoutInput,
+  updateSetInput,
+  UpdateWorkoutInput,
+} from "../interfaces/workout.interface";
 
-export async function createWorkout(input: WorkoutTypes.CreateWorkoutInput) {
+export async function createWorkout(input: CreateWorkoutInput) {
   const workoutId = Crypto.randomUUID();
   let exerciseCount = 0;
   let setCount = 0;
@@ -80,7 +85,7 @@ export async function createWorkoutBySession(sessionId: string, name: string) {
       isDefaultWorkout: false,
       createdAt: new Date().toISOString(),
       exerciseCount: session.exerciseCount,
-      setCount: session.setCount
+      setCount: session.setCount,
     });
     for (const sessionExercise of session.sessionExercises) {
       const workoutExerciseId = Crypto.randomUUID();
@@ -88,33 +93,34 @@ export async function createWorkoutBySession(sessionId: string, name: string) {
         id: workoutExerciseId,
         workoutId: workoutId,
         exerciseId: sessionExercise.exerciseId,
-        order: sessionExercise.order
+        order: sessionExercise.order,
       });
-        await tx.insert(sets).values(
-          sessionExercise.sessionSets.map((set) => ({
-            id: Crypto.randomUUID(),
-            workoutExerciseId: workoutExerciseId,
-            setNumber: set.setNumber,
-            targetReps: set.reps,
-            targetWeight: set.weight,
-          })),
-        );
+      await tx.insert(sets).values(
+        sessionExercise.sessionSets.map((set) => ({
+          id: Crypto.randomUUID(),
+          workoutExerciseId: workoutExerciseId,
+          setNumber: set.setNumber,
+          targetReps: set.reps,
+          targetWeight: set.weight,
+        })),
+      );
     }
-    await tx.update(sessions).set({
-      derivedWorkoutId: workoutId,
-    }).where(eq(sessions.id, sessionId));
+    await tx
+      .update(sessions)
+      .set({
+        derivedWorkoutId: workoutId,
+      })
+      .where(eq(sessions.id, sessionId));
   });
 }
 
-export async function getWorkouts(): Promise<WorkoutTypes.Workout[]> {
+export async function getWorkouts() {
   return await db.query.workouts.findMany({
     orderBy: (workouts, { desc }) => [desc(workouts.createdAt)],
   });
 }
 
-export async function getWorkoutById(
-  id: string,
-): Promise<WorkoutTypes.WorkoutWithExercises | undefined> {
+export async function getWorkoutById(id: string) {
   return await db.query.workouts.findFirst({
     where: (workouts, { eq }) => eq(workouts.id, id),
     with: {
@@ -136,7 +142,7 @@ export async function getWorkoutById(
   });
 }
 
-export async function updateWorkout(workout: WorkoutTypes.WorkoutWithExercises) {
+export async function updateWorkout(workout: UpdateWorkoutInput) {
   await db.transaction(async (tx) => {
     const existingExerciseIds = new Set(
       (
@@ -150,7 +156,7 @@ export async function updateWorkout(workout: WorkoutTypes.WorkoutWithExercises) 
     let setCount = 0;
 
     for (const we of workout.workoutExercises) {
-      if (existingExerciseIds.has(we.exercise.id)) {
+      if (existingExerciseIds.has(we.exerciseId)) {
         await tx
           .update(workoutExercises)
           .set({
@@ -196,7 +202,7 @@ export async function updateWorkout(workout: WorkoutTypes.WorkoutWithExercises) 
             .where(inArray(sets.id, Array.from(existingSetIds)));
         }
 
-        existingExerciseIds.delete(we.exercise.id);
+        existingExerciseIds.delete(we.exerciseId);
         exerciseCount++;
         setCount += we.sets.length;
       } else {
@@ -204,7 +210,7 @@ export async function updateWorkout(workout: WorkoutTypes.WorkoutWithExercises) 
         await tx.insert(workoutExercises).values({
           id: workoutExerciseId,
           workoutId: workout.id,
-          exerciseId: we.exercise.id,
+          exerciseId: we.exerciseId,
           order: we.order,
         });
 
@@ -249,7 +255,7 @@ export async function updateWorkout(workout: WorkoutTypes.WorkoutWithExercises) 
 
 export async function updateWorkoutBySession(sessionId: string) {
   await db.transaction(async (tx) => {
-    let rowsDeleted: DeletedRow[] = [];
+    let rowsDeleted: DeletedRowInterface.DeletedRow[] = [];
     const session = await tx.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
       with: {
@@ -279,17 +285,20 @@ export async function updateWorkoutBySession(sessionId: string) {
       throw new Error("Workout not found");
     }
     const exerciseMap = new Map(
-      workout.workoutExercises.map(we => [we.exerciseId, we.id])
+      workout.workoutExercises.map((we) => [we.exerciseId, we.id]),
     );
     let workoutSetsToAdd: WorkoutTypes.Set[] = [];
     for (const sessionExercise of session.sessionExercises) {
       let workoutExerciseId = "";
       if (exerciseMap.has(sessionExercise.exerciseId)) {
         workoutExerciseId = exerciseMap.get(sessionExercise.exerciseId)!;
-        const deletedSets = await tx.delete(sets).where(eq(sets.workoutExerciseId, workoutExerciseId)).returning();
+        const deletedSets = await tx
+          .delete(sets)
+          .where(eq(sets.workoutExerciseId, workoutExerciseId))
+          .returning();
         for (const set of deletedSets) {
           if (set.isSynced) {
-            rowsDeleted.push({ tableName: 'sets', rowId: set.id });
+            rowsDeleted.push({ tableName: "sets", rowId: set.id });
           }
         }
         await tx
@@ -298,7 +307,7 @@ export async function updateWorkoutBySession(sessionId: string) {
             order: sessionExercise.order,
           })
           .where(eq(workoutExercises.id, workoutExerciseId));
-          exerciseMap.delete(sessionExercise.exerciseId);
+        exerciseMap.delete(sessionExercise.exerciseId);
       } else {
         workoutExerciseId = Crypto.randomUUID();
         await tx.insert(workoutExercises).values({
@@ -308,13 +317,18 @@ export async function updateWorkoutBySession(sessionId: string) {
           order: sessionExercise.order,
         });
       }
-      workoutSetsToAdd.push(...sessionExercise.sessionSets.map(s => ({
-        id: Crypto.randomUUID(),
-        workoutExerciseId: workoutExerciseId,
-        setNumber: s.setNumber,
-        targetReps: s.reps,
-        targetWeight: s.weight,
-      } as WorkoutTypes.Set)));
+      workoutSetsToAdd.push(
+        ...sessionExercise.sessionSets.map(
+          (s) =>
+            ({
+              id: Crypto.randomUUID(),
+              workoutExerciseId: workoutExerciseId,
+              setNumber: s.setNumber,
+              targetReps: s.reps,
+              targetWeight: s.weight,
+            }) as WorkoutTypes.Set,
+        ),
+      );
     }
     if (exerciseMap.size > 0) {
       const deletedWorkoutExercises = await tx
@@ -327,30 +341,40 @@ export async function updateWorkoutBySession(sessionId: string) {
               Array.from(exerciseMap.keys()),
             ),
           ),
-        ).returning();
-        for (const workoutExercise of deletedWorkoutExercises) {
-          if (workoutExercise.isSynced) {
-            rowsDeleted.push({ tableName: 'workoutExercises', rowId: workoutExercise.id });
-          }
+        )
+        .returning();
+      for (const workoutExercise of deletedWorkoutExercises) {
+        if (workoutExercise.isSynced) {
+          rowsDeleted.push({
+            tableName: "workoutExercises",
+            rowId: workoutExercise.id,
+          });
         }
+      }
     }
     if (workoutSetsToAdd.length > 0) {
       await tx.insert(sets).values(workoutSetsToAdd);
     }
-    await tx.update(sessions).set({
-      updatedWorkoutAt: new Date().toISOString(),
-    }).where(eq(sessions.id, sessionId));
-    await tx.update(workouts).set({
-      exerciseCount: session.exerciseCount,
-      setCount: session.setCount,
-    }).where(eq(workouts.id, workout.id));
+    await tx
+      .update(sessions)
+      .set({
+        updatedWorkoutAt: new Date().toISOString(),
+      })
+      .where(eq(sessions.id, sessionId));
+    await tx
+      .update(workouts)
+      .set({
+        exerciseCount: session.exerciseCount,
+        setCount: session.setCount,
+      })
+      .where(eq(workouts.id, workout.id));
     if (rowsDeleted.length > 0) {
       await insertDeletedRows(rowsDeleted);
     }
   });
 }
 
-export async function updateSet(set: WorkoutTypes.Set) {
+export async function updateSet(set: updateSetInput) {
   await db
     .update(sets)
     .set({
@@ -362,15 +386,39 @@ export async function updateSet(set: WorkoutTypes.Set) {
 }
 
 export async function deleteWorkout(id: string) {
-  await db.delete(workouts).where(eq(workouts.id, id)).returning().then(async ([workout]) => {
-    if (workout && workout.isSynced) {
-      await insertDeletedRows([{ tableName: 'workouts', rowId: workout.id }]);
-    }
-  });
+  await db
+    .delete(workouts)
+    .where(eq(workouts.id, id))
+    .returning()
+    .then(async ([workout]) => {
+      if (workout && workout.isSynced) {
+        await insertDeletedRows([{ tableName: "workouts", rowId: workout.id }]);
+      }
+    });
 }
 
 export async function getWorkoutByName(name: string) {
   return await db.query.workouts.findFirst({
     where: sql`${workouts.name} COLLATE NOCASE = ${name}`,
+  });
+}
+
+export async function getWorkoutsToSync(): Promise<WorkoutTypes.Workout[]> {
+  return await db.query.workouts.findMany({
+    where: eq(workouts.isSynced, false),
+  });
+}
+
+export async function getWorkoutExercisesToSync(): Promise<
+  WorkoutTypes.WorkoutExercise[]
+> {
+  return await db.query.workoutExercises.findMany({
+    where: eq(workoutExercises.isSynced, false),
+  });
+}
+
+export async function getSetsToSync(): Promise<WorkoutTypes.Set[]> {
+  return await db.query.sets.findMany({
+    where: eq(sets.isSynced, false),
   });
 }

@@ -1,170 +1,34 @@
-import { TRPCError } from "@trpc/server";
-import bcrypt from "bcryptjs";
-import z from "zod";
 import { prisma } from "../../prisma/client";
 import { protectedProcedure } from "../middleware/auth.middleware";
 import { publicProcedure, router } from "../trpc";
 import { createToken } from "../utils/cookie";
+import { UserSchema, UserSchemaCreate } from "@w2s/shared/types/user.types";
 
 export const usersRouter = router({
-    create: publicProcedure.input(z.object({ username: z.string(), email: z.email().optional(), password: z.string(), isMobile: z.boolean().optional() })).mutation(async ({ input, ctx }) => {
-        const existingUser = await prisma.user.findFirst({
-            where: { username: input.username },
-        });
-        if (existingUser) {
-            throw new TRPCError({ code: 'CONFLICT', message: 'Username already exists' });
-        }
-
-        const passwordHash = await bcrypt.hash(input.password, 12);
-        const user = await prisma.user.create({
-            data: {
-                username: input.username,
-                passwordHash,
-                ...(input.email && { email: input.email }),
-            },
-        });
-
-        createToken(user, ctx, input.isMobile);
-
-        return {
-            success: true,
-            user: {
-                username: user.username
-            },
-        };
-    }),
-
-    login: publicProcedure.input(z.object({ username: z.string(), password: z.string(), isMobile: z.boolean().optional() })).mutation(async ({ input, ctx }) => {
-        const user = await prisma.user.findFirst({
-            where: { username: input.username },
+    createNewToken: publicProcedure.input(UserSchemaCreate).query(async ({ input, ctx }) => {
+        const user = await prisma.user.findUnique({
+            where: { id: input.id },
         });
         if (!user) {
-            throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+            const user = await prisma.user.create({
+                data: {
+                    id: input.id,
+                    username: input.username,
+                    createdAt: input.createdAt,
+                },
+            });
+            createToken(user, ctx, true);
+        } else {
+            createToken(user, ctx, true);
         }
-
-        const isPasswordValid = await bcrypt.compare(input.password, user.passwordHash);
-        if (!isPasswordValid) {
-            throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid password' });
-        }
-
-        createToken(user, ctx, input.isMobile);
-
-        return {
-            success: true,
-            user: {
-                username: user.username
-            },
-        };
+        return "New token created";
     }),
-
-    getUser: protectedProcedure.query(async ({ ctx }) => {
-        return prisma.user.findUnique({
-            where: { id: ctx.user.userId },
-            select: {
-                id: true,
-                username: true,
-                email: true,
-            },
-        });
-    }),
-
-    updateUser: protectedProcedure.input(z.object({
-        username: z.string().optional(),
-        email: z.email().optional(),
-    })).mutation(async ({ input, ctx }) => {
+    syncUser: protectedProcedure.input(UserSchema).query(async ({ input, ctx }) => {
         await prisma.user.update({
             where: { id: ctx.user.userId },
             data: {
-                ...(input.username && { username: input.username }),
-                ...(input.email && { email: input.email }),
+                username: input.username,
             },
         });
-
-        return {
-            success: true,
-        };
-    }),
-
-    checkUsername: publicProcedure.input(z.object({ username: z.string() })).mutation(async ({ input }) => {
-        const existingUser = await prisma.user.findFirst({
-            where: { username: input.username },
-        });
-        return {
-            exists: !!existingUser,
-        };
-    }),
-
-    checkEmail: publicProcedure.input(z.object({ email: z.string() })).mutation(async ({ input }) => {
-        const existingUser = await prisma.user.findFirst({
-            where: { email: input.email },
-        });
-        return {
-            exists: !!existingUser,
-        };
-    }),
-
-    getWorkoutInfo: protectedProcedure.mutation(async ({ ctx }) => {
-        const user = await prisma.user.findUnique({
-            where: { id: ctx.user.userId },
-            select: {
-                username: true,
-                workouts: {
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                    include: {
-                        _count: {
-                            select: {
-                                workoutExercises: true,
-                            },
-                        },
-                        workoutExercises: {
-                            include: {
-                                _count: {
-                                    select: {
-                                        sets: true,
-                                    },
-                                },
-                            },
-                        }
-                    },
-                },
-                sessions: {
-                    orderBy: {
-                        createdAt: 'desc',
-                    },
-                    include: {
-                        _count: {
-                            select: {
-                                sessionExercises: true,
-                            },
-                        },
-                        sessionExercises: {
-                            include: {
-                                _count: {
-                                    select: {
-                                        sessionSets: true,
-                                    },
-                                },
-                            },
-                        }
-                    },
-                },
-            },
-        });
-
-        return {
-            ...user,
-            workouts: user?.workouts.map(({ _count, workoutExercises, ...workout }) => ({
-                ...workout,
-                exerciseCount: _count.workoutExercises,
-                setCount: workoutExercises.reduce((acc, exercise) => acc + exercise._count.sets, 0),
-            })),
-            sessions: user?.sessions.map(({ _count, sessionExercises, ...session }) => ({
-                ...session,
-                exerciseCount: _count.sessionExercises,
-                setCount: sessionExercises.reduce((acc, exercise) => acc + exercise._count.sessionSets, 0),
-            })),
-        }
     }),
 });

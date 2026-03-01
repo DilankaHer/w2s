@@ -21,7 +21,7 @@ import Toast from 'react-native-toast-message'
 import { getApiErrorMessage } from '../api/errorMessage'
 import { colors } from '../theme/colors'
 import { deleteExerciseService, getExerciseByIdService, getExercisesService } from '../services/exercises.service'
-import type { BodyPart, Equipment, Exercise } from '@shared/types/exercises.types'
+import type { BodyParts, Equipment, ExerciseById, Exercises } from '../database/database.types'
 
 type ChipOption = { id: string; name: string }
 type ChipRow = { id: string; name: string }
@@ -103,18 +103,18 @@ function FilterChipsRow({
 
 function ExercisesScreen() {
   const navigation = useNavigation<any>()
-  const [optionsExercises, setOptionsExercises] = useState<Exercise[]>([])
-  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [optionsExercises, setOptionsExercises] = useState<Exercises>([])
+  const [exercises, setExercises] = useState<Exercises>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBodyPartId, setSelectedBodyPartId] = useState<string | null>(null)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
-  const [bodyParts, setBodyParts] = useState<BodyPart[]>([])
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>([])
-  const [infoExercise, setInfoExercise] = useState<Exercise | null>(null)
-  const [infoExerciseFull, setInfoExerciseFull] = useState<Exercise | null>(null)
+  const [bodyParts, setBodyParts] = useState<BodyParts>([])
+  const [equipmentList, setEquipmentList] = useState<Equipment>([])
+  const [infoExercise, setInfoExercise] = useState<Exercises[number] | null>(null)
+  const [infoExerciseFull, setInfoExerciseFull] = useState<ExerciseById | null>(null)
   const [infoLoading, setInfoLoading] = useState(false)
   const [infoError, setInfoError] = useState<string | null>(null)
   const [infoReloadToken, setInfoReloadToken] = useState(0)
@@ -143,16 +143,16 @@ function ExercisesScreen() {
     })
   }, [navigation])
 
-  const deriveBodyParts = useCallback((source: Exercise[]): BodyPart[] => {
-    const map = new Map<string, BodyPart>()
+  const deriveBodyParts = useCallback((source: Exercises): BodyParts => {
+    const map = new Map<string, BodyParts[number]>()
     source.forEach((ex) => {
       if (ex.bodyPart) map.set(ex.bodyPart.id, ex.bodyPart)
     })
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [])
 
-  const deriveEquipment = useCallback((source: Exercise[]): Equipment[] => {
-    const map = new Map<string, Equipment>()
+  const deriveEquipment = useCallback((source: Exercises): Equipment => {
+    const map = new Map<string, Equipment[number]>()
     source.forEach((ex) => {
       if (ex.equipment) map.set(ex.equipment.id, ex.equipment)
     })
@@ -239,7 +239,7 @@ function ExercisesScreen() {
 
   const availableBodyParts = useMemo(() => {
     if (selectedEquipmentId == null) return bodyParts
-    const map = new Map<string, BodyPart>()
+    const map = new Map<string, BodyParts[number]>()
     optionsExercises
       .filter((ex) => ex.equipment?.id === selectedEquipmentId)
       .forEach((ex) => {
@@ -250,7 +250,7 @@ function ExercisesScreen() {
 
   const availableEquipment = useMemo(() => {
     if (selectedBodyPartId == null) return equipmentList
-    const map = new Map<string, Equipment>()
+    const map = new Map<string, Equipment[number]>()
     optionsExercises
       .filter((ex) => ex.bodyPart?.id === selectedBodyPartId)
       .forEach((ex) => {
@@ -322,7 +322,7 @@ function ExercisesScreen() {
 
   const hasActiveFilters = selectedBodyPartId != null || selectedEquipmentId != null || searchQuery.trim().length > 0
 
-  const handleExercisePress = useCallback((item: Exercise) => {
+  const handleExercisePress = useCallback((item: Exercises[number]) => {
     setInfoExercise(item)
   }, [])
 
@@ -337,7 +337,7 @@ function ExercisesScreen() {
   )
 
   const handleDeleteExercise = useCallback(
-    (item: Exercise) => {
+    (item: Exercises[number]) => {
       if (item.isDefaultExercise) return
       Alert.alert('Delete exercise?', `"${item.name}" will be deleted.`, [
         { text: 'Cancel', style: 'cancel' },
@@ -401,7 +401,7 @@ function ExercisesScreen() {
     </View>
   )
 
-  const renderItem = ({ item }: { item: Exercise }) => {
+  const renderItem = ({ item }: { item: Exercises[number] }) => {
     const bodyName = item.bodyPart?.name ?? '—'
     const equipName = item.equipment?.name ?? '—'
     const subtitle = [bodyName, equipName].filter((s) => s !== '—').join(' · ') || '—'
@@ -556,7 +556,7 @@ function ExercisesScreen() {
     }
   }, [infoExercise?.id, infoReloadToken])
 
-  const renderInfoContent = (exercise: Exercise | null) => {
+  const renderInfoContent = (exercise: Exercises[number] | null) => {
     if (infoLoading) {
       return (
         <View style={styles.infoCard}>
@@ -587,7 +587,7 @@ function ExercisesScreen() {
       )
     }
 
-    const rawInfo = exercise.info
+    const rawInfo = (exercise as Exercises[number] & { info?: string | null }).info
     let info: unknown = rawInfo
     if (typeof rawInfo === 'string' && rawInfo.trim()) {
       try {
@@ -716,7 +716,7 @@ function ExercisesScreen() {
                 >
                   <View style={styles.infoSection}>
                     <Text style={styles.infoSectionLabel}>Info</Text>
-                    {renderInfoContent(infoExerciseFull)}
+                    {renderInfoContent(infoExerciseFull ?? null)}
                     {infoExerciseFull?.link ? (
                       <TouchableOpacity
                         style={styles.watchVideoButton}

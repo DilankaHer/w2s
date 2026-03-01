@@ -1,6 +1,6 @@
 /**
  * Callback invoked when any API returns 401 Unauthorized (e.g. token expired).
- * AuthProvider sets this to force logout and show toast.
+ * Set via setOnUnauthorized for optional handling (e.g. toast).
  */
 let onUnauthorized: (() => void) | null = null
 

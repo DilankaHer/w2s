@@ -1,7 +1,8 @@
 import { createSession, deleteSession, getSessionById, getSessions, updateSession } from "@/database/repositories/sessions.repository";
-import type * as SessionTypes from "@shared/types/sessions.types";
+import type * as dbTypes from "@/database/database.types";
+import { UpdateSessionInput } from "@/database/interfaces/session.interfaces";
 
-export const getSessionsService = async (): Promise<SessionTypes.Session[]> => {
+export const getSessionsService = async (): Promise<dbTypes.Sessions> => {
     try {
         return await getSessions();
     } catch (error) {
@@ -9,7 +10,7 @@ export const getSessionsService = async (): Promise<SessionTypes.Session[]> => {
     }
 };
 
-export const getSessionByIdService = async (id: string): Promise<SessionTypes.SessionWithExercises | undefined> => {
+export const getSessionByIdService = async (id: string): Promise<dbTypes.SessionById> => {
     try {
         return await getSessionById(id);
     } catch (error) {
@@ -17,7 +18,7 @@ export const getSessionByIdService = async (id: string): Promise<SessionTypes.Se
     }
 };
 
-export const createSessionService = async (sessionId: string, workoutId: string): Promise<SessionTypes.SessionWithExercises | undefined> => {
+export const createSessionService = async (sessionId: string, workoutId: string): Promise<dbTypes.SessionCreated> => {
     try {
         return await createSession(sessionId, workoutId);
     } catch (error) {
@@ -26,7 +27,7 @@ export const createSessionService = async (sessionId: string, workoutId: string)
     }
 };
 
-export const updateSessionService = async (session: SessionTypes.SessionWithExercises): Promise<SessionTypes.SessionWithExercises | undefined> => {
+export const updateSessionService = async (session: UpdateSessionInput): Promise<dbTypes.SessionUpdated> => {
     try {
         return await updateSession(session);
     } catch (error) {
