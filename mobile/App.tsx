@@ -1,5 +1,9 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { NavigationContainer, useNavigation } from '@react-navigation/native'
+import {
+  createNavigationContainerRef,
+  NavigationContainer,
+  useNavigation,
+} from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { StatusBar } from 'expo-status-bar'
@@ -7,6 +11,7 @@ import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Keyboard,
+  Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
+import { saveAuthTokenFromDeepLink } from '@/api/client'
 import CreateWorkoutScreen from './src/screens/CreateWorkoutScreen'
 import CreateExerciseScreen from '@/screens/CreateExerciseScreen'
 import ExercisePickerScreen from './src/screens/ExercisePickerScreen'
@@ -62,6 +68,26 @@ export type TabParamList = {
 
 const Stack = createStackNavigator<RootStackParamList>()
 const Tab = createBottomTabNavigator<TabParamList>()
+
+const navigationRef = createNavigationContainerRef<RootStackParamList>()
+
+function parseAuthSuccessToken(url: string | null): string | null {
+  if (!url || !url.includes('auth-success') || !url.includes('token=')) return null
+  const m = url.match(/token=([^&]+)/)
+  return m ? m[1] : null
+}
+
+function handleAuthSuccessUrl(url: string) {
+  const token = parseAuthSuccessToken(url)
+  if (!token) return
+  saveAuthTokenFromDeepLink(token).then(() => {
+    Toast.show({ type: 'success', text1: "You're signed in", text2: 'You can sync your data now.' })
+    navigationRef.isReady() &&
+      navigationRef.navigate('MainTabs', { screen: 'Profile' })
+  }).catch(() => {
+    Toast.show({ type: 'error', text1: 'Sign-in failed', text2: 'Could not save session.' })
+  })
+}
 
 function CreatePlaceholder() {
   return null
@@ -412,10 +438,19 @@ function RootNavigator() {
 }
 
 function App() {
+  useEffect(() => {
+    const onUrl = (event: { url: string }) => handleAuthSuccessUrl(event.url)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleAuthSuccessUrl(url)
+    })
+    const sub = Linking.addEventListener('url', onUrl)
+    return () => sub.remove()
+  }, [])
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
           <StatusBar style="light" />
           <RootNavigator />
           <Toast visibilityTime={3000} />

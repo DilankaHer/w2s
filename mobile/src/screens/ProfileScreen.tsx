@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import {
 } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Toast from 'react-native-toast-message'
+import { hasStoredAuth, trpc } from '@/api/client'
 import type { User } from '../database/database.types'
 import { syncService } from '../services/sync.service'
 import {
@@ -39,6 +41,9 @@ function ProfileScreen() {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [username, setUsername] = useState('')
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [email, setEmail] = useState('')
+  const [sendingLink, setSendingLink] = useState(false)
 
   const stats = {
     totalSessions: 0,
@@ -120,6 +125,10 @@ function ProfileScreen() {
   }
 
   const handleSyncData = async () => {
+    if (!(await hasStoredAuth())) {
+      setShowEmailModal(true)
+      return
+    }
     try {
       setSyncing(true)
       await syncService()
@@ -129,6 +138,31 @@ function ProfileScreen() {
       Toast.show({ type: 'error', text1: 'Sync failed', text2: message })
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleRequestMagicLink = async () => {
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed) {
+      Toast.show({ type: 'error', text1: 'Email required', text2: 'Please enter your email.' })
+      return
+    }
+    if (!user) return
+    try {
+      setSendingLink(true)
+      await trpc.auth.requestMagicLink.mutate({
+        email: trimmed,
+        userId: user.id,
+        username: user.username,
+        isMobile: true,
+      })
+      setShowEmailModal(false)
+      setEmail('')
+      Toast.show({ type: 'success', text1: 'Check your email', text2: 'We sent you a sign-in link.' })
+    } catch {
+      Toast.show({ type: 'error', text1: 'Failed to send link', text2: 'Please try again.' })
+    } finally {
+      setSendingLink(false)
     }
   }
 
@@ -264,6 +298,48 @@ function ProfileScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={showEmailModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEmailModal(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.emailModalOverlay}
+          onPress={() => setShowEmailModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.emailModalBox}>
+            <Text style={styles.emailModalTitle}>Sign in to sync</Text>
+            <Text style={styles.emailModalText}>Enter your email and we’ll send you a sign-in link.</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[styles.submitButton, sendingLink && styles.saveButtonDisabled]}
+              onPress={handleRequestMagicLink}
+              disabled={sendingLink}
+            >
+              {sendingLink ? (
+                <ActivityIndicator size="small" color={colors.primaryText} />
+              ) : (
+                <Text style={styles.submitButtonText}>Send link</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.emailModalCancel} onPress={() => setShowEmailModal(false)}>
+              <Text style={styles.emailModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -454,6 +530,41 @@ const styles = StyleSheet.create({
     color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
+  },
+  emailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emailModalBox: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emailModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  emailModalText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  emailModalCancel: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  emailModalCancelText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 })
 

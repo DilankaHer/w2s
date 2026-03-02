@@ -84,6 +84,12 @@ export async function clearStoredAuth(): Promise<void> {
   }
 }
 
+/** Save auth token from magic-link deep link (e.g. w2smobile://auth-success?token=JWT). */
+export async function saveAuthTokenFromDeepLink(token: string): Promise<void> {
+  const stored = await getStoredCookies()
+  await saveCookies({ ...stored, auth_token: token })
+}
+
 // Build cookie header string
 function buildCookieHeader(cookies: Record<string, string>): string {
   return Object.entries(cookies)

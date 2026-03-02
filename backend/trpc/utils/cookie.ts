@@ -1,6 +1,6 @@
 import cookie, { type SerializeOptions } from 'cookie';
 import jwt from "jsonwebtoken";
-import type { createContext } from './context';
+import type { IAuthService } from '../interfaces/auth.interface';
 
 export function getCookie(req: Request, name: string) {
     const cookieHeader = req.headers.get('Cookie')
@@ -23,12 +23,41 @@ export function setCookie(
     }
 }
 
-export function createToken(user: { id: string, username: string }, ctx: ReturnType<typeof createContext>, isMobile: boolean = false) {
+// export function createToken(user: { id: string, username: string }, ctx: ReturnType<typeof createContext>, isMobile: boolean = false) {
+//     const expiresIn = parseInt(process.env.JWT_EXPIRES_IN!);
+//     const token = jwt.sign(
+//         {
+//             userId: user.id,
+//             username: user.username,
+//         },
+//         process.env.JWT_SECRET_KEY!,
+//         {
+//             expiresIn: expiresIn,
+//         }
+//     );
+
+//     const cookieOptions: SerializeOptions = {
+//         httpOnly: true,
+//         path: "/",
+//         secure: process.env.NODE_ENV === "production",
+//         sameSite: "lax",
+//         maxAge: expiresIn,
+//     }
+
+//     ctx.setCookie(
+//         "auth_token",
+//         token,
+//         isMobile,
+//         cookieOptions
+//     );
+// }
+
+export function createJWTToken(info: IAuthService) {
     const expiresIn = parseInt(process.env.JWT_EXPIRES_IN!);
     const token = jwt.sign(
         {
-            userId: user.id,
-            username: user.username,
+            userId: info.userId,
+            username: info.username
         },
         process.env.JWT_SECRET_KEY!,
         {
@@ -36,18 +65,5 @@ export function createToken(user: { id: string, username: string }, ctx: ReturnT
         }
     );
 
-    const cookieOptions: SerializeOptions = {
-        httpOnly: true,
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: expiresIn,
-    }
-
-    ctx.setCookie(
-        "auth_token",
-        token,
-        isMobile,
-        cookieOptions
-    );
+    return token;
 }

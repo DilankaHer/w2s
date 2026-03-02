@@ -31,12 +31,7 @@ export async function syncService() {
     throw new Error("Create a profile first");
   }
   if (!(await hasStoredAuth())) {
-    await trpc.users.createNewToken.mutate({
-      id: user.id,
-      username: user.username,
-      createdAt: user.createdAt,
-      isMobile: true,
-    });
+    throw new Error("Sign in required");
   }
 
   const userToSync = await getUserToSync();

@@ -14,6 +14,7 @@ import {
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   username: text('username').notNull(),
+  email: text('email'),
   createdAt: text('created_at').notNull(),
   isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false),
 });

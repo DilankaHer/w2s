@@ -1,6 +1,9 @@
+import cookie, { type SerializeOptions } from 'cookie';
 import { createBunServeHandler } from 'trpc-bun-adapter';
+import { verifyMagicLink } from './services/auth.service.ts';
 import { appRouter } from './trpc/router.ts';
 import { createContext } from './trpc/utils/context.ts';
+import { createJWTToken } from './trpc/utils/cookie.ts';
 
 const trpcHandler = createBunServeHandler({
   router: appRouter,
@@ -53,6 +56,37 @@ Bun.serve({
         // fallback in case res is undefined (should not happen, but for type safety)
         return new Response('Not Found', { status: 404 });
       }
+    } else if (url.pathname.startsWith('/auth/verify')) {
+      const token = url.searchParams.get('token');
+      if (!token) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      const verificationInfo = await verifyMagicLink(token);
+      if (!verificationInfo) {
+        return new Response('Invalid or expired token', { status: 401 });
+      }
+
+      const headers = new Headers();
+
+      const tokenJWT = await createJWTToken(verificationInfo);
+
+      if (verificationInfo.isMobile) {
+        headers.set('Location', `w2smobile://auth-success?token=${tokenJWT}`);
+      } else {
+        const cookieOptions: SerializeOptions = {
+          httpOnly: true,
+          path: "/",
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: parseInt(process.env.JWT_EXPIRES_IN!),
+        }
+        headers.set('Set-Cookie', cookie.serialize("auth_token", tokenJWT, cookieOptions));
+        headers.set('Location', 'w2s-app.duvaher.com');
+      }
+      return new Response(null, {
+        status: 302,
+        headers,
+      });
     }
     return new Response('OK', { status: 200 });
   }
