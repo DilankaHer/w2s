@@ -17,9 +17,10 @@ export async function getUser() {
     return await db.query.users.findFirst({});
 }
 
-export async function updateUser(username: string) {
+export async function updateUser(username?: string, email?: string | null) {
     return await db.update(users).set({
-        username: username,
+        ...(username && { username: username }),
+        ...(email && { email: email }),
     }).returning().then(([user]) => user);
 }
 

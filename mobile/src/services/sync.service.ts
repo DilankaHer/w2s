@@ -25,13 +25,18 @@ import {
   updateSetsSynced,
 } from "@/database/repositories/workouts.repository";
 
+interface SyncResult {
+  status: 'sync_success' | 'sync_failed';
+  message: string;
+}
+
 export async function syncService() {
   const user = await getUser();
   if (!user) {
-    throw new Error("Create a profile first");
+    return { status: 'sync_failed', message: 'Create a profile first' };
   }
   if (!(await hasStoredAuth())) {
-    throw new Error("Sign in required");
+    return { status: 'sync_failed', message: 'Sign in required' };
   }
 
   const userToSync = await getUserToSync();
@@ -42,6 +47,17 @@ export async function syncService() {
   const exercisesToSync = await getExercisesToSync();
   const sessionsToSync = await getSessionsToSync();
   try {
+    if (
+      !userToSync &&
+      rowsDeleted.length === 0 &&
+      exercisesToSync.length === 0 &&
+      workoutsToSync.length === 0 &&
+      workoutExercisesToSync.length === 0 &&
+      setsToSync.length === 0 &&
+      sessionsToSync.length === 0
+    ) {
+      return { status: 'sync_success', message: 'Your data is already up to date' };
+    }
     if (userToSync) {
       await trpc.users.syncUser.mutate(userToSync);
       await updateUserSynced();
@@ -70,8 +86,9 @@ export async function syncService() {
       await trpc.sessions.syncSessions.mutate(sessionsToSync);
       await updateSessionsSynced();
     }
-    return "Sync completed";
+    return { status: 'sync_success', message: 'Your data has been synced' };
   } catch (error) {
-    throw new Error("Failed to sync");
+    console.error(error);
+    return { status: 'sync_failed', message: 'Failed to sync' };
   }
 }

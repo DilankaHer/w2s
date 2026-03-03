@@ -131,11 +131,28 @@ function ProfileScreen() {
     }
     try {
       setSyncing(true)
-      await syncService()
-      Toast.show({ type: 'success', text1: 'Sync complete', text2: 'Your data has been synced.' })
+      const result = await syncService()
+
+      if (result.status === 'sync_failed') {
+        Toast.show({
+          type: 'error',
+          text1: 'Sync failed',
+          text2: result.message,
+        })
+        return
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Sync complete',
+        text2: result.message,
+      })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sync failed'
-      Toast.show({ type: 'error', text1: 'Sync failed', text2: message })
+      Toast.show({
+        type: 'error',
+        text1: 'Sync failed',
+        text2: 'An unexpected error occurred during sync.',
+      })
     } finally {
       setSyncing(false)
     }
@@ -156,6 +173,7 @@ function ProfileScreen() {
         username: user.username,
         isMobile: true,
       })
+      await updateUserService(undefined, trimmed)
       setShowEmailModal(false)
       setEmail('')
       Toast.show({ type: 'success', text1: 'Check your email', text2: 'We sent you a sign-in link.' })
@@ -258,7 +276,6 @@ function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>My profile</Text>
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Username</Text>
           <TextInput
@@ -270,6 +287,13 @@ function ProfileScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
+        </View>
+
+        <View style={[styles.fieldGroup, styles.fieldGroupTight]}>
+          <Text style={styles.label}>Email</Text>
+          <View style={styles.readonlyField}>
+            <Text style={styles.readonlyFieldText}>{user.email ?? 'Not set'}</Text>
+          </View>
         </View>
 
         {hasChanges && (
@@ -396,6 +420,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
+    paddingBottom: 24,
     marginBottom: 24,
     borderWidth: 1,
     borderColor: colors.border,
@@ -448,11 +473,13 @@ const styles = StyleSheet.create({
   statRowLabel: {
     fontSize: 14,
     color: colors.textSecondary,
+    lineHeight: 18,
   },
   statRowValue: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+    lineHeight: 20,
   },
   sectionLabel: {
     fontSize: 14,
@@ -505,7 +532,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   fieldGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  fieldGroupTight: {
+    marginTop: -4,
   },
   label: {
     fontSize: 14,
@@ -513,8 +543,21 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 6,
   },
+  readonlyField: {
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  readonlyFieldText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
   saveButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.success,
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',

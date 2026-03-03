@@ -474,9 +474,13 @@ function WorkoutDetailScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Save workout"
                 >
-                  <Text style={styles.saveButtonSmallText}>
-                    {checkingWorkoutName ? 'Checking…' : saving ? 'Saving…' : 'Save'}
-                  </Text>
+                  {checkingWorkoutName ? (
+                    <Text style={styles.saveButtonSmallText}>Checking…</Text>
+                  ) : saving ? (
+                    <Text style={styles.saveButtonSmallText}>Saving…</Text>
+                  ) : (
+                    <Ionicons name="checkmark" size={16} color={colors.successText} />
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -509,7 +513,7 @@ function WorkoutDetailScreen() {
           </View>
         )}
 
-        {draft.workoutExercises.length === 0 ? (
+            {draft.workoutExercises.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No exercises in this workout</Text>
             {!isReadOnly && (
@@ -672,6 +676,23 @@ function WorkoutDetailScreen() {
                 <Text style={styles.addExerciseButtonText}>Add Exercise</Text>
               </TouchableOpacity>
             )}
+            {!isReadOnly && dirty && (
+              <TouchableOpacity
+                style={[
+                  styles.saveButtonBottom,
+                  (saving || checkingWorkoutName || workoutNameExists || !draft.name.trim()) && styles.buttonDisabled,
+                ]}
+                onPress={handleSave}
+                disabled={saving || checkingWorkoutName || workoutNameExists || !draft.name.trim()}
+                accessibilityRole="button"
+                accessibilityLabel="Save workout"
+              >
+                <Ionicons name="checkmark" size={18} color={colors.successText} />
+                <Text style={styles.saveButtonBottomText}>
+                  {checkingWorkoutName ? 'Checking…' : saving ? 'Saving…' : 'Save workout'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
     </>
@@ -791,6 +812,22 @@ const styles = StyleSheet.create({
     color: colors.successText,
     fontSize: 14,
     fontWeight: '700',
+  },
+  saveButtonBottom: {
+    marginTop: 24,
+    backgroundColor: colors.success,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  saveButtonBottomText: {
+    color: colors.successText,
+    fontSize: 16,
+    fontWeight: '600',
   },
   workoutSummary: {
     fontSize: 15,

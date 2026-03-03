@@ -17,9 +17,9 @@ export const getUserService = async (): Promise<dbTypes.User> => {
     }
 };
 
-export const updateUserService = async (username: string): Promise<dbTypes.UserUpdated> => {
+export const updateUserService = async (username?: string, email?: string | null): Promise<dbTypes.UserUpdated> => {
     try {
-        return await updateUser(username);
+        return await updateUser(username, email);
     } catch (error) {
         throw new Error("Failed to update user");
     }

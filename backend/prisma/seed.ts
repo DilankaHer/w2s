@@ -1,7 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '../generated/prisma';
-import { v4 as uuidv4 } from 'uuid';
-import type { workoutExercises } from '../../mobile/src/database/schema/schemas';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -16,21 +14,18 @@ async function main() {
   const now = () => new Date().toISOString();
 
   //
-  // BODY PARTS
+  // BODY PARTS (IDs match mobile/src/database/seed.ts)
   //
   const bodyPartData = [
-    'Legs',
-    'Chest',
-    'Back',
-    'Shoulders',
-    'Arms',
-    'Core',
-    'Glutes',
-    'Neck',
-  ].map(name => ({
-    id: uuidv4(),
-    name,
-  }));
+    { id: '7c0a98eb-886c-4ef1-91f4-32473db54afe', name: 'Legs' },
+    { id: 'e3886932-8f36-4f2b-91e9-89182dee39a2', name: 'Chest' },
+    { id: '274b778b-e135-4fdf-a974-59171cddf1ff', name: 'Back' },
+    { id: 'eaf82df5-ad0a-47cc-b783-ee47e0340f68', name: 'Shoulders' },
+    { id: '3dfdd8db-20bb-4195-b32f-77cc39b9397e', name: 'Arms' },
+    { id: 'cfdfec00-0212-479c-b8f7-813e14e5d698', name: 'Core' },
+    { id: '658478a6-0d62-4ad7-b4d7-88ae545fe31f', name: 'Glutes' },
+    { id: '5d9f61ea-daf3-4f6c-b00e-2ece9f28f293', name: 'Neck' },
+  ];
 
   await prisma.bodyPart.createMany({
     data: bodyPartData,
@@ -39,30 +34,27 @@ async function main() {
   console.log('Inserted body parts');
 
   //
-  // EQUIPMENT
+  // EQUIPMENT (IDs match mobile/src/database/seed.ts)
   //
   const equipmentData = [
-    'Barbell-Standard',
-    'Barbell-Olympic',
-    'Barbell-Powerlifting',
-    'Safety squat bar',
-    'EZ curl bar',
-    'Cambered bar',
-    'Trap bar',
-    'Pull-up bar',
-    'Dip bar',
-    'Dumbbell',
-    'Kettlebell',
-    'Cable',
-    'Machine',
-    'Bodyweight',
-    'Resistance band',
-    'Plate',
-    'Other',
-  ].map(name => ({
-    id: uuidv4(),
-    name,
-  }));
+    { id: 'b4fd9a88-c0a7-4959-9f25-cbfded1c7046', name: 'Barbell-Standard' },
+    { id: 'e0f615ff-d505-4fda-a04d-a23050159e99', name: 'Barbell-Olympic' },
+    { id: '23527f22-1b73-4ad4-9823-018eee2c08b1', name: 'Barbell-Powerlifting' },
+    { id: '7e9ad40a-3967-434a-b3cc-80511220457e', name: 'Safety squat bar' },
+    { id: '967e6db9-7ce4-4da7-a617-fbe83a60b815', name: 'EZ curl bar' },
+    { id: 'b5739d5a-09c9-4b15-a5df-d4fd9d028bab', name: 'Cambered bar' },
+    { id: '0fb6c780-b4fe-40ad-a0d5-f13d758b8bbb', name: 'Trap bar' },
+    { id: '6c82c018-9b19-47ec-9c1e-24bd61979252', name: 'Pull-up bar' },
+    { id: 'fc1d8304-8b5c-4b7b-a6d2-5510b137fad3', name: 'Dip bar' },
+    { id: '3af7b6b9-96fe-4a95-9c38-993165647ee2', name: 'Dumbbell' },
+    { id: '3ad5853a-61e2-4fe3-9fc6-e456fc997723', name: 'Kettlebell' },
+    { id: '335e1bd6-8788-4732-bbb0-db554755355e', name: 'Cable' },
+    { id: '15aec9d2-e9d5-4510-83d1-b654c190fd85', name: 'Machine' },
+    { id: 'afb99cc2-ad50-415e-9b9c-f7a041044c2e', name: 'Bodyweight' },
+    { id: '155d1a7c-6097-4065-ad6b-1a5cb9bcbf5d', name: 'Resistance band' },
+    { id: 'b12c8be4-8c52-4e05-8348-f3a44df8fcfd', name: 'Plate' },
+    { id: 'fd8b6d53-ce86-4afb-8d85-a17c52cf163b', name: 'Other' },
+  ];
 
   await prisma.equipment.createMany({
     data: equipmentData,
@@ -78,6 +70,7 @@ async function main() {
   //
   const exerciseList = [
     {
+      id: '8a2d1eb0-cb08-4c72-be54-fc81ce22b0aa',
       name: 'Squat',
       bodyPartId: bp['Legs'],
       equipmentId: eq['Barbell-Standard'],
@@ -92,6 +85,7 @@ async function main() {
       ],
     },
     {
+      id: '0f9cdaff-8cdf-4c4a-a417-45cae5339afd',
       name: 'Bench Press - Flat',
       bodyPartId: bp['Chest'],
       equipmentId: eq['Barbell-Standard'],
@@ -106,6 +100,7 @@ async function main() {
       ],
     },
     {
+      id: '3953e230-aa63-4e39-bc53-124653648d86',
       name: 'Deadlift',
       bodyPartId: bp['Back'],
       equipmentId: eq['Barbell-Standard'],
@@ -121,6 +116,7 @@ async function main() {
       ],
     },
     {
+      id: '3d509eaa-c8df-4e03-a49d-f71edbc4564e',
       name: 'Overhead Press',
       bodyPartId: bp['Shoulders'],
       equipmentId: eq['Barbell-Standard'],
@@ -128,6 +124,7 @@ async function main() {
       info: [],
     },
     {
+      id: '9977078c-7518-4189-ba18-3eedd9aa0f9d',
       name: 'Barbell Row',
       bodyPartId: bp['Back'],
       equipmentId: eq['Barbell-Standard'],
@@ -142,6 +139,7 @@ async function main() {
       ],
     },
     {
+      id: '962355b1-eccc-4f82-8e05-8264dd984fd7',
       name: 'Pull-ups',
       bodyPartId: bp['Back'],
       equipmentId: eq['Pull-up bar'],
@@ -156,6 +154,7 @@ async function main() {
       ],
     },
     {
+      id: '30fe94c2-33fa-4f70-92d0-cfcfb977207f',
       name: 'Dips-Chest',
       bodyPartId: bp['Chest'],
       equipmentId: eq['Dip bar'],
@@ -169,6 +168,7 @@ async function main() {
       ],
     },
     {
+      id: 'd7b2ab2e-d310-43a8-aea2-5eb497e445cb',
       name: 'Push-ups',
       bodyPartId: bp['Chest'],
       equipmentId: eq['Bodyweight'],
@@ -184,6 +184,7 @@ async function main() {
       ],
     },
     {
+      id: '3de6315a-7391-49cf-817b-acb511c9e5af',
       name: 'Bicep Curls',
       bodyPartId: bp['Arms'],
       equipmentId: eq['Dumbbell'],
@@ -198,6 +199,7 @@ async function main() {
       ],
     },
     {
+      id: '00abdfd6-5f77-4783-b871-65a96d1b977d',
       name: 'Leg Press',
       bodyPartId: bp['Legs'],
       equipmentId: eq['Machine'],
@@ -211,10 +213,7 @@ async function main() {
         "Lockout: You can lock out your knees, but avoid snapping them; a very slight bend at the top is fine."
       ],
     },
-  ].map(exercise => ({
-    ...exercise,
-    id: uuidv4(),
-  }));
+  ];
 
   await prisma.exercise.createMany({
     data: exerciseList,
@@ -226,10 +225,10 @@ async function main() {
   );
 
   //
-  // WORKOUTS
+  // WORKOUTS (IDs match mobile/src/database/seed.ts)
   //
-  const fullBodyId = crypto.randomUUID();
-  const upperBodyId = crypto.randomUUID();
+  const fullBodyId = '976c421f-6388-4a80-be6c-192ec58ce822';
+  const upperBodyId = 'e3489389-52f9-4e1b-af23-fbf6ea9b9f12';
 
   await prisma.workout.createMany({
     data: [
@@ -253,38 +252,38 @@ async function main() {
   });
 
   //
-  // WORKOUT EXERCISES
+  // WORKOUT EXERCISES (IDs match mobile/src/database/seed.ts)
   //
-  const workoutExercisesList: Prisma.WorkoutExerciseUncheckedCreateInput[] = [];
-
   const fullBodyOrder = [
-    'Squat',
-    'Bench Press - Flat',
-    'Deadlift',
-    'Overhead Press',
-    'Barbell Row',
+    { id: 'f1803f9e-e3c2-4a21-b89c-da9ece8d6403', name: 'Squat' },
+    { id: '63a667dd-c070-49e7-a136-9d67d4ac5422', name: 'Bench Press - Flat' },
+    { id: 'e4b0e3ee-b53e-4ab3-9c34-3a6d455155fd', name: 'Deadlift' },
+    { id: 'f65ee738-3208-4046-a751-7ff29cd7897d', name: 'Overhead Press' },
+    { id: 'c300da8f-c79e-4058-8e58-19a49e36216a', name: 'Barbell Row' },
   ];
 
-  fullBodyOrder.forEach((name, index) => {
+  const upperBodyOrder = [
+    { id: '1e2b09a8-3584-4688-9085-3c20dc287d1e', name: 'Bench Press - Flat' },
+    { id: 'e1a6be6f-5ae3-4708-bb54-6e1956ee09e9', name: 'Overhead Press' },
+    { id: 'f52c7fb9-9346-4f71-a3e4-7b923fb139f9', name: 'Barbell Row' },
+  ];
+
+  const workoutExercisesList: Prisma.WorkoutExerciseUncheckedCreateInput[] = [];
+
+  fullBodyOrder.forEach((ex, index) => {
     workoutExercisesList.push({
-      id: uuidv4(),
+      id: ex.id,
       workoutId: fullBodyId,
-      exerciseId: exMap[name]!,
+      exerciseId: exMap[ex.name]!,
       order: index + 1,
     });
   });
 
-  const upperBodyOrder = [
-    'Bench Press - Flat',
-    'Overhead Press',
-    'Barbell Row',
-  ];
-
-  upperBodyOrder.forEach((name, index) => {
+  upperBodyOrder.forEach((ex, index) => {
     workoutExercisesList.push({
-      id: crypto.randomUUID(),
+      id: ex.id,
       workoutId: upperBodyId,
-      exerciseId: exMap[name]!,
+      exerciseId: exMap[ex.name]!,
       order: index + 1,
     });
   });
@@ -295,26 +294,39 @@ async function main() {
   console.log('Inserted workout exercises');
 
   //
-  // SETS
+  // SETS (IDs match mobile/src/database/seed.ts)
   //
-  const setsRows: Prisma.SetUncheckedCreateInput[] = [];
+  const fullBodySets: Prisma.SetUncheckedCreateInput[] = [
+    { id: '4fa15e11-151e-4d2a-8593-207ae08d9946', workoutExerciseId: 'f1803f9e-e3c2-4a21-b89c-da9ece8d6403', setNumber: 1, targetReps: 10, targetWeight: 135 },
+    { id: '7d049142-2c5b-4e66-a433-8967a51a5fed', workoutExerciseId: 'f1803f9e-e3c2-4a21-b89c-da9ece8d6403', setNumber: 2, targetReps: 10, targetWeight: 135 },
+    { id: '2c1b4a8f-163d-4bd9-9d94-0114b5e62366', workoutExerciseId: 'f1803f9e-e3c2-4a21-b89c-da9ece8d6403', setNumber: 3, targetReps: 10, targetWeight: 135 },
+    { id: '31da5a5c-8bc4-4a46-8e38-7abd4d45af85', workoutExerciseId: '63a667dd-c070-49e7-a136-9d67d4ac5422', setNumber: 1, targetReps: 10, targetWeight: 135 },
+    { id: 'eac774da-3fa4-48f6-ae73-7b89fa8ac47b', workoutExerciseId: '63a667dd-c070-49e7-a136-9d67d4ac5422', setNumber: 2, targetReps: 10, targetWeight: 135 },
+    { id: 'c9c076ab-5c70-41ab-84de-0b2099f1bcc0', workoutExerciseId: '63a667dd-c070-49e7-a136-9d67d4ac5422', setNumber: 3, targetReps: 10, targetWeight: 135 },
+    { id: '02b3db7d-317e-4087-ae50-5db99a857a46', workoutExerciseId: 'e4b0e3ee-b53e-4ab3-9c34-3a6d455155fd', setNumber: 1, targetReps: 10, targetWeight: 135 },
+    { id: 'fda1b419-3166-43de-997e-c232fc5712bb', workoutExerciseId: 'e4b0e3ee-b53e-4ab3-9c34-3a6d455155fd', setNumber: 2, targetReps: 10, targetWeight: 135 },
+    { id: 'a60c4416-e28f-4902-8248-f4f46c53df23', workoutExerciseId: 'e4b0e3ee-b53e-4ab3-9c34-3a6d455155fd', setNumber: 3, targetReps: 10, targetWeight: 135 },
+    { id: 'fa2e52d9-62c5-431f-b921-98f4484401e6', workoutExerciseId: 'f65ee738-3208-4046-a751-7ff29cd7897d', setNumber: 1, targetReps: 10, targetWeight: 135 },
+    { id: '2a80d39e-a1a3-4b81-9ba0-fcc3f6f9c6a3', workoutExerciseId: 'f65ee738-3208-4046-a751-7ff29cd7897d', setNumber: 2, targetReps: 10, targetWeight: 135 },
+    { id: 'eb63405f-12dc-45dc-9e5d-fcef6ae2b485', workoutExerciseId: 'f65ee738-3208-4046-a751-7ff29cd7897d', setNumber: 3, targetReps: 10, targetWeight: 135 },
+    { id: '60ee176d-0455-400e-a125-7b3349e0cb69', workoutExerciseId: 'c300da8f-c79e-4058-8e58-19a49e36216a', setNumber: 1, targetReps: 10, targetWeight: 135 },
+    { id: 'b5e0cb0b-2a80-4184-8ad2-d437faecdc66', workoutExerciseId: 'c300da8f-c79e-4058-8e58-19a49e36216a', setNumber: 2, targetReps: 10, targetWeight: 135 },
+    { id: 'c3a0ccdd-b287-415a-8049-badc99c58a92', workoutExerciseId: 'c300da8f-c79e-4058-8e58-19a49e36216a', setNumber: 3, targetReps: 10, targetWeight: 135 },
+  ];
 
-  workoutExercisesList.forEach(te => {
-    const isFullBody = te.workoutId === fullBodyId;
+  const upperBodySets: Prisma.SetUncheckedCreateInput[] = [
+    { id: 'e71477ec-ef4c-4280-acdf-a3c778ae9ce0', workoutExerciseId: '1e2b09a8-3584-4688-9085-3c20dc287d1e', setNumber: 1, targetReps: 8, targetWeight: 135 },
+    { id: 'd4c45e8d-52e6-41bd-9b10-031925c5cd79', workoutExerciseId: '1e2b09a8-3584-4688-9085-3c20dc287d1e', setNumber: 2, targetReps: 8, targetWeight: 135 },
+    { id: 'ecf88a22-d1d9-4cef-9b43-509b42e0346f', workoutExerciseId: '1e2b09a8-3584-4688-9085-3c20dc287d1e', setNumber: 3, targetReps: 8, targetWeight: 135 },
+    { id: 'f4dc60ed-54e4-4414-a617-3b61a16e8f5e', workoutExerciseId: 'e1a6be6f-5ae3-4708-bb54-6e1956ee09e9', setNumber: 1, targetReps: 8, targetWeight: 135 },
+    { id: '486ae2fd-b240-4f09-918c-82bd85ab4a7f', workoutExerciseId: 'e1a6be6f-5ae3-4708-bb54-6e1956ee09e9', setNumber: 2, targetReps: 8, targetWeight: 135 },
+    { id: '3b5167bd-89bf-4f44-850e-97b72c2b788e', workoutExerciseId: 'e1a6be6f-5ae3-4708-bb54-6e1956ee09e9', setNumber: 3, targetReps: 8, targetWeight: 135 },
+    { id: '4c3db3c2-f312-4735-bee1-eed8545d8094', workoutExerciseId: 'f52c7fb9-9346-4f71-a3e4-7b923fb139f9', setNumber: 1, targetReps: 8, targetWeight: 135 },
+    { id: '615fa12f-a27f-449a-85be-62101f9956b0', workoutExerciseId: 'f52c7fb9-9346-4f71-a3e4-7b923fb139f9', setNumber: 2, targetReps: 8, targetWeight: 135 },
+    { id: '863b5069-7417-4ad2-b3c4-29101cd33cde', workoutExerciseId: 'f52c7fb9-9346-4f71-a3e4-7b923fb139f9', setNumber: 3, targetReps: 8, targetWeight: 135 },
+  ];
 
-    const repScheme = isFullBody ? 10 : 8;
-    const weight = 135;
-
-    for (let i = 0; i < 3; i++) {
-      setsRows.push({
-        id: uuidv4(),
-        workoutExerciseId: te.id,
-        setNumber: i + 1,
-        targetReps: repScheme,
-        targetWeight: weight,
-      });
-    }
-  });
+  const setsRows = [...fullBodySets, ...upperBodySets];
 
   await prisma.set.createMany({
     data: setsRows,

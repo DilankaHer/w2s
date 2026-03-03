@@ -4,6 +4,9 @@ import { verifyMagicLink } from './services/auth.service.ts';
 import { appRouter } from './trpc/router.ts';
 import { createContext } from './trpc/utils/context.ts';
 import { createJWTToken } from './trpc/utils/cookie.ts';
+import dotenv from 'dotenv';
+
+dotenv.config(process.env.NODE_ENV === 'production' ? { path: '.env.prod' } : { path: '.env.dev' });
 
 const trpcHandler = createBunServeHandler({
   router: appRouter,

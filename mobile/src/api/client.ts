@@ -26,9 +26,6 @@ const getApiBaseUrl = (): string => {
 }
 
 const API_BASE_URL = getApiBaseUrl()
-
-console.log("API_BASE_URL", API_BASE_URL)
-
 // Cookie storage key
 const COOKIE_STORAGE_KEY = '@w2s:cookies'
 
