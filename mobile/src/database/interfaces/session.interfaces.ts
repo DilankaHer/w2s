@@ -8,6 +8,7 @@ export interface UpdateSessionInput {
     sessionExercises: {
         id: string;
         order: number;
+        restTime: number;
         exerciseId: string;
         sessionSets: SessionSet[];
     }[];

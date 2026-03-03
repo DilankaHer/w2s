@@ -7,7 +7,6 @@ import { insertDeletedRows } from "./delete-rows.repository";
 import * as DeletedRowInterface from "../interfaces/deleted-row.interface";
 import {
   CreateWorkoutInput,
-  updateSetInput,
   UpdateWorkoutInput,
 } from "../interfaces/workout.interface";
 
@@ -33,6 +32,7 @@ export async function createWorkout(input: CreateWorkoutInput) {
         workoutId,
         exerciseId: exercise.exerciseId,
         order: exercise.order,
+        restTime: exercise.restTime,
       });
 
       setCount += exercise.sets.length;
@@ -44,6 +44,8 @@ export async function createWorkout(input: CreateWorkoutInput) {
           setNumber: set.setNumber,
           targetReps: set.targetReps,
           targetWeight: set.targetWeight,
+          setType: set.setType,
+          restTime: set.restTime,
         })),
       );
     }
@@ -94,6 +96,7 @@ export async function createWorkoutBySession(sessionId: string, name: string) {
         workoutId: workoutId,
         exerciseId: sessionExercise.exerciseId,
         order: sessionExercise.order,
+        restTime: sessionExercise.restTime,
       });
       await tx.insert(sets).values(
         sessionExercise.sessionSets.map((set) => ({
@@ -102,6 +105,7 @@ export async function createWorkoutBySession(sessionId: string, name: string) {
           setNumber: set.setNumber,
           targetReps: set.reps,
           targetWeight: set.weight,
+          setType: set.setType,
         })),
       );
     }
@@ -161,6 +165,7 @@ export async function updateWorkout(workout: UpdateWorkoutInput) {
           .update(workoutExercises)
           .set({
             order: we.order,
+            restTime: we.restTime,
           })
           .where(eq(workoutExercises.id, we.id));
 
@@ -181,6 +186,7 @@ export async function updateWorkout(workout: UpdateWorkoutInput) {
                 setNumber: s.setNumber,
                 targetReps: s.targetReps,
                 targetWeight: s.targetWeight,
+                setType: s.setType,
               })
               .where(eq(sets.id, s.id));
 
@@ -192,6 +198,7 @@ export async function updateWorkout(workout: UpdateWorkoutInput) {
               setNumber: s.setNumber,
               targetReps: s.targetReps,
               targetWeight: s.targetWeight,
+              setType: s.setType,
             });
           }
         }
@@ -212,6 +219,7 @@ export async function updateWorkout(workout: UpdateWorkoutInput) {
           workoutId: workout.id,
           exerciseId: we.exerciseId,
           order: we.order,
+          restTime: we.restTime,
         });
 
         await tx.insert(sets).values(
@@ -221,6 +229,7 @@ export async function updateWorkout(workout: UpdateWorkoutInput) {
             setNumber: s.setNumber,
             targetReps: s.targetReps,
             targetWeight: s.targetWeight,
+            setType: s.setType,
           })),
         );
         exerciseCount++;
@@ -305,6 +314,7 @@ export async function updateWorkoutBySession(sessionId: string) {
           .update(workoutExercises)
           .set({
             order: sessionExercise.order,
+            restTime: sessionExercise.restTime,
           })
           .where(eq(workoutExercises.id, workoutExerciseId));
         exerciseMap.delete(sessionExercise.exerciseId);
@@ -315,6 +325,7 @@ export async function updateWorkoutBySession(sessionId: string) {
           workoutId: workout.id,
           exerciseId: sessionExercise.exerciseId,
           order: sessionExercise.order,
+          restTime: sessionExercise.restTime,
         });
       }
       workoutSetsToAdd.push(
@@ -326,6 +337,7 @@ export async function updateWorkoutBySession(sessionId: string) {
               setNumber: s.setNumber,
               targetReps: s.reps,
               targetWeight: s.weight,
+              setType: s.setType,
             }) as WorkoutTypes.Set,
         ),
       );
@@ -372,17 +384,6 @@ export async function updateWorkoutBySession(sessionId: string) {
       await insertDeletedRows(rowsDeleted);
     }
   });
-}
-
-export async function updateSet(set: updateSetInput) {
-  await db
-    .update(sets)
-    .set({
-      setNumber: set.setNumber,
-      targetReps: set.targetReps,
-      targetWeight: set.targetWeight,
-    })
-    .where(eq(sets.id, set.id));
 }
 
 export async function deleteWorkout(id: string) {

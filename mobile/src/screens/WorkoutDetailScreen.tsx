@@ -20,8 +20,12 @@ import type { WorkoutById } from '../database/database.types'
 import type { UpdateWorkoutInput } from '../database/interfaces/workout.interface'
 import type { RootStackParamList } from '../../App'
 import { getExerciseByIdService } from '../services/exercises.service'
+import { createSessionService } from '../services/sessions.service'
 import { checkWorkoutNameExistsService, getWorkoutByIdService, updateWorkoutService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
+import { msToMmSs, formatDigitsToMmSs, parseMmSsToDigits, digitsToMs } from '../utils/formatRestTime'
+
+const DEFAULT_REST_MS = 120000
 
 type WorkoutDetailRouteProp = RouteProp<RootStackParamList, 'WorkoutDetail'>
 type WorkoutExerciseItem = NonNullable<WorkoutById>['workoutExercises'][number]
@@ -179,6 +183,7 @@ function WorkoutDetailScreen() {
                 exerciseId: nextExerciseFull.id,
                 exercise: nextExerciseFull,
                 order: target.order ?? 0,
+                restTime: DEFAULT_REST_MS,
                 isSynced: false,
                 sets: [
                   {
@@ -187,6 +192,7 @@ function WorkoutDetailScreen() {
                     setNumber: 1,
                     targetReps: 0,
                     targetWeight: 0,
+                    setType: null,
                     isSynced: false,
                   },
                 ],
@@ -210,6 +216,7 @@ function WorkoutDetailScreen() {
               exerciseId: nextExerciseFull.id,
               exercise: nextExerciseFull,
               order: nextOrder,
+              restTime: DEFAULT_REST_MS,
               isSynced: false,
               sets: [
                 {
@@ -218,6 +225,7 @@ function WorkoutDetailScreen() {
                   setNumber: 1,
                   targetReps: 0,
                   targetWeight: 0,
+                  setType: null,
                   isSynced: false,
                 },
               ],
@@ -277,6 +285,7 @@ function WorkoutDetailScreen() {
             setNumber: we.sets.length + 1,
             targetReps: last?.targetReps ?? 0,
             targetWeight: last?.targetWeight ?? 0,
+            setType: null,
             isSynced: false,
           }
           return { ...we, sets: [...we.sets, nextSet] }
@@ -326,6 +335,40 @@ function WorkoutDetailScreen() {
     },
     [draft, isReadOnly, setDraftAndDirty]
   )
+
+  const [editingRestForExerciseId, setEditingRestForExerciseId] = useState<string | null>(null)
+  const [restInputValue, setRestInputValue] = useState('')
+
+  const updateRestTime = useCallback(
+    (workoutExerciseId: string, newMs: number) => {
+      if (!draft || isReadOnly) return
+      const next = {
+        ...draft,
+        workoutExercises: draft.workoutExercises.map((we) =>
+          we.id === workoutExerciseId ? { ...we, restTime: newMs } : we
+        ),
+      }
+      setDraftAndDirty(next)
+    },
+    [draft, isReadOnly, setDraftAndDirty]
+  )
+
+  const handleRestFocus = useCallback((workoutExerciseId: string, currentMs: number) => {
+    setEditingRestForExerciseId(workoutExerciseId)
+    setRestInputValue(parseMmSsToDigits(msToMmSs(currentMs)))
+  }, [])
+
+  const handleRestBlur = useCallback(() => {
+    if (editingRestForExerciseId) {
+      const ms = digitsToMs(restInputValue)
+      updateRestTime(editingRestForExerciseId, ms)
+      setEditingRestForExerciseId(null)
+    }
+  }, [editingRestForExerciseId, restInputValue, updateRestTime])
+
+  const handleRestChange = useCallback((text: string) => {
+    setRestInputValue(text.replace(/\D/g, '').slice(-4))
+  }, [])
 
   const removeExercise = useCallback(
     (workoutExerciseId: string) => {
@@ -379,6 +422,7 @@ function WorkoutDetailScreen() {
           id: we.id,
           order: we.order,
           exerciseId: we.exerciseId,
+          restTime: we.restTime ?? DEFAULT_REST_MS,
           sets: we.sets.map((s) => ({
             id: s.id,
             setNumber: s.setNumber,
@@ -407,12 +451,16 @@ function WorkoutDetailScreen() {
   const handleCreateSession = async () => {
     if (!draft) return
     setCreatingSession(true)
-    Toast.show({
-      type: 'info',
-      text1: 'Offline mode',
-      text2: 'Starting session from workout will be available when session flow is wired to local.',
-    })
-    setCreatingSession(false)
+    try {
+      const newSession = await createSessionService('', draft.id)
+      if (!newSession) throw new Error('Failed to create session')
+      ;(navigation as any).navigate('SessionDetail', { id: newSession.id, initialSession: newSession })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start session'
+      Toast.show({ type: 'error', text1: 'Error', text2: message })
+    } finally {
+      setCreatingSession(false)
+    }
   }
 
   if (!draft && loading) {
@@ -550,14 +598,33 @@ function WorkoutDetailScreen() {
                     )}
                   </View>
 
-                  {(() => {
-                    const ex: any = workoutExercise.exercise as any
-                    const body = ex?.bodyPart?.name as string | undefined
-                    const equip = ex?.equipment?.name as string | undefined
-                    const meta = [body, equip].filter(Boolean).join(' · ')
-                    if (!meta) return null
-                    return <Text style={styles.exerciseMeta}>{meta}</Text>
-                  })()}
+                  <View style={styles.metaAndRestRow}>
+                    {(() => {
+                      const ex: any = workoutExercise.exercise as any
+                      const body = ex?.bodyPart?.name as string | undefined
+                      const equip = ex?.equipment?.name as string | undefined
+                      const meta = [body, equip].filter(Boolean).join(' · ')
+                      return meta ? <Text style={styles.exerciseMeta}>{meta}</Text> : <View style={styles.exerciseMetaSpacer} />
+                    })()}
+                    <View style={styles.restRow}>
+                      {isReadOnly ? (
+                        <Text style={styles.restValue}>
+                          {msToMmSs(workoutExercise.restTime ?? DEFAULT_REST_MS)}
+                        </Text>
+                      ) : (
+                        <TextInput
+                          style={styles.restInput}
+                          value={editingRestForExerciseId === workoutExercise.id ? formatDigitsToMmSs(restInputValue) : msToMmSs(workoutExercise.restTime ?? DEFAULT_REST_MS)}
+                          onChangeText={handleRestChange}
+                          onFocus={() => handleRestFocus(workoutExercise.id, workoutExercise.restTime ?? DEFAULT_REST_MS)}
+                          onBlur={handleRestBlur}
+                          placeholder="00:00"
+                          placeholderTextColor={colors.placeholder}
+                          keyboardType="number-pad"
+                        />
+                      )}
+                    </View>
+                  </View>
 
                   {workoutExercise.sets.length === 0 ? (
                     <Text style={styles.noSetsText}>No sets configured</Text>
@@ -904,7 +971,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: -10,
-    marginBottom: 12,
+    flex: 1,
+  },
+  exerciseMetaSpacer: {
+    flex: 1,
+  },
+  metaAndRestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 12,
   },
   exerciseActionButtons: {
     flexDirection: 'row',
@@ -912,6 +990,34 @@ const styles = StyleSheet.create({
   },
   exerciseActionButton: {
     padding: 6,
+  },
+  restRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  restLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  restValue: {
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+    minWidth: 72,
+  },
+  restInput: {
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    minWidth: 72,
+    textAlign: 'center',
   },
   noSetsText: {
     fontSize: 14,

@@ -89,6 +89,7 @@ export async function createSession(
           sessionId: newSessionId,
           exerciseId: we.exerciseId,
           order: we.order,
+          restTime: we.restTime,
         });
         newSessionSets.push(
           ...we.sets.map((set) => ({
@@ -97,6 +98,7 @@ export async function createSession(
             setNumber: set.setNumber,
             reps: set.targetReps,
             weight: set.targetWeight,
+            setType: set.setType,
           })),
         );
       }
@@ -130,6 +132,7 @@ export async function createSession(
           sessionId: newSessionId,
           exerciseId: se.exerciseId,
           order: se.order,
+          restTime: se.restTime,
         });
         newSessionSets.push(
           ...se.sessionSets.map((set) => ({
@@ -138,6 +141,7 @@ export async function createSession(
             setNumber: set.setNumber,
             reps: set.reps,
             weight: set.weight,
+            setType: set.setType,
           })),
         );
       }
@@ -200,6 +204,7 @@ export async function updateSession(
           .update(sessionExercises)
           .set({
             order: se.order,
+            restTime: se.restTime,
           })
           .where(eq(sessionExercises.id, se.id));
         existingExerciseIds.delete(se.exerciseId);
@@ -210,6 +215,7 @@ export async function updateSession(
           sessionId: session.id,
           exerciseId: se.exerciseId,
           order: se.order,
+          restTime: se.restTime,
         });
       }
       sessionSetsToAdd.push(...se.sessionSets!.map(s => ({
@@ -218,6 +224,7 @@ export async function updateSession(
         setNumber: s.setNumber,
         reps: s.reps,
         weight: s.weight,
+        setType: s.setType,
       })));
       exerciseCount++;
       setCount += se.sessionSets?.length ?? 0;

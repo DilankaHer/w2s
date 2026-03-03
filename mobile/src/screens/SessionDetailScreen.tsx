@@ -25,6 +25,9 @@ import type { RootStackParamList } from '../../App'
 import { createSessionService, deleteSessionService, getSessionByIdService, updateSessionService } from '../services/sessions.service'
 import { checkWorkoutNameExistsService, createWorkoutBySessionService, updateWorkoutBySessionService } from '../services/workouts.service'
 import { colors } from '../theme/colors'
+import { msToMmSs, formatDigitsToMmSs, parseMmSsToDigits, digitsToMs } from '../utils/formatRestTime'
+
+const DEFAULT_REST_MS = 120000
 
 type SessionDetailRouteProp = RouteProp<RootStackParamList, 'SessionDetail'>
 type SessionSetItem = NonNullable<SessionById>['sessionExercises'][number]['sessionSets'][number]
@@ -36,6 +39,7 @@ type UISessionExercise = {
   order: number
   exerciseName: string
   meta: string | null
+  restTime: number
   sets: UISessionSet[]
 }
 type UISession = {
@@ -102,6 +106,7 @@ function mapSharedToUi(shared: SessionById | null | undefined): UISession {
         order: se.order,
         exerciseName: se.exercise?.name ?? 'Exercise',
         meta,
+        restTime: se.restTime ?? DEFAULT_REST_MS,
         sets: (se.sessionSets ?? []).map((s) => ({
           ...s,
           isCompleted: completed ? true : false,
@@ -357,6 +362,60 @@ export default function SessionDetailScreen() {
     })
   }, [])
 
+  const [editingRestForExerciseId, setEditingRestForExerciseId] = useState<string | null>(null)
+  const [restInputValue, setRestInputValue] = useState('')
+
+  type ActiveRestTimer = { sessionExerciseId: string; sessionSetId: string; remainingMs: number }
+  const [activeRestTimer, setActiveRestTimer] = useState<ActiveRestTimer | null>(null)
+
+  const updateRestTime = useCallback((sessionExerciseId: string, newMs: number) => {
+    setSession((prev) => {
+      if (!prev || prev.completedAt) return prev
+      setDirty(true)
+      return {
+        ...prev,
+        sessionExercises: prev.sessionExercises.map((se) =>
+          se.id === sessionExerciseId ? { ...se, restTime: newMs } : se
+        ),
+      }
+    })
+  }, [])
+
+  const handleRestFocus = useCallback((sessionExerciseId: string, currentMs: number) => {
+    setEditingRestForExerciseId(sessionExerciseId)
+    setRestInputValue(parseMmSsToDigits(msToMmSs(currentMs)))
+  }, [])
+
+  const handleRestBlur = useCallback(() => {
+    if (editingRestForExerciseId) {
+      const ms = digitsToMs(restInputValue)
+      updateRestTime(editingRestForExerciseId, ms)
+      setEditingRestForExerciseId(null)
+    }
+  }, [editingRestForExerciseId, restInputValue, updateRestTime])
+
+  const handleRestChange = useCallback((text: string) => {
+    setRestInputValue(text.replace(/\D/g, '').slice(-4))
+  }, [])
+
+  useEffect(() => {
+    if (!activeRestTimer) return
+    const interval = setInterval(() => {
+      setActiveRestTimer((prev) => {
+        if (!prev) return null
+        const next = prev.remainingMs - 1000
+        return next <= 0 ? null : { ...prev, remainingMs: next }
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [activeRestTimer?.sessionExerciseId, activeRestTimer?.sessionSetId])
+
+  const adjustRestTimer = useCallback((deltaMs: number) => {
+    setActiveRestTimer((prev) =>
+      prev ? { ...prev, remainingMs: Math.max(0, prev.remainingMs + deltaMs) } : null
+    )
+  }, [])
+
   // Consume picker selection (add/replace exercise), then clear params.
   useFocusEffect(
     useCallback(() => {
@@ -395,6 +454,7 @@ export default function SessionDetailScreen() {
             order: target.order ?? 0,
             exerciseName: selectedExercise.name,
             meta: null,
+            restTime: DEFAULT_REST_MS,
             sets: [
               {
                 id: Crypto.randomUUID(),
@@ -425,6 +485,7 @@ export default function SessionDetailScreen() {
           order: nextOrder,
           exerciseName: selectedExercise.name,
           meta: null,
+          restTime: DEFAULT_REST_MS,
           sets: [
             {
               id: Crypto.randomUUID(),
@@ -457,6 +518,7 @@ export default function SessionDetailScreen() {
           sessionId: session.id,
           exerciseId: se.exerciseId,
           order: se.order,
+          restTime: se.restTime ?? DEFAULT_REST_MS,
           sessionSets: sets.map((s) => ({
             id: s.id,
             setNumber: s.setNumber,
@@ -713,7 +775,6 @@ export default function SessionDetailScreen() {
                 <Text style={styles.exerciseTitle}>
                   {se.order}. {se.exerciseName}
                 </Text>
-                {se.meta ? <Text style={styles.exerciseMeta}>{se.meta}</Text> : null}
               </View>
               {!isReadOnly ? (
                 <View style={styles.exerciseActionButtons}>
@@ -726,6 +787,30 @@ export default function SessionDetailScreen() {
                 </View>
               ) : null}
             </View>
+
+            {isReadOnly ? (
+              se.meta ? (
+                <View style={styles.metaOnlyRow}>
+                  <Text style={styles.exerciseMeta}>{se.meta}</Text>
+                </View>
+              ) : null
+            ) : (
+              <View style={styles.metaAndRestRow}>
+                {se.meta ? <Text style={styles.exerciseMeta}>{se.meta}</Text> : <View style={styles.exerciseMetaSpacer} />}
+                <View style={styles.restRow}>
+                  <TextInput
+                    style={styles.restInput}
+                    value={editingRestForExerciseId === se.id ? formatDigitsToMmSs(restInputValue) : msToMmSs(se.restTime ?? DEFAULT_REST_MS)}
+                    onChangeText={handleRestChange}
+                    onFocus={() => handleRestFocus(se.id, se.restTime ?? DEFAULT_REST_MS)}
+                    onBlur={handleRestBlur}
+                    placeholder="00:00"
+                    placeholderTextColor={colors.placeholder}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+            )}
 
             <View style={styles.setsContainer}>
               <View style={styles.tableHeader}>
@@ -784,7 +869,24 @@ export default function SessionDetailScreen() {
                           completed && styles.checkboxChecked,
                           !canComplete && !completed && styles.checkboxDisabled,
                         ]}
-                        onPress={() => toggleSetComplete(se.id, s.id)}
+                        onPress={() => {
+                          const completing = !completed && canComplete
+                          const noSetsLeftAfterThis = completedSetsCount + 1 >= totalSets
+                          toggleSetComplete(se.id, s.id)
+                          if (completing && !noSetsLeftAfterThis) {
+                            setActiveRestTimer({
+                              sessionExerciseId: se.id,
+                              sessionSetId: s.id,
+                              remainingMs: se.restTime ?? DEFAULT_REST_MS,
+                            })
+                          } else if (completing && noSetsLeftAfterThis) {
+                            setActiveRestTimer(null)
+                          } else if (completed) {
+                            setActiveRestTimer((prev) =>
+                              prev && prev.sessionExerciseId === se.id && prev.sessionSetId === s.id ? null : prev
+                            )
+                          }
+                        }}
                         disabled={!!session.completedAt || (!canComplete && !completed)}
                       >
                         {completed ? <Ionicons name="checkmark" size={16} color={colors.primaryText} /> : null}
@@ -796,25 +898,55 @@ export default function SessionDetailScreen() {
                 </View>
               )
 
-              if (!isReadOnly && se.sets.length > 1) {
-                return (
-                  <Swipeable
-                    key={s.id}
-                    renderRightActions={() => (
-                      <TouchableOpacity style={styles.swipeDelete} onPress={() => removeSet(se.id, s.id)}>
-                        <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
-                        <Text style={styles.swipeDeleteText}>Delete</Text>
-                      </TouchableOpacity>
-                    )}
-                    friction={2}
-                    rightThreshold={40}
-                  >
-                    {row}
-                  </Swipeable>
-                )
-              }
+              const showRestTimer =
+                !session.completedAt &&
+                hasIncompleteSets &&
+                activeRestTimer?.sessionExerciseId === se.id &&
+                activeRestTimer?.sessionSetId === s.id
 
-              return <View key={s.id}>{row}</View>
+              const setRowWithTimer = (
+                <View key={s.id}>
+                  {!isReadOnly && se.sets.length > 1 ? (
+                    <Swipeable
+                      renderRightActions={() => (
+                        <TouchableOpacity style={styles.swipeDelete} onPress={() => removeSet(se.id, s.id)}>
+                          <Ionicons name="trash-outline" size={20} color={colors.primaryText} />
+                          <Text style={styles.swipeDeleteText}>Delete</Text>
+                        </TouchableOpacity>
+                      )}
+                      friction={2}
+                      rightThreshold={40}
+                    >
+                      {row}
+                    </Swipeable>
+                  ) : (
+                    row
+                  )}
+                  {showRestTimer && activeRestTimer ? (
+                    <View style={styles.restTimerRow}>
+                      <Text style={styles.restTimerLabel}>
+                        {msToMmSs(activeRestTimer.remainingMs)}
+                      </Text>
+                      <View style={styles.restTimerButtons}>
+                        <TouchableOpacity
+                          style={styles.restTimerButton}
+                          onPress={() => adjustRestTimer(-15000)}
+                        >
+                          <Text style={styles.restTimerButtonText}>-15s</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.restTimerButton}
+                          onPress={() => adjustRestTimer(15000)}
+                        >
+                          <Text style={styles.restTimerButtonText}>+15s</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              )
+
+              return setRowWithTimer
             })}
 
               {!isReadOnly ? (
@@ -924,9 +1056,81 @@ const styles = StyleSheet.create({
   exerciseCard: { backgroundColor: colors.card, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
   exerciseHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
   exerciseTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 4 },
-  exerciseMeta: { fontSize: 13, color: colors.textSecondary, marginBottom: 0 },
+  exerciseMeta: { fontSize: 13, color: colors.textSecondary, flex: 1 },
+  exerciseMetaSpacer: { flex: 1 },
+  metaOnlyRow: { marginTop: 4, marginBottom: 8 },
+  metaAndRestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 12,
+  },
   exerciseActionButtons: { flexDirection: 'row', gap: 8 },
   exerciseActionButton: { padding: 6 },
+  restRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  restLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  restValue: {
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+    minWidth: 72,
+  },
+  restInput: {
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    minWidth: 72,
+    textAlign: 'center',
+  },
+  restTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginBottom: 4,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  restTimerLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  restTimerButtons: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  restTimerButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 0,
+    borderWidth: 0,
+  },
+  restTimerButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.accentText,
+  },
   setsContainer: { marginTop: 0 },
   setRowInvalid: {
     borderTopWidth: 1,

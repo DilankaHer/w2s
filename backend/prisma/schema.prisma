@@ -91,6 +91,7 @@ model WorkoutExercise {
   workoutId  String
   exerciseId String
   order      Int
+  restTime   Int @default(120000)
   userId     String?
 
   workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
@@ -110,6 +111,7 @@ model Set {
   targetReps        Int
   targetWeight      Float
   userId            String?
+  setType           String?
 
   workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
   user            User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -146,6 +148,7 @@ model SessionExercise {
   sessionId  String
   exerciseId String
   order      Int
+  restTime   Int @default(120000)
 
   exercise    Exercise     @relation(fields: [exerciseId], references: [id])
   sessionSets SessionSet[]
@@ -163,6 +166,7 @@ model SessionSet {
   setNumber         Int
   reps              Int
   weight            Float
+  setType           String?
 
   sessionExercise SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
 

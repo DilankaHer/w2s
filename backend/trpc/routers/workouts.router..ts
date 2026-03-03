@@ -47,12 +47,14 @@ export const workoutsRouter = router({
         update: {
           exerciseId: workoutExercise.exerciseId,
           order: workoutExercise.order,
+          restTime: workoutExercise.restTime,
         },
         create: {
           id: workoutExercise.id,
           workoutId: workoutExercise.workoutId,
           exerciseId: workoutExercise.exerciseId,
           order: workoutExercise.order,
+          restTime: workoutExercise.restTime,
           userId: ctx.user.userId,
         },
       });
@@ -66,6 +68,7 @@ export const workoutsRouter = router({
           setNumber: set.setNumber,
           targetReps: set.targetReps,
           targetWeight: set.targetWeight,
+          setType: set.setType,
         },
         create: {
           id: set.id,
@@ -74,6 +77,7 @@ export const workoutsRouter = router({
           targetReps: set.targetReps,
           targetWeight: set.targetWeight,
           userId: ctx.user.userId,
+          setType: set.setType,
         },
       });
     }

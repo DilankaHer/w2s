@@ -46,12 +46,14 @@ export const sessionsRouter = router({
                   id: se.id,
                   exerciseId: se.exerciseId,
                   order: se.order,
+                  restTime: se.restTime,
                   sessionSets: {
                     create: se.sessionSets.map((set) => ({
                       id: set.id,
                       setNumber: set.setNumber,
                       reps: set.reps,
                       weight: set.weight,
+                      setType: set.setType,
                     })),
                   },
                 })),

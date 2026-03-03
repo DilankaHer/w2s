@@ -14,6 +14,7 @@ const WorkoutExerciseSchema = z.object({
     id: z.string(),
     workoutId: z.string(),
     order: z.number(),
+    restTime: z.number().optional(),
     exerciseId: z.string(),
     isSynced: z.boolean().optional(),
 });
@@ -24,6 +25,7 @@ const SetSchema = z.object({
     targetReps: z.number(),
     targetWeight: z.number(),
     workoutExerciseId: z.string(),
+    setType: z.string().nullable().optional(),
     isSynced: z.boolean().optional(),
 });
 

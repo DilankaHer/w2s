@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import {
   createNavigationContainerRef,
+  DefaultTheme,
   NavigationContainer,
   useNavigation,
 } from '@react-navigation/native'
@@ -302,6 +303,10 @@ function MainTabs() {
 }
 
 const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+    backgroundColor: colors.screen,
+  },
   addButtonWrapper: {
     flex: 1,
     justifyContent: 'center',
@@ -322,6 +327,14 @@ const styles = StyleSheet.create({
   },
 })
 
+const navTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: colors.screen,
+  },
+}
+
 const stackScreenOptions = {
   animation: 'slide_from_right' as const,
   headerStyle: {
@@ -332,6 +345,7 @@ const stackScreenOptions = {
     fontWeight: 'bold' as const,
   },
   contentStyle: { backgroundColor: colors.screen, padding: 16, paddingBottom: 30 },
+  cardStyle: { backgroundColor: colors.screen },
 }
 
 function SplashScreen() {
@@ -448,9 +462,9 @@ function App() {
   }, [])
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <NavigationContainer ref={navigationRef}>
+    <GestureHandlerRootView style={styles.appRoot}>
+      <SafeAreaProvider style={{ backgroundColor: colors.screen }}>
+        <NavigationContainer ref={navigationRef} theme={navTheme}>
           <StatusBar style="light" />
           <RootNavigator />
           <Toast visibilityTime={3000} />

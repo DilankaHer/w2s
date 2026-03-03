@@ -12,6 +12,9 @@ import m0007 from './0007_puzzling_blindfold.sql';
 import m0008 from './0008_vengeful_emma_frost.sql';
 import m0009 from './0009_fresh_stone_men.sql';
 import m0010 from './0010_orange_mister_sinister.sql';
+import m0011 from './0011_eager_dormammu.sql';
+import m0012 from './0012_flimsy_madrox.sql';
+import m0013 from './0013_lucky_hemingway.sql';
 
   export default {
     journal,
@@ -26,7 +29,10 @@ m0006,
 m0007,
 m0008,
 m0009,
-m0010
+m0010,
+m0011,
+m0012,
+m0013
     }
   }
   

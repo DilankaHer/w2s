@@ -20,6 +20,7 @@ const SessionExerciseSchema = z.object({
     sessionId: z.string(),
     exerciseId: z.string(),
     order: z.number(),
+    restTime: z.number().optional(),
     isSynced: z.boolean().optional(),
 });
 
@@ -29,6 +30,7 @@ const SessionSetSchema = z.object({
     setNumber: z.number(),
     reps: z.number(),
     weight: z.number(),
+    setType: z.string().nullable().optional(),
     isSynced: z.boolean().optional(),
 });
 
@@ -37,6 +39,7 @@ const SessionExercisesSchemaToSync = z.object({
     sessionId: z.string(),
     exerciseId: z.string(),
     order: z.number(),
+    restTime: z.number().optional(),
     isSynced: z.boolean().optional(),
     sessionSets: z.array(SessionSetSchema),
 });

@@ -7,10 +7,13 @@ export interface CreateWorkoutInput {
   exercises: {
     exerciseId: string;
     order: number;
+    restTime: number;
     sets: {
       setNumber: number;
       targetReps: number;
       targetWeight: number;
+      setType: string | null;
+      restTime: number;
     }[];
   }[];
 }
@@ -21,14 +24,8 @@ export interface UpdateWorkoutInput {
   workoutExercises: {
     id: string;
     order: number;
+    restTime: number;
     exerciseId: string;
     sets: Set[];
   }[];
-}
-
-export interface updateSetInput {
-  id: string;
-  setNumber: number;
-  targetReps: number;
-  targetWeight: number;
 }

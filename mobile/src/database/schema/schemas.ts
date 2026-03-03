@@ -82,6 +82,7 @@ export const workoutExercises = sqliteTable('workoutexercises', {
   workoutId: text('workout_id').notNull().references(() => workouts.id, { onDelete: 'cascade' }),
   exerciseId: text('exercise_id').notNull().references(() => exercises.id, { onDelete: 'restrict' }),
   order: integer('order').notNull(),
+  restTime: integer('rest_time').notNull().default(120000),
   isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false)
 }, (table) => ({
   uniqueWorkoutExercise: uniqueIndex('workoutexercises_unique')
@@ -99,6 +100,7 @@ export const sets = sqliteTable('sets', {
   setNumber: integer('set_number').notNull(),
   targetReps: integer('target_reps').notNull(),
   targetWeight: integer('target_weight').notNull(),
+  setType: text('set_type'),
   isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false)
 }, (table) => ({
   uniqueSet: uniqueIndex('sets_unique')
@@ -136,6 +138,7 @@ export const sessionExercises = sqliteTable('sessionexercises', {
   sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   exerciseId: text('exercise_id').notNull().references(() => exercises.id, { onDelete: 'restrict' }),
   order: integer('order').notNull(),
+  restTime: integer('rest_time').notNull().default(120000),
   isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false)
 }, (table) => ({
   uniqueSessionExercise: uniqueIndex('sessionexercises_unique')
@@ -153,6 +156,7 @@ export const sessionSets = sqliteTable('sessionsets', {
   setNumber: integer('set_number').notNull(),
   reps: integer('reps').notNull(),
   weight: real('weight').notNull(),
+  setType: text('set_type'),
   isSynced: integer('is_synced', { mode: 'boolean' }).notNull().default(false)
 }, (table) => ({
   uniqueSessionSet: uniqueIndex('sessionsets_unique')

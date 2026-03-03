@@ -23,8 +23,11 @@ import type { Exercises } from '../database/database.types'
 import type { CreateWorkoutInput } from '../database/interfaces/workout.interface'
 import { getExercisesService } from '../services/exercises.service'
 import { checkWorkoutNameExistsService, createWorkoutService } from '../services/workouts.service'
+import { msToMmSs, formatDigitsToMmSs, parseMmSsToDigits, digitsToMs } from '../utils/formatRestTime'
 
 type CreateWorkoutRouteProp = RouteProp<RootStackParamList, 'CreateWorkout'>
+
+const DEFAULT_REST_MS = 120000
 
 interface Set {
   setNumber: number
@@ -35,6 +38,7 @@ interface Set {
 interface WorkoutExercise {
   id: string
   order: number
+  restTime: number
   sets: Set[]
 }
 
@@ -52,6 +56,8 @@ function CreateWorkoutScreen() {
   const [exercises, setExercises] = useState<Exercises>([])
   const [workoutNameExists, setWorkoutNameExists] = useState(false)
   const [checkingWorkoutName, setCheckingWorkoutName] = useState(false)
+  const [editingRestForExerciseId, setEditingRestForExerciseId] = useState<string | null>(null)
+  const [restInputValue, setRestInputValue] = useState('')
 
   useEffect(() => {
     let active = true
@@ -119,7 +125,7 @@ function CreateWorkoutScreen() {
       if (isReplace) {
         setWorkoutExercises((prev) =>
           prev.map((ex) =>
-            ex.id === replacingId ? { ...ex, id: selectedId } : ex
+            ex.id === replacingId ? { ...ex, id: selectedId, restTime: ex.restTime ?? DEFAULT_REST_MS } : ex
           )
         )
       } else {
@@ -182,6 +188,7 @@ function CreateWorkoutScreen() {
       const newExercise: WorkoutExercise = {
         id: exercise.id,
         order: newOrder,
+        restTime: DEFAULT_REST_MS,
         sets: [
           {
             setNumber: 1,
@@ -222,6 +229,29 @@ function CreateWorkoutScreen() {
       .map((ex, index) => ({ ...ex, order: index + 1 }))
     setWorkoutExercises(updated)
   }
+
+  const updateRestTime = useCallback((exerciseId: string, newMs: number) => {
+    setWorkoutExercises((prev) =>
+      prev.map((ex) => (ex.id === exerciseId ? { ...ex, restTime: newMs } : ex))
+    )
+  }, [])
+
+  const handleRestFocus = useCallback((exerciseId: string, currentMs: number) => {
+    setEditingRestForExerciseId(exerciseId)
+    setRestInputValue(parseMmSsToDigits(msToMmSs(currentMs)))
+  }, [])
+
+  const handleRestBlur = useCallback(() => {
+    if (editingRestForExerciseId) {
+      const ms = digitsToMs(restInputValue)
+      updateRestTime(editingRestForExerciseId, ms)
+      setEditingRestForExerciseId(null)
+    }
+  }, [editingRestForExerciseId, restInputValue, updateRestTime])
+
+  const handleRestChange = useCallback((text: string) => {
+    setRestInputValue(text.replace(/\D/g, '').slice(-4))
+  }, [])
 
   const addSet = (exerciseId: string) => {
     setWorkoutExercises(
@@ -308,10 +338,13 @@ function CreateWorkoutScreen() {
         exercises: workoutExercises.map((ex) => ({
           exerciseId: ex.id,
           order: ex.order,
+          restTime: ex.restTime ?? DEFAULT_REST_MS,
           sets: ex.sets.map((set) => ({
             setNumber: set.setNumber,
             targetReps: set.targetReps,
             targetWeight: set.targetWeight,
+            setType: null,
+            restTime: ex.restTime ?? DEFAULT_REST_MS,
           })),
         })),
       }
@@ -334,6 +367,14 @@ function CreateWorkoutScreen() {
 
   const getExerciseName = (exerciseId: string) => {
     return exercises?.find((e) => e.id === exerciseId)?.name || 'Unknown'
+  }
+
+  const getExerciseMeta = (exerciseId: string) => {
+    const ex = exercises?.find((e) => e.id === exerciseId) as { bodyPart?: { name: string } | null; equipment?: { name: string } | null } | undefined
+    const body = ex?.bodyPart?.name
+    const equip = ex?.equipment?.name
+    const meta = [body, equip].filter(Boolean).join(' · ')
+    return meta || null
   }
 
   const areAllSetsFilled = () => {
@@ -409,6 +450,23 @@ function CreateWorkoutScreen() {
                         <Ionicons name="trash-outline" size={20} color={colors.error} />
                       </TouchableOpacity>
                     </View>
+                  </View>
+
+                  <View style={styles.metaAndRestRow}>
+                    {(() => {
+                      const meta = getExerciseMeta(workoutExercise.id)
+                      return meta ? <Text style={styles.exerciseMeta}>{meta}</Text> : <View style={styles.exerciseMetaSpacer} />
+                    })()}
+                    <TextInput
+                      style={styles.restInput}
+                      value={editingRestForExerciseId === workoutExercise.id ? formatDigitsToMmSs(restInputValue) : msToMmSs(workoutExercise.restTime ?? DEFAULT_REST_MS)}
+                      onChangeText={handleRestChange}
+                      onFocus={() => handleRestFocus(workoutExercise.id, workoutExercise.restTime ?? DEFAULT_REST_MS)}
+                      onBlur={handleRestBlur}
+                      placeholder="00:00"
+                      placeholderTextColor={colors.placeholder}
+                      keyboardType="number-pad"
+                    />
                   </View>
 
                   {workoutExercise.sets.length === 0 ? (
@@ -715,6 +773,34 @@ const styles = StyleSheet.create({
   },
   exerciseActionButton: {
     padding: 6,
+  },
+  exerciseMeta: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  exerciseMetaSpacer: {
+    flex: 1,
+  },
+  metaAndRestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 12,
+  },
+  restInput: {
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    minWidth: 72,
+    textAlign: 'center',
   },
   noSetsText: {
     fontSize: 14,
